@@ -423,8 +423,8 @@ O manual fechou as antigas decisões 5 (regra dos efeitos) e 6 (recompensa por e
 
 5. **DON!! do oponente:** o manual só fala em mão e Vida. O motor trata os DON!! do mesmo jeito ("your opponent
    returns 1 DON!!" vale para cada oponente). Mantém, ou nesses efeitos quem usa escolhe um oponente só?
-6. **Counter de quem está de fora:** a vez dele só abre quando ele tem um Evento [Counter] que pode pagar (o jogo
-   anda, mas a pausa revela que ele tem um). A alternativa é abrir sempre para os três, em todo ataque.
+6. **Counter de quem está de fora:** *decidido (22/11/2026): só quem foi atacado usa Counter por enquanto; a regra
+   do manual fica no motor, desligada (`TableRules.bystanderCounter`).*
 7. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos? *Implementado: quem cria a
    mesa online escolhe se põe bots nos lugares vagos.*
 

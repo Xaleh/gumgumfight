@@ -501,8 +501,8 @@ Os bots jogam com decks prontos montados do mesmo jeito.
 **Na mesa:** os oponentes ficam em painéis no alto, com tudo o que é público (Líder, Vida, mão, DON!!, deck,
 descarte, Personagens, Stage e, no online, o relógio e quem está desconectado); a sua mesa fica embaixo, e ao lado
 vêm a ordem dos turnos, o registro e a carta em destaque. Tudo é por clique: toque numa carta da mão para jogar,
-numa carta sua em campo para atacar, dar DON!! ou ativar; ao atacar, os alvos válidos acendem nas três mesas. Quando
-outro jogador é atacado e você tem um Evento [Counter] que pode pagar, a faixa do meio abre a sua vez de usá-lo.
+numa carta sua em campo para atacar, dar DON!! ou ativar; ao atacar, os alvos válidos acendem nas três mesas. Só quem foi
+atacado usa Counter (o manual também deixa os outros usarem Evento [Counter]; por ora isso fica desligado).
 **No celular**, os oponentes viram abas e o registro e a carta abrem em gavetas.
 
 O que ainda **não** tem: espectadores, replay, chat e avisos no celular na mesa online; arrastar cartas, animações e

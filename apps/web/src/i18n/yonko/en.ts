@@ -39,7 +39,7 @@ const yonko = {
   'yonko.howEffects': 'Effects on "your opponent"',
   'yonko.howTarget': 'Targets on the field: any legal target any opponent controls.',
   'yonko.howEach': 'An opponent’s hand, Life and DON!!: applies to each opponent. Continuous effects apply to all of them.',
-  'yonko.howCounter': 'Counter values and [Blocker] belong to the attacked player only; players outside the battle may use [Counter] Events.',
+  'yonko.howCounter': 'Counter and [Blocker] are only for the attacked player.',
   'yonko.howWin': 'How to win',
   'yonko.howWinText': 'A player whose Leader takes damage with no Life left, or who runs out of deck, leaves the table and their cards leave the game. The last one left wins; the others place 2nd, 3rd and 4th in the order they fell.',
   'yonko.start': 'Start the table',

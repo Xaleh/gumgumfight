@@ -31,7 +31,7 @@ O formato: quatro capitães, todos contra todos, deck de 60 cartas sem repetiç�
 |---|---|---|
 | 1 | Efeito que mira Personagens/Stages "do oponente" pode mirar **qualquer alvo legal de qualquer oponente**. | `targetCandidates`: `side: 'opponent'` junta as cartas de todos os oponentes. "Up to 2" pode pegar alvos de oponentes diferentes. Vale também na batalha. |
 | 2 | Efeito que dura "até o fim do turno do seu oponente" passa a durar **até o começo do seu turno**. | `setExpiry`: a duração `nextOpponentTurn` acaba quando o turno de quem usou o efeito recomeça. |
-| 3 | Não se pode descartar carta para dar Counter à defesa de outro, nem bloquear ataque que não é contra você. **Mas** quem está de fora pode jogar Evento [Counter] para usar a parte que afeta Personagens de oponentes (exemplo do Punk Gibson). | O valor de Counter e o [Blocker] são só do defensor. Na etapa de Counter, os outros oponentes do atacante podem usar Eventos [Counter] (`counter` com `bystander`), antes do defensor. |
+| 3 | Não se pode descartar carta para dar Counter à defesa de outro, nem bloquear ataque que não é contra você. **Mas** quem está de fora pode jogar Evento [Counter] para usar a parte que afeta Personagens de oponentes (exemplo do Punk Gibson). | O valor de Counter e o [Blocker] são só do defensor. **Por decisão da casa, hoje só o defensor usa Counter**, Evento incluído: a parte do manual que deixa quem está de fora jogar Evento [Counter] fica desligada (`TableRules.bystanderCounter`). Ligada, os outros oponentes do atacante usam Eventos [Counter] antes do defensor (`counter` com `bystander`). |
 | 4 | Cartas que reagem ao **ataque ou ao bloqueio de um oponente** disparam mesmo que você não seja o atacante nem o defensor (exemplo do Luffy da ST10). | [On Your Opponent's Attack] dispara para todos os oponentes do atacante; "When your opponent activates a [Blocker]" já valia para qualquer oponente. |
 | 5 | Efeito sobre "os Personagens do oponente" (Foxy de custo 7, Shanks da OP09) vale para **todos os Personagens de todos os oponentes**. | As auras `side: 'opponent'` e os alvos com `all` alcançam todos os oponentes. |
 | 6 | Efeito que mexe na **mão ou na Vida** do oponente vale para os oponentes que são alvo legal. Exemplos: Linlin de custo 10 tira 1 Vida de cada um; Linlin de custo 7 pergunta a cada um; Law de custo 4 só descarta de quem tem 7 ou mais cartas; Pudding faz todos devolverem a mão e comprarem 5. | `eachOpponent`: o passo roda uma vez contra cada oponente, na ordem dos turnos, e a condição do passo é conferida contra cada um. |
@@ -48,10 +48,10 @@ Decisões tomadas para o motor funcionar. Todas fáceis de mudar; as três prime
    jeito tudo o que não é alvo em campo: DON!! ("your opponent returns 1 DON!!", "rest up to 1 of your opponent's
    DON!! cards"), deck e descarte do oponente valem para **cada** oponente. Isso deixa cartas como o Magellan
    (OP02-085) três vezes mais fortes numa mesa de 4. A alternativa seria quem usa o efeito escolher um oponente.
-2. **Counter de quem está de fora: ordem e aviso.** O manual não diz a ordem. No motor, os de fora respondem
-   primeiro (na ordem dos turnos) e o defensor decide por último, sabendo o que os outros fizeram. E a vez de quem
-   está de fora **só abre se ele tem um Evento [Counter] que pode pagar**: senão cada ataque esperaria três
-   jogadores. O custo é que a pausa revela à mesa que ele tem um Evento desses na mão.
+2. **Counter de quem está de fora: desligado.** Decisão da casa (22/11/2026): por ora só quem foi atacado usa
+   Counter, ao contrário do manual. O código da regra do manual continua no motor, atrás de
+   `TableRules.bystanderCounter`: ligado, os de fora respondem primeiro (na ordem dos turnos) e o defensor por
+   último, e a vez de quem está de fora só abre se ele tem um Evento [Counter] que pode pagar.
 3. **Eliminação.** O manual não descreve. No motor: dano no Líder sem Vida, deck vazio, desistência ou tempo
    esgotado tiram o jogador da mesa; as cartas dele saem do jogo, os efeitos dele acabam e a mesa segue; o último
    de pé vence. **Sem recompensa por eliminação** (o manual não tem); `TableRules.eliminationDraw` existe como

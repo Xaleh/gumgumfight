@@ -39,7 +39,7 @@ const yonkoPtBR = {
   'yonko.howEffects': 'Efeitos em "seu oponente"',
   'yonko.howTarget': 'Alvo em campo: qualquer alvo legal de qualquer oponente.',
   'yonko.howEach': 'Mão, Vida e DON!! do oponente: vale para cada oponente. Efeitos contínuos valem para todos.',
-  'yonko.howCounter': 'Valor de Counter e [Blocker] são só de quem foi atacado; quem está de fora pode usar Evento [Counter].',
+  'yonko.howCounter': 'Counter e [Blocker] são só de quem foi atacado.',
   'yonko.howWin': 'Como se vence',
   'yonko.howWinText': 'Quem leva dano no Líder sem Vida, ou fica sem deck, sai da mesa e as cartas dele saem do jogo. O último que sobrar vence; os outros ficam em 2º, 3º e 4º pela ordem de queda.',
   'yonko.start': 'Começar a mesa',

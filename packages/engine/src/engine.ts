@@ -2815,10 +2815,11 @@ function stepBattle(state: GameState) {
     }
 
     case 'counter': {
-      // Mesa com mais de dois: antes do defensor, os outros oponentes do atacante podem usar Eventos
-      // [Counter] (não o valor de Counter das cartas, nem [Blocker]: isso é só de quem foi atacado). A
-      // vez de cada um só abre se ele tem um Evento que pode pagar; o defensor decide por último.
-      if (isMultiplayer(state)) {
+      // Mesa com mais de dois e `bystanderCounter` ligado: antes do defensor, os outros oponentes do
+      // atacante podem usar Eventos [Counter] (não o valor de Counter das cartas, nem [Blocker]: isso é só
+      // de quem foi atacado). A vez de cada um só abre se ele tem um Evento que pode pagar; o defensor
+      // decide por último. Desligado (o padrão), só quem foi atacado usa Counter.
+      if (isMultiplayer(state) && state.table?.bystanderCounter) {
         b.bystanders ??= opponentsOf(state, attackerOwner).filter((id) => id !== defender);
         while (b.bystanders.length) {
           const options = bystanderCounterOptions(state, b.bystanders[0]);

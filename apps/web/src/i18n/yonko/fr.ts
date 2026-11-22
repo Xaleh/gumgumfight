@@ -39,7 +39,7 @@ const yonko = {
   'yonko.howEffects': 'Effets sur « votre adversaire »',
   'yonko.howTarget': 'Cible sur le terrain : n’importe quelle cible légale de n’importe quel adversaire.',
   'yonko.howEach': 'Main, Vie et DON!! de l’adversaire : s’applique à chaque adversaire. Les effets continus valent pour tous.',
-  'yonko.howCounter': 'La valeur de Counter et [Blocker] sont réservés au joueur attaqué ; les autres peuvent jouer des Événements [Counter].',
+  'yonko.howCounter': 'Counter et [Blocker] sont réservés au joueur attaqué.',
   'yonko.howWin': 'Comment gagner',
   'yonko.howWinText': 'Un joueur dont le Leader subit des dégâts sans Vie, ou qui n’a plus de deck, quitte la table et ses cartes quittent la partie. Le dernier restant gagne ; les autres finissent 2e, 3e et 4e dans l’ordre de leur chute.',
   'yonko.start': 'Lancer la table',

@@ -1733,6 +1733,11 @@ export interface TableRules {
   curveChoice?: boolean;
   /** Cartas que compra quem dá o golpe final num oponente (regra da casa; o manual não tem recompensa). */
   eliminationDraw?: number;
+  /**
+   * Quem está fora da batalha também pode usar Evento [Counter] (o manual permite). Desligado (padrão da casa),
+   * só quem foi atacado usa Counter.
+   */
+  bystanderCounter?: boolean;
 }
 
 export interface GameConfig {

@@ -350,10 +350,10 @@ nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`
   empilha herdam o oponente (`vs` nos passos, `focus` no frame). `opponentOf(state, p)` devolve o oponente fixado
   (`fixedOpponent`: a cópia em execução, o `focus` do frame ou o único oponente vivo).
 - **Condições**: `conditionHolds` sem oponente fixado vale se algum oponente cumpre (`anyOpponent`).
-- **Batalha**: o defensor é o dono do alvo atual. Em `stepBattle`, a etapa de Counter percorre `battle.bystanders`
-  (os oponentes do atacante que não são o defensor) antes do defensor: abre `counter` com `bystander` para quem tem
-  Evento [Counter] pagável (`bystanderCounterOptions`). [On Your Opponent's Attack] é empilhado para todos os
-  oponentes do atacante.
+- **Batalha**: o defensor é o dono do alvo atual. Só ele usa Counter. Com `TableRules.bystanderCounter` (desligado
+  por padrão), `stepBattle` percorre antes `battle.bystanders` (os oponentes do atacante que não são o defensor) e
+  abre `counter` com `bystander` para quem tem Evento [Counter] pagável (`bystanderCounterOptions`). [On Your
+  Opponent's Attack] é empilhado para todos os oponentes do atacante.
 - **Durações**: `setExpiry` (em `addModifier`, `restrict`, `negateOnPlay`). Na mesa, `untilTurn` fica em `FAR_TURN` e
   `untilStartOf`/`untilEndOf` dizem de quem é o turno que encerra o efeito; `turnExpiries`, no começo de cada turno,
   remove os primeiros e converte os segundos no número do turno em curso.

@@ -564,8 +564,20 @@ describe('Yonko: condições sobre "o oponente" (basta um)', () => {
 });
 
 describe('Yonko: quem está fora da batalha', () => {
-  it('pode usar Evento [Counter] (e os efeitos dele alcançam qualquer oponente), mas não o valor de Counter', () => {
+  it('por padrão, só quem foi atacado usa Counter', () => {
     let s = toTurn(ready(), 5);
+    fetchToHand(s, 1, PUNK_GIBSON);
+    fetchToHand(s, 3, PUNK_GIBSON);
+    s.players[1].donActive = 2;
+    s.players[3].donActive = 2;
+    s = applyAction(s, { type: 'attack', player: 0, attacker: leaderOf(s, 0), target: leaderOf(s, 2) });
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 2 });
+    expect(s.pending).not.toHaveProperty('bystander');
+    expect(s.battle).not.toHaveProperty('bystanders');
+  });
+
+  it('com `bystanderCounter`: pode usar Evento [Counter] (e os efeitos dele alcançam qualquer oponente), mas não o valor de Counter', () => {
+    let s = toTurn(ready({ rules: { ...YONKO_TABLE, bystanderCounter: true } }), 5);
     const gibson = fetchToHand(s, 1, PUNK_GIBSON);
     s.players[1].donActive = 2;
     s.players[3].hand = s.players[3].hand.filter((u) => s.cards[u].cardId !== PUNK_GIBSON);
@@ -591,8 +603,8 @@ describe('Yonko: quem está fora da batalha', () => {
     expect(s.battle).toMatchObject({ bystanders: [] });
   });
 
-  it('pode passar: a vez vai para o próximo de fora e, por último, para o defensor', () => {
-    let s = toTurn(ready(), 5);
+  it('com `bystanderCounter`, pode passar: a vez vai para o próximo de fora e, por último, para o defensor', () => {
+    let s = toTurn(ready({ rules: { ...YONKO_TABLE, bystanderCounter: true } }), 5);
     const first = fetchToHand(s, 1, PUNK_GIBSON);
     const second = fetchToHand(s, 3, PUNK_GIBSON);
     s.players[1].donActive = 2;
