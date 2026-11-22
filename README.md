@@ -287,7 +287,8 @@ boosters que o jogador abre na hora.
 
 1. **Escolha a coleção e abra 6 boosters.** Cada booster tem 12 cartas, com as vagas e as taxas do booster daquela
    linha de produto (veja [Os boosters](#os-boosters)); a tela mostra a composição e as chances da coleção marcada. Dá
-   para abrir um por vez ou todos de uma vez.
+   para abrir um por vez ou todos de uma vez, **em qualquer ordem**: um clique num booster fechado o seleciona e o
+   segundo clique abre (o duplo clique também); o botão "Abrir" abre o selecionado ou, sem seleção, o próximo.
 2. **Monte um deck de 40 cartas** com o que saiu. Vale **qualquer cor com qualquer Líder**, não há limite de cópias
    (vale o que você abriu) e **não há lista de banidas, pares proibidos nem rotação**. **Montar sozinho** preenche um
    deck jogável (curva de custo, Counters e alguns Eventos). O deck é salvo sozinho enquanto você monta. Para achar
@@ -380,6 +381,8 @@ dos 6 boosters é sorteado entre elas** na hora. O booster inteiro é de uma col
 dentro dele), a mesma coleção pode sair mais de uma vez e alguma pode não sair. O resto é o Selado: deck de 40,
 qualquer cor, sem limite de cópias e sem banidas.
 
+- **Os boosters não trazem Líder:** como vale qualquer Líder do jogo, a vaga do Líder fica com outra carta da
+  coleção (a comum que ele tiraria do lugar). SR e SEC saem nas mesmas taxas. Vale no Pack Rush selado e no draft.
 - **Líder:** com mais de uma coleção, vale **qualquer Líder do jogo**, inclusive os banidos nos formatos oficiais e o
   Luffy de 6 cores. "Escolher qualquer Líder", na montagem, abre todos, com busca e filtro por cor; os primeiros são os
   que mais combinam com os tipos das cartas abertas. Líder de coleção ainda não lançada só vale se a coleção dele

@@ -36,6 +36,11 @@ describe('Draft: boosters do pod', () => {
     b.packs.forEach((round, r) => round.forEach((pack, seat) => expect(pack.every((id) => id.startsWith(`${b.sets[r][seat]}-`))).toBe(true)));
     // Numa mesma rodada, os assentos podem abrir coleções diferentes.
     expect(b.sets.some((round) => new Set(round).size > 1)).toBe(true);
+    // No Pack Rush vale qualquer Líder do jogo: os boosters não trazem Líder (no draft de uma coleção, trazem).
+    const leaders = (packs: string[][][]) => packs.flat(2).filter((id) => byId.get(id)?.category === 'leader').length;
+    expect(leaders(b.packs)).toBe(0);
+    expect(b.packs.flat().every((pack) => pack.length === boosterSize())).toBe(true);
+    expect(leaders(openDraftBoosters([op01], 9, DRAFT_SEATS, DRAFT_ROUNDS).packs)).toBeGreaterThan(0);
   });
 });
 

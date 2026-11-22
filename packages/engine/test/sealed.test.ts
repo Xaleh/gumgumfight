@@ -312,6 +312,18 @@ describe('Pack Rush: Selado com várias coleções', () => {
     expect(openMixedBoosters(sources, 6)).not.toEqual(opened);
   });
 
+  it('os boosters não trazem Líder (vale qualquer Líder do jogo): no lugar vem outra carta da coleção', () => {
+    const many = openMixedBoosters(sources, 77, 600);
+    expect(many.packs.flat().some(isLeader)).toBe(false);
+    // Continuam com 12 cartas, sem repetir carta dentro do booster, e com as SR e SEC nas mesmas taxas.
+    expect(many.packs.every((p) => p.length === 12 && new Set(p).size === 12)).toBe(true);
+    const srPerBox = (many.packs.flat().filter((id) => rarity(id) === 'SR').length / 600) * 24;
+    expect(srPerBox).toBeGreaterThan(6.3);
+    expect(srPerBox).toBeLessThan(8.6);
+    // Numa coleção só (Selado e Draft comuns), os Líderes continuam saindo.
+    expect(openBoosters(op01, 77, 200, boosterModelOf('OP01')).flat().some(isLeader)).toBe(true);
+  });
+
   it('as coleções saem em proporções parecidas, e um jogador pode abrir a mesma mais de uma vez', () => {
     const many = openMixedBoosters(sources, 99, 2000).sets;
     const share = many.filter((s) => s === 'OP01').length / many.length;

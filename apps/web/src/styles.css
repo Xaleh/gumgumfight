@@ -17003,6 +17003,25 @@ div.dk-tile-main {
 .po .sealed-pack img {
   filter: none;
 }
+/* Booster fechado selecionado: o próximo clique abre. */
+.sealed-pack.picked {
+  outline: 3px dashed var(--teal);
+  outline-offset: 4px;
+  transform: translateY(-6px) scale(1.04);
+  animation: sealed-pick 1.1s ease-in-out infinite;
+}
+@keyframes sealed-pick {
+  50% {
+    outline-color: var(--cream);
+  }
+}
+.sealed-pack-btn:not(:disabled) .sealed-pack:not(.open):not(.current):not(.picked):hover {
+  transform: translateY(-3px);
+}
+.sealed-pick-hint {
+  margin: 0;
+  text-align: center;
+}
 .sealed-pack.current {
   outline: 4px solid var(--brand-yellow);
   outline-offset: 3px;
