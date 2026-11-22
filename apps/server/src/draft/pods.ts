@@ -358,7 +358,7 @@ export class DraftPods {
   private finish(pod: PodData) {
     const draft = pod.draft!;
     const cards = this.catalog(pod);
-    const rules = poolRules({ set: pod.sets });
+    const rules = poolRules({ set: pod.sets, podId: pod.id });
     pod.botDecks = [];
     pod.seats.forEach((s, i) => {
       s.deadline = null;

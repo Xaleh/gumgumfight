@@ -258,9 +258,13 @@ export function poolCatalog(db: DB, pool: SealedPool, extra: string[] = []): Map
   return new Map((getCards(db, ids) as CardData[]).map((c) => [c.id, c]));
 }
 
-/** Regras do Líder: no Pack Rush (várias coleções), qualquer Líder do jogo; numa coleção só, os que saíram. */
-export const poolRules = (pool: Pick<SealedPool, 'set'>): LimitedRules =>
-  isCube(pool.set) ? { leaders: 'any', sets: [] } : isRush(pool.set) ? { leaders: 'any', sets: rushSets(pool.set) } : {};
+/**
+ * Regras do Líder. Qualquer Líder do jogo só nos drafts em que os boosters não trazem Líder: o Draft
+ * Cubo e o Draft de Pack Rush. No Selado (de uma coleção ou Pack Rush) e no Draft de uma coleção, o
+ * Líder é um dos que saíram ou o de 6 cores, que vale em todos os modos.
+ */
+export const poolRules = (pool: Pick<SealedPool, 'set'> & { podId?: string | null }): LimitedRules =>
+  isCube(pool.set) ? { leaders: 'any', sets: [] } : isRush(pool.set) && pool.podId ? { leaders: 'any', sets: rushSets(pool.set) } : {};
 
 /** Nome do deck nas partidas: "Selado OP01", "Pack Rush OP01 + OP05", "Draft OP01" ou "Draft Cubo". */
 export const poolName = (pool: Pick<SealedPool, 'set'> & { podId?: string | null }) => playModeLabel({ format: 'sealed', sealedSet: pool.set, sealedPod: pool.podId });

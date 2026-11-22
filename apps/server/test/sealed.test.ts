@@ -278,18 +278,30 @@ describe('Pack Rush: Selado com várias coleções', () => {
     expect((await post(Array.from({ length: 13 }, (_, i) => `OP${String(i + 1).padStart(2, '0')}`))).json().errorCode).toBe('sealedRushManySets');
   });
 
-  it('vale qualquer Líder do jogo; no Selado de uma coleção, não', async () => {
+  it('o Líder é um dos que saíram nos boosters ou o de 6 cores, como no Selado de uma coleção', async () => {
     const { app, db } = setup();
-    // Law ST10-001: Líder de starter (fora dos boosters) e banido nos formatos oficiais.
-    const rush = await readyPool(app, db, ALICE, ['OP01', 'OP02'], 'ST10-001');
-    expect(rush).toMatchObject({ ready: true, leader: 'ST10-001', size: 40 });
-    const single = (await call(app, 'POST', '/api/sealed/pools', BOB, { set: 'OP01' })).json() as Pool;
-    const cards = autoBuildLimited(poolCounts(single.packs), new Map((getCards(db, [...new Set(single.packs.flat()), SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]))).cards;
-    const refused = await call(app, 'PUT', `/api/sealed/pools/${single.id}/deck`, BOB, { leader: 'ST10-001', cards });
+    // Com o Líder de 6 cores o deck fecha.
+    const rush = await readyPool(app, db, ALICE, ['OP01', 'OP02'], SEALED_LEADER_ID);
+    expect(rush).toMatchObject({ ready: true, leader: SEALED_LEADER_ID, size: 40 });
+    // Líder de fora (Law ST10-001, de starter) não vale: "qualquer Líder" é só do Draft de Pack Rush e do Cubo.
+    const refused = await call(app, 'PUT', `/api/sealed/pools/${rush.id}/deck`, ALICE, { leader: 'ST10-001', cards: rush.deck!.cards });
     expect(refused.json().errorParams.issueCode).toBe('rules.leaderNotInPool');
-    // Mesmo no Pack Rush, as cartas do deck só saem dos boosters.
+    // Líder que saiu num booster vale (abre boosters até sair um).
+    const catalog = (ids: string[]) => new Map((getCards(db, [...ids, SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]));
+    let used = false;
+    for (let n = 0; n < 8 && !used; n++) {
+      const pool = (await call(app, 'POST', '/api/sealed/pools', BOB, { sets: ['OP01', 'OP02'] })).json() as Pool;
+      const cards = catalog([...new Set(pool.packs.flat())]);
+      const leader = pool.packs.flat().find((id) => cards.get(id)?.category === 'leader');
+      if (!leader) continue;
+      const saved = await call(app, 'PUT', `/api/sealed/pools/${pool.id}/deck`, BOB, autoBuildLimited(poolCounts(pool.packs), cards, leader));
+      expect(saved.json()).toMatchObject({ ready: true, leader });
+      used = true;
+    }
+    expect(used, 'em 8 aberturas de Pack Rush saiu pelo menos um Líder').toBe(true);
+    // As cartas do deck só saem dos boosters.
     const [first, ...rest] = rush.deck!.cards;
-    const outside = await call(app, 'PUT', `/api/sealed/pools/${rush.id}/deck`, ALICE, { leader: 'ST10-001', cards: [{ id: 'ST01-002', count: first.count }, ...rest] });
+    const outside = await call(app, 'PUT', `/api/sealed/pools/${rush.id}/deck`, ALICE, { leader: SEALED_LEADER_ID, cards: [{ id: 'ST01-002', count: first.count }, ...rest] });
     expect(outside.json().errorParams.issueCode).toBe('rules.notInPool');
   });
 

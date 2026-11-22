@@ -312,6 +312,15 @@ describe('Pack Rush: Selado com várias coleções', () => {
     expect(openMixedBoosters(sources, 6)).not.toEqual(opened);
   });
 
+  it('os boosters trazem Líder como os de uma coleção só (o Líder do deck é um dos que saírem, ou o de 6 cores)', () => {
+    const many = openMixedBoosters(sources, 77, 600);
+    const withLeader = many.packs.filter((p) => p.some(isLeader)).length / 600;
+    expect(withLeader).toBeGreaterThan(0.26);
+    expect(withLeader).toBeLessThan(0.41);
+    // 12 cartas, sem repetir carta dentro do booster (mesmo com um id repetido na lista da coleção).
+    expect(many.packs.every((p) => p.length === 12 && new Set(p).size === 12)).toBe(true);
+  });
+
   it('as coleções saem em proporções parecidas, e um jogador pode abrir a mesma mais de uma vez', () => {
     const many = openMixedBoosters(sources, 99, 2000).sets;
     const share = many.filter((s) => s === 'OP01').length / many.length;

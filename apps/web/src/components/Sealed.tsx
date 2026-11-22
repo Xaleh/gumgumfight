@@ -56,19 +56,29 @@ const BANDS: Array<{ key: MessageKey; fits: (cost: number) => boolean }> = [
   { key: 'sealed.bandHigh', fits: (c) => c >= 5 },
 ];
 
-/** Quantos boosters de cada coleção aberta o jogador já revelou (só deste navegador). */
-function readOpened(): Record<string, number> {
+/**
+ * Quais boosters de cada abertura o jogador já abriu, na ordem em que abriu (só deste navegador).
+ * Versões antigas guardavam só a quantidade: valia "os N primeiros".
+ */
+function readOpened(): Record<string, number | number[]> {
   try {
-    return JSON.parse(localStorage.getItem(OPENED_KEY) ?? '{}') as Record<string, number>;
+    return JSON.parse(localStorage.getItem(OPENED_KEY) ?? '{}') as Record<string, number | number[]>;
   } catch {
     return {};
   }
 }
-function writeOpened(id: string, n: number | null) {
+/** Os boosters abertos de uma abertura (`null`: este navegador não sabe). */
+function openedOf(id: string, total: number): number[] | null {
+  const saved = readOpened()[id];
+  if (saved === undefined) return null;
+  const list = typeof saved === 'number' ? Array.from({ length: Math.max(0, saved) }, (_, i) => i) : Array.isArray(saved) ? saved : [];
+  return [...new Set(list)].filter((i) => Number.isInteger(i) && i >= 0 && i < total);
+}
+function writeOpened(id: string, list: number[] | null) {
   try {
     const all = readOpened();
-    if (n === null) delete all[id];
-    else all[id] = n;
+    if (list === null) delete all[id];
+    else all[id] = list;
     localStorage.setItem(OPENED_KEY, JSON.stringify(all));
   } catch {
     /* sem armazenamento: a abertura recomeça ao recarregar */
@@ -170,7 +180,7 @@ export function Sealed({
   const openPool = useCallback((p: SealedPool) => {
     setPool(p);
     // Deck de Draft: as cartas já foram escolhidas uma a uma, não há booster para abrir.
-    const opened = p.draft ? p.packs.length : (readOpened()[p.id] ?? (p.deck ? p.packs.length : 0));
+    const opened = p.draft ? p.packs.length : (openedOf(p.id, p.packs.length)?.length ?? (p.deck ? p.packs.length : 0));
     setView(opened >= p.packs.length ? 'build' : 'packs');
   }, []);
   const resume = useCallback(
@@ -200,7 +210,7 @@ export function Sealed({
     setError(null);
     try {
       const p = await api.sealed.open(rush ? mix : [picked]);
-      writeOpened(p.id, 0);
+      writeOpened(p.id, []);
       setPool(p);
       setView('packs');
     } catch (e) {
@@ -351,7 +361,7 @@ export function Sealed({
           <ul className="home-chips">
             <li className="home-chip">{t('sealed.ruleDeck', { n: LIMITED_DECK_SIZE })}</li>
             <li className="home-chip">{t('sealed.ruleColors')}</li>
-            <li className="home-chip">{rush || cubeMode ? t('sealed.ruleLeaderAny') : t('sealed.ruleLeader')}</li>
+            <li className="home-chip">{isDraft && (rush || cubeMode) ? t('sealed.ruleLeaderAny') : t('sealed.ruleLeader')}</li>
             <li className="home-chip">{t('sealed.ruleBans')}</li>
           </ul>
         </section>
@@ -450,7 +460,7 @@ export function Sealed({
           ) : (
             <ul className="sealed-pools">
               {myPools.map((p) => {
-                const opened = readOpened()[p.id] ?? (p.size ? packsPerPool : 0);
+                const opened = openedOf(p.id, packsPerPool)?.length ?? (p.size ? packsPerPool : 0);
                 const status = p.ready ? t('sealed.statusReady') : opened < packsPerPool && !p.size ? t('sealed.statusOpening') : t('sealed.statusBuilding', { size: p.size, max: LIMITED_DECK_SIZE });
                 return (
                   <li key={p.id} className="sealed-pool">
@@ -511,42 +521,48 @@ function useCardPeek() {
 function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<string, CardData>; onBuild: () => void }) {
   const t = useT();
   const total = pool.packs.length;
-  const [opened, setOpened] = useState(() => Math.min(total, readOpened()[pool.id] ?? (pool.deck ? total : 0)));
-  const [shown, setShown] = useState(() => Math.max(0, opened - 1));
+  /** Os boosters já abertos, na ordem em que foram abertos (qualquer ordem: o jogador escolhe). */
+  const [opened, setOpened] = useState<number[]>(() => openedOf(pool.id, total) ?? (pool.deck ? pool.packs.map((_, i) => i) : []));
+  const [shown, setShown] = useState(() => opened[opened.length - 1] ?? -1);
+  /** Booster fechado selecionado: um clique seleciona, o segundo abre. */
+  const [picked, setPicked] = useState<number | null>(null);
+  const closed = pool.packs.map((_, i) => i).filter((i) => !opened.includes(i));
   const peek = useCardPeek();
   const { animations } = useSettings();
   // Com as animações ligadas, cada booster é aberto na tela antes de as cartas aparecerem (nas suaves,
   // na versão curta). Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e a abertura sumiria sem o jogador saber por quê, como na mesa (GameScreen).
   const showy = animations !== 'off';
-  /** Boosters sendo abertos agora, um de cada vez: do `at` (o que está na tela) até o `to`. */
-  const [opening, setOpening] = useState<{ at: number; to: number; many: boolean } | null>(null);
-  const reveal = (n: number) => {
-    const next = Math.min(total, n);
+  /** Boosters sendo abertos agora, um de cada vez: o primeiro da fila é o que está na tela. */
+  const [opening, setOpening] = useState<{ queue: number[]; many: boolean } | null>(null);
+  const reveal = (list: number[]) => {
+    const next = [...opened, ...list.filter((i) => !opened.includes(i))];
     setOpened(next);
-    setShown(Math.max(0, next - 1));
+    setShown(next[next.length - 1] ?? -1);
+    setPicked(null);
     writeOpened(pool.id, next);
   };
-  const open = (n: number) => {
-    const to = Math.min(total, n);
-    if (opening || to <= opened) return;
-    if (showy) setOpening({ at: opened, to, many: to - opened > 1 });
-    else reveal(to);
+  const open = (list: number[]) => {
+    const todo = list.filter((i) => !opened.includes(i));
+    if (opening || !todo.length) return;
+    if (showy) setOpening({ queue: todo, many: todo.length > 1 });
+    else reveal(todo);
   };
   const openedOne = () => {
     if (!opening) return;
-    reveal(opening.at + 1);
-    setOpening(opening.at + 1 < opening.to ? { ...opening, at: opening.at + 1 } : null);
+    const [first, ...rest] = opening.queue;
+    reveal([first]);
+    setOpening(rest.length ? { ...opening, queue: rest } : null);
   };
   const skipOpening = () => {
     if (!opening) return;
-    reveal(opening.to);
+    reveal(opening.queue);
     setOpening(null);
   };
-  const revealed = pool.packs.slice(0, opened).flat();
+  const revealed = opened.flatMap((i) => pool.packs[i]);
   const leaders = [...new Set(revealed.filter((id) => byId.get(id)?.category === 'leader'))];
   const byColor = COLORS.map((c) => ({ ...c, n: revealed.filter((id) => byId.get(id)?.category !== 'leader' && byId.get(id)?.colors.includes(c.id)).length }));
-  const pack = opened > 0 ? pool.packs[shown] : [];
+  const pack = shown >= 0 ? pool.packs[shown] : [];
   /** No Pack Rush cada booster é de uma coleção: ela só aparece depois de aberto. */
   const mixed = isRush(pool.set);
   const packSet = (i: number) => pool.packSets?.[i] ?? pool.set;
@@ -554,25 +570,37 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
   return (
     <div className="sealed-wrap sealed-packs">
       <div className="sealed-main">
-        <div className="sealed-pack-row" role="group" aria-label={t('sealed.packOf', { n: Math.max(1, opened), total })}>
-          {pool.packs.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              className="sealed-pack-btn"
-              disabled={i >= opened}
-              aria-pressed={i === shown && opened > 0}
-              onClick={() => setShown(i)}
-              title={i < opened ? t('sealed.packN', { n: i + 1 }) : t('sealed.packSealed')}
-            >
-              <Booster set={i >= opened ? pool.set : packSet(i)} state={i >= opened ? undefined : i === shown ? 'current' : 'open'} />
-              <small>{i < opened ? t('sealed.packN', { n: i + 1 }) : t('sealed.packSealed')}</small>
-            </button>
-          ))}
+        <div className="sealed-pack-row" role="group" aria-label={t('sealed.packOf', { n: Math.max(1, opened.length), total })}>
+          {pool.packs.map((_, i) => {
+            const isOpen = opened.includes(i);
+            const isPicked = picked === i;
+            return (
+              <button
+                key={i}
+                type="button"
+                className="sealed-pack-btn"
+                disabled={Boolean(opening)}
+                aria-pressed={isOpen ? i === shown : isPicked}
+                // Aberto: mostra as cartas dele. Fechado: o primeiro clique seleciona, o segundo abre.
+                onClick={() => {
+                  if (isOpen) {
+                    setShown(i);
+                    setPicked(null);
+                  } else if (isPicked) open([i]);
+                  else setPicked(i);
+                }}
+                title={isOpen ? t('sealed.packN', { n: i + 1 }) : isPicked ? t('sealed.openPicked', { n: i + 1 }) : t('sealed.packSealed')}
+              >
+                <Booster set={isOpen ? packSet(i) : pool.set} state={isOpen ? (i === shown ? 'current' : 'open') : isPicked ? 'picked' : undefined} />
+                <small>{isOpen ? t('sealed.packN', { n: i + 1 }) : isPicked ? t('sealed.packOpenIt') : t('sealed.packSealed')}</small>
+              </button>
+            );
+          })}
         </div>
+        {closed.length > 0 && <p className="muted small sealed-pick-hint">{peek.canHover ? t('sealed.packPickHintMouse') : t('sealed.packPickHintTouch')}</p>}
 
         <section className="sealed-panel sealed-reveal">
-          {opened === 0 ? (
+          {shown < 0 ? (
             <p className="sealed-empty">{mixed ? t('sealed.rushPacksReady', { n: total, sets: setsText(pool.set) }) : t('sealed.packsReady', { n: total, set: pool.set })}</p>
           ) : (
             <>
@@ -602,15 +630,15 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
         </section>
 
         <div className="sealed-actions">
-          {opened < total ? (
+          {closed.length > 0 ? (
             <>
-              {opened > 0 && (
-                <button type="button" className="btn" onClick={() => open(total)} disabled={Boolean(opening)}>
-                  {t('sealed.openAll', { n: total - opened })}
+              {opened.length > 0 && closed.length > 1 && (
+                <button type="button" className="btn" onClick={() => open(closed)} disabled={Boolean(opening)}>
+                  {t('sealed.openAll', { n: closed.length })}
                 </button>
               )}
-              <button type="button" className="mode-btn sealed-cta" onClick={() => open(opened + 1)} disabled={Boolean(opening)}>
-                {opened === 0 ? t('sealed.openFirst') : t('sealed.openNext')}
+              <button type="button" className="mode-btn sealed-cta" onClick={() => open([picked ?? closed[0]])} disabled={Boolean(opening)}>
+                {picked !== null ? t('sealed.openPicked', { n: picked + 1 }) : opened.length === 0 ? t('sealed.openFirst') : t('sealed.openNext')}
               </button>
             </>
           ) : (
@@ -642,7 +670,7 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
               ) : null;
             })}
           </div>
-          <p className="muted small">{mixed ? t('sealed.rushLeadersHint') : t('sealed.leadersHint')}</p>
+          <p className="muted small">{t('sealed.leadersHint')}</p>
         </div>
         <div>
           <div className="kicker">{t('sealed.byColor')}</div>
@@ -661,11 +689,11 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
       {peek.layer}
       {opening && (
         <BoosterOpening
-          key={opening.at}
-          set={packSet(opening.at)}
+          key={opening.queue[0]}
+          set={packSet(opening.queue[0])}
           cover={mixed ? pool.set : undefined}
-          label={t('sealed.openingPack', { n: opening.at + 1, total })}
-          cards={pool.packs[opening.at].map((id) => byId.get(id)).filter((c): c is CardData => Boolean(c))}
+          label={t('sealed.openingPack', { n: opening.queue[0] + 1, total })}
+          cards={pool.packs[opening.queue[0]].map((id) => byId.get(id)).filter((c): c is CardData => Boolean(c))}
           mode={animations === 'soft' ? 'burst' : opening.many ? 'auto' : 'reveal'}
           quick={animations === 'soft'}
           onDone={openedOne}
@@ -713,8 +741,10 @@ function Build({
   const [code, setCode] = useState('');
   const [pickingLeader, setPickingLeader] = useState(false);
   /** Pack Rush (várias coleções) e Draft Cubo: vale qualquer Líder do jogo. */
-  const mixed = isRush(pool.set) || isCube(pool.set);
-  const rules = useMemo<LimitedRules>(() => (mixed ? { leaders: 'any', sets: isCube(pool.set) ? [] : rushSets(pool.set) } : {}), [mixed, pool.set]);
+  const rush = isRush(pool.set);
+  /** Draft de Pack Rush e Draft Cubo: os boosters não trazem Líder, então vale qualquer Líder do jogo. */
+  const anyLeader = isCube(pool.set) || (rush && Boolean(pool.draft));
+  const rules = useMemo<LimitedRules>(() => (anyLeader ? { leaders: 'any', sets: isCube(pool.set) ? [] : rushSets(pool.set) } : {}), [anyLeader, pool.set]);
 
   const total = [...deck.values()].reduce((n, c) => n + c, 0);
   const list = useMemo(() => ({ leader, cards: [...deck].map(([id, count]) => ({ id, count })).sort((a, b) => a.id.localeCompare(b.id)) }), [leader, deck]);
@@ -787,10 +817,10 @@ function Build({
   // Os Líderes à mão: os que saíram e o de 6 cores; no Pack Rush, também o escolhido de fora, na frente.
   const leaders = useMemo(() => {
     const own = sealedLeaders(have, byId);
-    return mixed && leader && !own.includes(leader) ? [leader, ...own] : own;
-  }, [have, byId, mixed, leader]);
+    return anyLeader && leader && !own.includes(leader) ? [leader, ...own] : own;
+  }, [have, byId, anyLeader, leader]);
   /** Todos os Líderes que valem no Pack Rush (os de spoiler, só das coleções escolhidas). */
-  const allLeaders = useMemo(() => (mixed ? cards.filter((c) => anyLeaderAllowed(c, rules.sets)) : []), [mixed, cards, rules]);
+  const allLeaders = useMemo(() => (anyLeader ? cards.filter((c) => anyLeaderAllowed(c, rules.sets)) : []), [anyLeader, cards, rules]);
   const owned = useMemo(
     () =>
       [...have.keys()]
@@ -933,7 +963,7 @@ function Build({
               ) : null;
             })}
           </div>
-          {mixed && (
+          {anyLeader && (
             <button type="button" className="btn small" onClick={() => setPickingLeader(true)}>
               {t('sealed.anyLeader')}
             </button>
@@ -983,7 +1013,7 @@ function Build({
           <button type="button" className="mode-btn sealed-cta" onClick={() => void vsBot()} disabled={!ready || busy}>
             {t('sealed.vsBot')}
           </button>
-          <p className="muted small">{pool.draft ? t('sealed.draftBotHint') : mixed ? t('sealed.rushBotHint', { sets: setsText(pool.set) }) : t('sealed.vsBotHint', { set: pool.set })}</p>
+          <p className="muted small">{pool.draft ? t('sealed.draftBotHint') : rush ? t('sealed.rushBotHint', { sets: setsText(pool.set) }) : t('sealed.vsBotHint', { set: pool.set })}</p>
           <button type="button" className="btn" onClick={() => void createRoom()} disabled={!ready || busy}>
             {t('sealed.createRoom')}
           </button>
@@ -993,7 +1023,7 @@ function Build({
               {t('sealed.joinRoom')}
             </button>
           </div>
-          <p className="muted small">{pool.draft ? t('sealed.roomHintDraft') : mixed ? t('sealed.roomHintRush', { sets: setsText(pool.set) }) : t('sealed.roomHint', { set: pool.set })}</p>
+          <p className="muted small">{pool.draft ? t('sealed.roomHintDraft') : rush ? t('sealed.roomHintRush', { sets: setsText(pool.set) }) : t('sealed.roomHint', { set: pool.set })}</p>
           {pool.wins + pool.losses > 0 && <p className="muted small">{t('sealed.record', { w: pool.wins, l: pool.losses })}</p>}
         </div>
         <div className="sealed-list">

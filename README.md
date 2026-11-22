@@ -287,7 +287,8 @@ boosters que o jogador abre na hora.
 
 1. **Escolha a coleção e abra 6 boosters.** Cada booster tem 12 cartas, com as vagas e as taxas do booster daquela
    linha de produto (veja [Os boosters](#os-boosters)); a tela mostra a composição e as chances da coleção marcada. Dá
-   para abrir um por vez ou todos de uma vez.
+   para abrir um por vez ou todos de uma vez, **em qualquer ordem**: um clique num booster fechado o seleciona e o
+   segundo clique abre (o duplo clique também); o botão "Abrir" abre o selecionado ou, sem seleção, o próximo.
 2. **Monte um deck de 40 cartas** com o que saiu. Vale **qualquer cor com qualquer Líder**, não há limite de cópias
    (vale o que você abriu) e **não há lista de banidas, pares proibidos nem rotação**. **Montar sozinho** preenche um
    deck jogável (curva de custo, Counters e alguns Eventos). O deck é salvo sozinho enquanto você monta. Para achar
@@ -380,10 +381,15 @@ dos 6 boosters é sorteado entre elas** na hora. O booster inteiro é de uma col
 dentro dele), a mesma coleção pode sair mais de uma vez e alguma pode não sair. O resto é o Selado: deck de 40,
 qualquer cor, sem limite de cópias e sem banidas.
 
-- **Líder:** com mais de uma coleção, vale **qualquer Líder do jogo**, inclusive os banidos nos formatos oficiais e o
-  Luffy de 6 cores. "Escolher qualquer Líder", na montagem, abre todos, com busca e filtro por cor; os primeiros são os
-  que mais combinam com os tipos das cartas abertas. Líder de coleção ainda não lançada só vale se a coleção dele
-  estiver entre as escolhidas.
+- **Líder no Pack Rush selado:** como no Selado de uma coleção, é **um dos que saírem nos boosters ou o Luffy de 6
+  cores**. Os boosters trazem Líder normalmente.
+- **Líder no Draft de Pack Rush (e no Draft Cubo):** vale **qualquer Líder do jogo**, inclusive os banidos nos formatos
+  oficiais e o Luffy de 6 cores, escolhido ao fim do draft, na montagem. Por isso **os boosters desse draft não trazem
+  Líder**: a vaga fica com outra carta da coleção (a comum que ele tiraria do lugar), e SR e SEC saem nas mesmas
+  taxas. "Escolher qualquer Líder" abre todos, com busca e filtro por cor; os primeiros são os que mais combinam com
+  os tipos das cartas escolhidas. Líder de coleção ainda não lançada só vale se a coleção dele estiver entre as do
+  draft.
+- **O Luffy de 6 cores vale em todos os modos especiais** (Selado, Pack Rush, Draft e Draft Cubo).
 - **Sala privada:** os dois precisam ter aberto **as mesmas coleções** (a ordem da escolha não importa). Quem abriu
   só uma delas, ou outra combinação, recebe o aviso com as coleções da sala.
 - **Bot:** abre os próprios boosters, sorteados entre as mesmas coleções.

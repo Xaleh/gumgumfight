@@ -285,8 +285,11 @@ rotas do Selado o criam), com `PlayMode.sealedSet`; nele `cardLegality`/`formatI
 `sealed_pools` guarda dono, coleção, seed, boosters, deck e placar; nas salas, o `deckId` de um assento do Selado é
 `sealed:<id>` e o deck é conferido contra as cartas abertas (`sealedDeckFor`, em `online/routes.ts`). **Pack Rush**
 (`kind = 'rush'`): `openMixedBoosters` sorteia a coleção de cada booster entre as escolhidas, `rushKey` dá a chave
-("OP01+OP05", gravada em `set_code` e usada como `sealedSet` da sala) e `LimitedRules.leaders = 'any'` libera qualquer
-Líder (`anyLeaderAllowed`: os de spoiler, só das coleções da chave); `pack_sets` guarda a coleção de cada booster.
+("OP01+OP05", gravada em `set_code` e usada como `sealedSet` da sala); `pack_sets` guarda a coleção de cada booster.
+O Líder segue `poolRules` (`sealed/store.ts`): `LimitedRules.leaders = 'any'` (qualquer Líder do jogo; `anyLeaderAllowed`:
+os de spoiler, só das coleções da chave) vale só nos drafts em que os boosters não trazem Líder, o Draft de Pack Rush
+(`openDraftBoosters` com mais de uma coleção) e o Draft Cubo. No Selado, de uma coleção ou Pack Rush, e no Draft de uma
+coleção, o Líder é um dos que saíram ou o de 6 cores, que vale em todos.
 
 A busca e os filtros de cartas são um componente só (`apps/web/src/components/CardFilterBar.tsx`), usado no construtor
 de decks e na montagem do Selado: `CardFilterBar` (a barra, com o painel de atalhos), `CardFilters` (o estado, guardado

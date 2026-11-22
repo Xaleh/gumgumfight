@@ -140,9 +140,9 @@ export function boosterReady(setCards: readonly CardData[], model: BoosterModel 
 /** O RNG de um sorteio a partir da seed: um número (32 bits) ou as 4 palavras do sfc32. */
 export const holderOf = (seed: number | readonly number[]): RngHolder => (typeof seed === 'number' ? { rng: seed | 0 } : { rng: 0, rng128: seedRng128(seed) });
 
-/** `n` cartas diferentes de `from` (ou todas, se houver menos). */
+/** `n` cartas diferentes de `from` (ou todas, se houver menos). Uma lista com o mesmo id duas vezes conta uma. */
 function draw(holder: RngHolder, from: readonly string[], n: number, taken: Set<string>): string[] {
-  const left = from.filter((id) => !taken.has(id));
+  const left = [...new Set(from)].filter((id) => !taken.has(id));
   const out: string[] = [];
   while (out.length < n && left.length) {
     const [id] = left.splice(Math.floor(nextRandom(holder) * left.length), 1);
@@ -169,12 +169,15 @@ function boosterSource(setCards: readonly CardData[]): BoosterSource {
   return { ...src, leaders: setCards.filter((c) => c.category === 'leader').map((c) => c.id), any: [...src.C, ...src.UC, ...src.R] };
 }
 
-/** Um booster da coleção. Nenhuma carta se repete dentro dele. */
-function openBooster(holder: RngHolder, src: BoosterSource, model: BoosterModel): string[] {
+/**
+ * Um booster da coleção. Nenhuma carta se repete dentro dele. `leaders: false` (Draft de Pack Rush,
+ * em que vale qualquer Líder do jogo): o booster não traz Líder, e a carta que ele tiraria do lugar fica.
+ */
+function openBooster(holder: RngHolder, src: BoosterSource, model: BoosterModel, leaders = true): string[] {
   const taken = new Set<string>();
   // Um sorteio decide o booster. Nos de hoje, Líder, SR e SEC são fatias separadas dele (não saem
   // juntos); nos das primeiras coleções, o Líder é sorteado à parte da vaga de destaque.
-  const chance = leaderChanceOf(model, src.leaders.length);
+  const chance = leaders ? leaderChanceOf(model, src.leaders.length) : 0;
   const roll = nextRandom(holder);
   const leader = model.leaderTakesHit ? roll < chance : nextRandom(holder) < chance;
   const at = model.leaderTakesHit ? roll - chance : roll;
@@ -213,6 +216,8 @@ export const RUSH_MAX_SETS = 12;
 /**
  * Pack Rush: cada booster é de uma das coleções de `sources`, sorteada na hora (a mesma coleção
  * pode sair mais de uma vez, e alguma pode não sair). Devolve os boosters e a coleção de cada um.
+ * Os boosters trazem Líder como os de uma coleção só: no Pack Rush selado o Líder do deck é um dos
+ * que saírem (ou o de 6 cores).
  */
 export function openMixedBoosters(
   sources: ReadonlyArray<{ set: string; cards: readonly CardData[] }>,
@@ -233,8 +238,9 @@ export function openMixedBoosters(
 
 /**
  * Boosters de um Draft: `rounds` rodadas, um booster por assento em cada uma. Com mais de uma
- * coleção (Pack Rush draft), a de cada booster é sorteada entre elas, como no Pack Rush selado.
- * Devolve `packs[rodada][assento]` e a coleção de cada um.
+ * coleção (Pack Rush draft), a de cada booster é sorteada entre elas e nenhum traz Líder: nesse
+ * draft vale qualquer Líder do jogo, então a vaga fica com outra carta da coleção. Devolve
+ * `packs[rodada][assento]` e a coleção de cada um.
  */
 export function openDraftBoosters(
   sources: ReadonlyArray<{ set: string; cards: readonly CardData[] }>,
@@ -252,7 +258,7 @@ export function openDraftBoosters(
     for (let seat = 0; seat < seats; seat++) {
       const pick = built.length === 1 ? built[0] : built[Math.floor(nextRandom(holder) * built.length)];
       sets.push(pick.set);
-      packs.push(openBooster(holder, pick.src, pick.model));
+      packs.push(openBooster(holder, pick.src, pick.model, built.length < 2));
     }
     out.sets.push(sets);
     out.packs.push(packs);
@@ -283,9 +289,10 @@ export function sealedLeaders(pool: ReadonlyMap<string, number>, cards: Catalog)
 }
 
 /**
- * Quem pode ser o Líder. `pool` (Selado de uma coleção): os que saíram nos boosters ou o de 6
- * cores. `any` (Pack Rush e os outros modos com várias coleções): qualquer Líder do jogo; os de
- * spoiler, só se a coleção deles estiver entre as do modo (`sets`).
+ * Quem pode ser o Líder. `pool` (Selado, de uma coleção ou Pack Rush, e Draft de uma coleção): os
+ * que saíram nos boosters ou o de 6 cores. `any` (Draft de Pack Rush e Draft Cubo): qualquer Líder
+ * do jogo; os de spoiler, só se a coleção deles estiver entre as do modo (`sets`). O Líder de 6
+ * cores vale em todos.
  */
 export interface LimitedRules {
   leaders?: 'pool' | 'any';

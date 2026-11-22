@@ -16,7 +16,7 @@ export const boosterArt = (set: string) => `/boosters/${set.toUpperCase()}.webp`
 /** Coleções cuja arte falhou ao carregar nesta sessão: não tenta de novo a cada desenho. */
 const missingArt = new Set<string>();
 
-export function Booster({ set, small, big, state, draft }: { set: string; small?: boolean; big?: boolean; state?: 'open' | 'current'; draft?: boolean }) {
+export function Booster({ set, small, big, state, draft }: { set: string; small?: boolean; big?: boolean; state?: 'open' | 'current' | 'picked'; draft?: boolean }) {
   // Coleções vizinhas com cores bem diferentes: o número da coleção anda de 47 em 47 graus.
   // O deck de Pack Rush (várias coleções) tem um booster próprio, dourado; o de Draft, roxo; o do Cubo, verde-água.
   const mixed = isRush(set);
