@@ -467,7 +467,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.fewerCharacters && ps.characters.length >= opp.characters.length) return false;
   const acw = cond.anyCharactersWithCost;
   if (acw && [...ps.characters, ...opp.characters].filter((c) => getCost(state, c.uid) >= acw.cost).length < acw.count) return false;
-  if (cond.leaderNameIncludes && !cardDef(state, ps.leader.uid).name.toLowerCase().includes(cond.leaderNameIncludes.toLowerCase())) return false;
+  if (cond.leaderNameIncludes && !nameIncludes(cardDef(state, ps.leader.uid), cond.leaderNameIncludes)) return false;
   if (cond.leaderColor && !cardDef(state, ps.leader.uid).colors.includes(cond.leaderColor)) return false;
   if (cond.leaderMaxPower !== undefined && getPower(state, ps.leader.uid) > cond.leaderMaxPower) return false;
   if (cond.opponentLeaderMinPower !== undefined && getPower(state, opp.leader.uid) < cond.opponentLeaderMinPower) return false;
@@ -705,10 +705,21 @@ export function matchesFilter(def: CardDef, f: import('./types').CardFilter): bo
   return true;
 }
 
-/** "with a type including "X"": algum tipo contém o texto (sem diferenciar maiúsculas). */
-export function typeIncludes(def: CardDef, part: string): boolean {
+/**
+ * "with a type including "X"": algum tipo contém o texto (sem diferenciar maiúsculas). O Líder de
+ * 6 cores (`wild`) tem todos os tipos, então também tem um que inclui o texto.
+ */
+export function typeIncludes(def: Pick<CardDef, 'types' | 'wild'>, part: string): boolean {
+  if (def.wild) return true;
   const p = part.toLowerCase();
   return def.types.some((t) => t.toLowerCase().includes(p));
+}
+
+/** "name includes "X"": o nome (ou um nome alternativo) contém o texto; o Líder de 6 cores tem todos os nomes. */
+export function nameIncludes(def: Pick<CardDef, 'name' | 'aliases' | 'wild'>, part: string): boolean {
+  if (def.wild) return true;
+  const p = part.toLowerCase();
+  return def.name.toLowerCase().includes(p) || Boolean(def.aliases?.some((a) => a.toLowerCase().includes(p)));
 }
 
 /** Soma das auras ativas que afetam a carta (bônus de outras cartas do mesmo jogador). */
@@ -6019,7 +6030,6 @@ export function koProtected(state: GameState, uid: string, inBattle: boolean, by
   const effectKO = (v: true | 'opponent' | undefined) => !inBattle && (v === true || (v === 'opponent' && byOpponent));
   const kinds = inBattle ? ['cannotBeKO', 'cannotBeKOInBattle'] : ['cannotBeKO', 'cannotBeKOByEffect', ...(byOpponent ? ['cannotBeKOByOpponentEffect'] : [])];
   if (state.modifiers.some((m) => m.uid === uid && kinds.includes(m.kind))) return true;
-  const byAttrs = by ? (cardDef(state, by).attributes ?? []) : [];
   const zone = locate(state, uid)?.zone;
   if (!inBattle && zone && zone !== 'stage' && aurasOn(state, uid, zone, (au) => effectKO(au.noEffectKO)).length) return true;
   if (inBattle && zone && zone !== 'stage' && aurasOn(state, uid, zone, (au) => Boolean(au.noBattleKO)).length) return true;
@@ -6041,7 +6051,7 @@ export function koProtected(state: GameState, uid: string, inBattle: boolean, by
     (a) =>
       a.timing === 'static' &&
       ((inBattle ? a.staticNoBattleKO : effectKO(a.staticNoEffectKO)) ||
-        (inBattle && a.noBattleKOVsAttribute !== undefined && byAttrs.includes(a.noBattleKOVsAttribute) && (!a.noBattleKOVsAttributeCharacters || byChar)) ||
+        (inBattle && a.noBattleKOVsAttribute !== undefined && by !== undefined && hasAttribute(cardDef(state, by), a.noBattleKOVsAttribute) && (!a.noBattleKOVsAttributeCharacters || byChar)) ||
         (inBattle && a.noBattleKOByLeader && by !== undefined && locate(state, by)?.zone === 'leader') ||
         // "by Characters without the "Special" attribute": o Líder (qualquer atributo) ainda nocauteia.
         (inBattle && a.noBattleKOUnlessAttribute !== undefined && byChar && !hasAttributeOn(state, by!, a.noBattleKOUnlessAttribute))) &&

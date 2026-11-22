@@ -19,10 +19,13 @@ const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures/op18-oficial.j
 };
 const support = (JSON.parse(readFileSync(join(__dirname, 'fixtures/op18-automacao.json'), 'utf8')) as { support: CardData[] }).support;
 const teach = support.find((c) => c.id === 'OP09-081')!;
+/** O Líder de 6 cores do Selado (tem todos os nomes, tipos e atributos). */
+const rainbow = (JSON.parse(readFileSync(join(__dirname, '../../../data/cards/sealed.json'), 'utf8')) as { cards: CardData[] }).cards;
 
 const char = (id: string, name: string, extra: Partial<CardData> = {}): CardData => ({ id, name, category: 'character', colors: ['black'], cost: 5, power: 6000, types: [], text: '', ...extra });
 const extra: CardData[] = [
   teach,
+  ...rainbow,
   ...fixture.starters,
   // Vice-almirantes para o Buster Call (OP18-117).
   char('SPO-101', 'Garp', { types: ['Navy', 'Vice Admiral'] }),
@@ -268,6 +271,52 @@ describe('OP18 com o texto da carta impressa', () => {
     expect(s.players[1].hand).toHaveLength(handSize + 1);
     expect(s.players[0].characters.some((c) => c.uid === enemy)).toBe(false);
     expect(s.players[0].deck.at(-1)).toBe(enemy);
+  });
+
+  it('Jabra (OP18-103): com o Líder de 6 cores, "o tipo do seu Líder inclui "CP"" vale e o [Trigger] funciona', () => {
+    /** Jabra sai da Vida do jogador 1, que responde "sim" ao [Trigger]. */
+    const hit = (leader: string) => {
+      let s = toTurn(game(['ST01-001', leader]), 3);
+      const enemy = field(s, 0, 'ST01-006');
+      const jabra = take(s, 1, 'OP18-103');
+      s.players[1].life.push(jabra);
+      const before = s.players[1].hand.length;
+      s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+      if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 1, uids: [] });
+      if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: 1 });
+      expect(s.pending).toMatchObject({ kind: 'lifeCard', player: 1 });
+      s = applyAction(s, { type: 'answer', player: 1, yes: true });
+      return { s, enemy, drew: s.players[1].hand.length - before };
+    };
+    // Luffy de 6 cores: compra 1 e escolhe o Personagem que vai para o fundo do deck.
+    const wild = hit('SEALED-001');
+    expect(wild.drew).toBe(1);
+    expect(wild.s.pending).toMatchObject({ kind: 'selectTargets', player: 1, options: [wild.enemy] });
+    const done = applyAction(wild.s, { type: 'choose', player: 1, uids: [wild.enemy] });
+    expect(done.players[0].characters.some((c) => c.uid === wild.enemy)).toBe(false);
+    expect(done.players[0].deck.at(-1)).toBe(wild.enemy);
+    // Igual a um Líder {CP9} de verdade.
+    const cp = hit('OP18-079');
+    expect(cp.drew).toBe(1);
+    expect(cp.s.pending).toMatchObject({ kind: 'selectTargets', player: 1 });
+    // Líder sem tipo "CP": o [Trigger] não faz nada.
+    const other = hit('ST02-001');
+    expect(other.drew).toBe(0);
+    expect(other.s.pending).toBeNull();
+  });
+
+  it('Kumadori (OP18-101): o [Trigger] que pede Líder "CP" também vale com o Líder de 6 cores', () => {
+    let s = toTurn(game(['ST01-001', 'SEALED-001']), 3);
+    const enemy = field(s, 0, 'ST01-006');
+    const kumadori = take(s, 1, 'OP18-101');
+    s.players[1].life.push(kumadori);
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 1, uids: [] });
+    if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: 1 });
+    s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    // O efeito chega a pedir a escolha (K.O. ou virar um Personagem de custo 6 ou menos do oponente).
+    expect(s.pending).not.toBeNull();
+    expect(JSON.stringify(s.pending)).toContain(enemy);
   });
 
   it('Buster Call (OP18-117): descarta a Vida e todos os Personagens e joga até 5 {Vice Admiral} de nomes diferentes do deck ou do descarte', () => {

@@ -5,7 +5,7 @@ import { actingPlayer } from '../src/actions';
 import { chooseBotAction } from '../src/bot/simple';
 import { buildCardDef, needsManual } from '../src/cards';
 import { validateDeck } from '../src/deck';
-import { applyAction, createGame, hasName, hasType, LIMITED_DECK_SIZE } from '../src/engine';
+import { applyAction, createGame, hasName, hasType, LIMITED_DECK_SIZE, nameIncludes, typeIncludes } from '../src/engine';
 import { cardLegality, formatIssues, formatLabel, playMode, playModeLabel, rarityCode, SEALED_LEADER_ID, spoilerRule } from '../src/formats';
 import {
   anyLeaderAllowed,
@@ -186,10 +186,13 @@ describe('Selado: o Líder de 6 cores', () => {
     expect(def.wild).toBe(true);
     expect([hasType(def, 'Straw Hat Crew'), hasType(def, 'Animal Kingdom Pirates'), hasType(def, 'Navy')]).toEqual([true, true, true]);
     expect([hasName(def, 'Monkey.D.Luffy'), hasName(def, 'Kaido'), hasName(def, 'Charlotte Linlin')]).toEqual([true, true, true]);
+    // "O tipo do seu Líder inclui "CP"" e "o nome inclui…" também valem: ele tem todos os tipos e nomes.
+    expect([typeIncludes(def, 'CP'), typeIncludes(def, 'Pirates'), nameIncludes(def, 'Charlotte')]).toEqual([true, true, true]);
     // As outras cartas continuam com o que têm impresso.
     const zoro = buildCardDef(byId.get('OP01-001')!);
     expect(zoro.wild).toBeUndefined();
     expect([hasType(zoro, 'Straw Hat Crew'), hasType(zoro, 'Navy'), hasName(zoro, 'Kaido')]).toEqual([true, false, false]);
+    expect([typeIncludes(zoro, 'CP'), typeIncludes(zoro, 'straw'), nameIncludes(zoro, 'zoro'), nameIncludes(zoro, 'Charlotte')]).toEqual([false, true, true, false]);
   });
 
   it('só vale no Selado (e no Livre): fica fora de todo formato de deck construído', () => {

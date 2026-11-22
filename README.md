@@ -302,7 +302,8 @@ boosters que o jogador abre na hora.
 
 - **Líder:** um dos que saíram nos boosters ou o **Luffy de 6 cores**, que todo jogador tem sempre. É o Líder dos
   eventos Sealed Battle da Bandai (Vida 5, 5000, "treated as a card with all card names, types, and attributes"): o
-  motor trata o Líder como tendo qualquer nome, tipo e atributo. A carta não tem número impresso, então o id é nosso
+  motor trata o Líder como tendo qualquer nome, tipo e atributo, inclusive nas condições do tipo "o tipo do seu Líder
+  inclui "CP"" (os [Trigger] do Jabra e do Kumadori, por exemplo). A carta não tem número impresso, então o id é nosso
   (`SEALED-001`, em `data/cards/sealed.json`, com a imagem em `apps/web/public/cards/`). Ela **só vale no Selado** (e
   no Livre): num deck construído, o aviso é "só pode ser usada no Selado".
 - **Coleções disponíveis:** as de booster (OP e EB) que estão completas no banco (cartas comuns, raras e, onde o
