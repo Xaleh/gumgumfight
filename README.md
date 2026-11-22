@@ -356,7 +356,11 @@ cartas), e cada linha de produto tem o seu booster (`BOOSTER_MODELS`, em `packag
   [guia do OP17 do TCG Talk](https://tcgtalk.com/guides/op17-pull-rates-case-opening) para as taxas.
 - **A arte dos boosters** é a do produto em inglês (`apps/web/public/boosters/<COLEÇÃO>.webp`, das páginas da Bandai;
   o EB04 usa a do produto japonês, o único que existe). Coleção sem arquivo aparece com um booster desenhado; para
-  uma coleção nova, basta pôr o arquivo na pasta. Pack Rush fechado, Draft e Cubo têm boosters próprios, desenhados.
+  uma coleção nova, basta pôr o arquivo na pasta.
+- **Pack Rush, Cubo e Draft têm arte própria**, do GumGum Fight (`RUSH.webp`, `CUBE.webp` e `DRAFT.webp`, na mesma
+  pasta; os desenhos e o jeito de refazê-los estão em `apps/web/art/boosters`). No Pack Rush, o booster fechado é o
+  "Pack Rush"; na abertura ele chega assim e, quando o brilho passa, **vira o booster da coleção sorteada** antes de
+  estourar.
 - **Abrir um booster** é uma cena: ele vem ao centro com um brilho, treme e gira carregando, **estoura em raios de
   luz** enquanto a embalagem rasga em duas, a pilha de cartas sobe e as cartas **voam para a mesa viradas para baixo**.
   As de destaque já chegam brilhando (SR e Líder em dourado, SEC em arco-íris). Aí o jogador **vira as cartas**, uma a

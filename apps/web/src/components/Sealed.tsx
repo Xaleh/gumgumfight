@@ -634,6 +634,7 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
         <BoosterOpening
           key={opening.at}
           set={packSet(opening.at)}
+          cover={mixed ? pool.set : undefined}
           label={t('sealed.openingPack', { n: opening.at + 1, total })}
           cards={pool.packs[opening.at].map((id) => byId.get(id)).filter((c): c is CardData => Boolean(c))}
           mode={animations === 'soft' ? 'burst' : opening.many ? 'auto' : 'reveal'}

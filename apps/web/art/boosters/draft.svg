@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1000" width="600" height="1000" data-name="DRAFT">
+<defs>
+  <clipPath id="draft-pack"><path d="M6.0,16.0 L15.8,6.0 L25.6,16.0 L35.4,6.0 L45.2,16.0 L55.0,6.0 L64.8,16.0 L74.6,6.0 L84.4,16.0 L94.2,6.0 L104.0,16.0 L113.8,6.0 L123.6,16.0 L133.4,6.0 L143.2,16.0 L153.0,6.0 L162.8,16.0 L172.6,6.0 L182.4,16.0 L192.2,6.0 L202.0,16.0 L211.8,6.0 L221.6,16.0 L231.4,6.0 L241.2,16.0 L251.0,6.0 L260.8,16.0 L270.6,6.0 L280.4,16.0 L290.2,6.0 L300.0,16.0 L309.8,6.0 L319.6,16.0 L329.4,6.0 L339.2,16.0 L349.0,6.0 L358.8,16.0 L368.6,6.0 L378.4,16.0 L388.2,6.0 L398.0,16.0 L407.8,6.0 L417.6,16.0 L427.4,6.0 L437.2,16.0 L447.0,6.0 L456.8,16.0 L466.6,6.0 L476.4,16.0 L486.2,6.0 L496.0,16.0 L505.8,6.0 L515.6,16.0 L525.4,6.0 L535.2,16.0 L545.0,6.0 L554.8,16.0 L564.6,6.0 L574.4,16.0 L584.2,6.0 L594.0,16.0 L594.0,984.0 L584.2,994.0 L574.4,984.0 L564.6,994.0 L554.8,984.0 L545.0,994.0 L535.2,984.0 L525.4,994.0 L515.6,984.0 L505.8,994.0 L496.0,984.0 L486.2,994.0 L476.4,984.0 L466.6,994.0 L456.8,984.0 L447.0,994.0 L437.2,984.0 L427.4,994.0 L417.6,984.0 L407.8,994.0 L398.0,984.0 L388.2,994.0 L378.4,984.0 L368.6,994.0 L358.8,984.0 L349.0,994.0 L339.2,984.0 L329.4,994.0 L319.6,984.0 L309.8,994.0 L300.0,984.0 L290.2,994.0 L280.4,984.0 L270.6,994.0 L260.8,984.0 L251.0,994.0 L241.2,984.0 L231.4,994.0 L221.6,984.0 L211.8,994.0 L202.0,984.0 L192.2,994.0 L182.4,984.0 L172.6,994.0 L162.8,984.0 L153.0,994.0 L143.2,984.0 L133.4,994.0 L123.6,984.0 L113.8,994.0 L104.0,984.0 L94.2,994.0 L84.4,984.0 L74.6,994.0 L64.8,984.0 L55.0,994.0 L45.2,984.0 L35.4,994.0 L25.6,984.0 L15.8,994.0 L6.0,984.0 Z"/></clipPath>
+  <linearGradient id="draft-foil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c79bff"/><stop offset="0.5" stop-color="#7d3fd0"/><stop offset="1" stop-color="#2a0f5c"/></linearGradient>
+  <linearGradient id="draft-round" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#000" stop-opacity="0.42"/><stop offset="0.1" stop-color="#000" stop-opacity="0"/>
+    <stop offset="0.24" stop-color="#fff" stop-opacity="0.2"/><stop offset="0.36" stop-color="#fff" stop-opacity="0"/>
+    <stop offset="0.9" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.46"/>
+  </linearGradient>
+  <linearGradient id="draft-sheen" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0.3" stop-color="#fff" stop-opacity="0"/><stop offset="0.42" stop-color="#fff" stop-opacity="0.26"/>
+    <stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="0.62" stop-color="#fff" stop-opacity="0.12"/><stop offset="0.7" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+  <radialGradient id="draft-glow" cx="0.5" cy="0.44" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="0.85"/><stop offset="0.45" stop-color="#b98bff" stop-opacity="0.35"/><stop offset="1" stop-color="#b98bff" stop-opacity="0"/></radialGradient>
+  <linearGradient id="draft-titleFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="0.55" stop-color="#fff3c4"/><stop offset="1" stop-color="#b98bff"/></linearGradient>
+  <linearGradient id="draft-vignette" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.2"/><stop offset="0.25" stop-color="#000" stop-opacity="0"/><stop offset="0.62" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.5"/></linearGradient>
+  <pattern id="draft-ridges" width="9" height="60" patternUnits="userSpaceOnUse"><rect width="9" height="60" fill="#6431ad"/><rect x="0" width="3" height="60" fill="#fff" opacity="0.28"/><rect x="5" width="2" height="60" fill="#000" opacity="0.18"/></pattern>
+  <pattern id="draft-dots" width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><circle cx="5" cy="5" r="2.2" fill="#fff" opacity="0.1"/></pattern>
+  <filter id="draft-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#000" flood-opacity="0.5"/></filter>
+  <filter id="draft-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="14"/></filter>
+</defs>
+<g clip-path="url(#draft-pack)">
+  <rect width="600" height="1000" fill="url(#draft-foil)"/>
+  <rect width="600" height="1000" fill="url(#draft-dots)"/>
+  <ellipse cx="300" cy="440" rx="330" ry="330" fill="url(#draft-glow)"/>
+  <path d="M300,440 L860.0,440.0 L856.0,507.0 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L837.3,597.8 L814.6,660.9 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L771.1,742.8 L731.5,797.0 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L666.7,863.2 L613.4,904.1 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L532.6,949.4 L470.0,973.6 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L379.7,994.3 L312.8,999.9 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L220.3,994.3 L154.5,980.8 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L67.4,949.4 L8.1,917.9 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L-66.7,863.2 L-114.7,816.3 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L-171.1,742.8 L-203.9,684.2 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L-237.3,597.8 L-252.3,532.3 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L-260.0,440.0 L-256.0,373.0 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L-237.3,282.2 L-214.6,219.1 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L-171.1,137.2 L-131.5,83.0 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L-66.7,16.8 L-13.4,-24.1 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L67.4,-69.4 L130.0,-93.6 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L220.3,-114.3 L287.2,-119.9 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L379.7,-114.3 L445.5,-100.8 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L532.6,-69.4 L591.9,-37.9 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L666.7,16.8 L714.7,63.7 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L771.1,137.2 L803.9,195.8 Z" fill="#fff" opacity="0.13"/><path d="M300,440 L837.3,282.2 L852.3,347.7 Z" fill="#fff" opacity="0.13"/>
+  <path d="M112,470 A196,196 0 0 1 430,292" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" opacity="0.95"/><path d="M398,246 L470,286 L404,338 Z" fill="#fff"/><path d="M488,414 A196,196 0 0 1 176,590" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" opacity="0.95"/><path d="M208,634 L134,598 L198,544 Z" fill="#fff"/>
+  <g transform="rotate(-22 300 720)" filter="url(#draft-shadow)">
+  <rect x="208" y="300" width="184" height="258" rx="14" fill="#2b1a5c" stroke="#fff" stroke-width="7"/>
+  <rect x="224" y="316" width="152" height="226" rx="9" fill="none" stroke="#c9a6ff" stroke-width="3" opacity="0.8"/>
+  <circle cx="300" cy="429" r="50" fill="none" stroke="#ffd66b" stroke-width="5"/>
+  <circle cx="300" cy="429" r="34" fill="none" stroke="#ffd66b" stroke-width="2" opacity="0.7"/>
+  <path d="M300,385 L309.68,419.32 L344,429 L309.68,438.68 L300,473 L290.32,438.68 L256,429 L290.32,419.32 Z" fill="#ffd66b" opacity="1.0"/>
+</g><g transform="rotate(22 300 720)" filter="url(#draft-shadow)">
+  <rect x="208" y="300" width="184" height="258" rx="14" fill="#2b1a5c" stroke="#fff" stroke-width="7"/>
+  <rect x="224" y="316" width="152" height="226" rx="9" fill="none" stroke="#c9a6ff" stroke-width="3" opacity="0.8"/>
+  <circle cx="300" cy="429" r="50" fill="none" stroke="#ffd66b" stroke-width="5"/>
+  <circle cx="300" cy="429" r="34" fill="none" stroke="#ffd66b" stroke-width="2" opacity="0.7"/>
+  <path d="M300,385 L309.68,419.32 L344,429 L309.68,438.68 L300,473 L290.32,438.68 L256,429 L290.32,419.32 Z" fill="#ffd66b" opacity="1.0"/>
+</g><g transform="rotate(0 300 720)" filter="url(#draft-shadow)">
+  <rect x="208" y="300" width="184" height="258" rx="14" fill="#2b1a5c" stroke="#fff" stroke-width="7"/>
+  <rect x="224" y="316" width="152" height="226" rx="9" fill="none" stroke="#c9a6ff" stroke-width="3" opacity="0.8"/>
+  <circle cx="300" cy="429" r="50" fill="none" stroke="#ffd66b" stroke-width="5"/>
+  <circle cx="300" cy="429" r="34" fill="none" stroke="#ffd66b" stroke-width="2" opacity="0.7"/>
+  <path d="M300,385 L309.68,419.32 L344,429 L309.68,438.68 L300,473 L290.32,438.68 L256,429 L290.32,419.32 Z" fill="#ffd66b" opacity="1.0"/>
+</g>
+  <path d="M92,224 L97.72,244.28 L118,250 L97.72,255.72 L92,276 L86.28,255.72 L66,250 L86.28,244.28 Z" fill="#fff" opacity="1.0"/><path d="M520,536 L525.28,554.72 L544,560 L525.28,565.28 L520,584 L514.72,565.28 L496,560 L514.72,554.72 Z" fill="#fff" opacity="1.0"/><path d="M506,190 L509.96,204.04 L524,208 L509.96,211.96 L506,226 L502.04,211.96 L488,208 L502.04,204.04 Z" fill="#fff" opacity="0.9"/><path d="M88,584 L91.52,596.48 L104,600 L91.52,603.52 L88,616 L84.48,603.52 L72,600 L84.48,596.48 Z" fill="#fff" opacity="0.9"/>
+  <rect width="600" height="1000" fill="url(#draft-vignette)"/>
+  <g transform="translate(300 832) skewX(-7) translate(-300 -832)">
+  <text x="300" y="742" font-size="66" letter-spacing="5" fill="#fff6d8" stroke-width="12" font-family="Bangers, Impact, sans-serif" text-anchor="middle" paint-order="stroke" stroke="#1f0a47" stroke-linejoin="round">PICK &amp; PASS</text>
+  <text x="306" y="880" font-size="160" letter-spacing="6" fill="#000" opacity="0.35" stroke-width="18" font-family="Bangers, Impact, sans-serif" text-anchor="middle" paint-order="stroke" stroke="#1f0a47" stroke-linejoin="round">DRAFT</text>
+  <text x="300" y="872" font-size="160" letter-spacing="6" fill="url(#draft-titleFill)" stroke-width="18" font-family="Bangers, Impact, sans-serif" text-anchor="middle" paint-order="stroke" stroke="#1f0a47" stroke-linejoin="round">DRAFT</text>
+</g>
+  <text x="300" y="922" font-family="Nunito, Arial, sans-serif" font-weight="900" font-size="21" letter-spacing="4.5" text-anchor="middle" fill="#fff" opacity="0.92">8 PLAYERS · 4 BOOSTERS</text>
+  <g font-family="Nunito, Arial, sans-serif" font-weight="900">
+    <rect x="30" y="80" width="196" height="40" rx="9" fill="#fff"/>
+    <text x="128" y="108" font-size="21" letter-spacing="1.5" text-anchor="middle" fill="#1f0a47">GUMGUM FIGHT</text>
+    <rect x="30" y="126" width="75" height="34" rx="8" fill="#1f0a47"/>
+    <text x="67.5" y="150" font-size="19" letter-spacing="2" text-anchor="middle" fill="#fff">POD</text>
+    <rect x="486" y="80" width="84" height="80" rx="12" fill="none" stroke="#fff" stroke-width="4" opacity="0.95"/>
+    <text x="528" y="126" font-family="Bangers, Impact, sans-serif" font-weight="400" font-size="46" text-anchor="middle" fill="#fff">12</text>
+    <text x="528" y="148" font-size="13" letter-spacing="2" text-anchor="middle" fill="#fff">CARDS</text>
+  </g>
+  <rect x="0" y="0" width="600" height="60" fill="url(#draft-ridges)"/>
+  <rect x="0" y="940" width="600" height="60" fill="url(#draft-ridges)"/>
+  <rect x="0" y="58" width="600" height="4" fill="#000" opacity="0.28"/><rect x="0" y="62" width="600" height="2" fill="#fff" opacity="0.3"/>
+  <rect x="0" y="936" width="600" height="4" fill="#000" opacity="0.28"/><rect x="0" y="934" width="600" height="2" fill="#fff" opacity="0.3"/>
+  <rect width="600" height="1000" fill="url(#draft-round)"/>
+  <rect width="600" height="1000" fill="url(#draft-sheen)"/>
+</g>
+<path d="M6.0,16.0 L15.8,6.0 L25.6,16.0 L35.4,6.0 L45.2,16.0 L55.0,6.0 L64.8,16.0 L74.6,6.0 L84.4,16.0 L94.2,6.0 L104.0,16.0 L113.8,6.0 L123.6,16.0 L133.4,6.0 L143.2,16.0 L153.0,6.0 L162.8,16.0 L172.6,6.0 L182.4,16.0 L192.2,6.0 L202.0,16.0 L211.8,6.0 L221.6,16.0 L231.4,6.0 L241.2,16.0 L251.0,6.0 L260.8,16.0 L270.6,6.0 L280.4,16.0 L290.2,6.0 L300.0,16.0 L309.8,6.0 L319.6,16.0 L329.4,6.0 L339.2,16.0 L349.0,6.0 L358.8,16.0 L368.6,6.0 L378.4,16.0 L388.2,6.0 L398.0,16.0 L407.8,6.0 L417.6,16.0 L427.4,6.0 L437.2,16.0 L447.0,6.0 L456.8,16.0 L466.6,6.0 L476.4,16.0 L486.2,6.0 L496.0,16.0 L505.8,6.0 L515.6,16.0 L525.4,6.0 L535.2,16.0 L545.0,6.0 L554.8,16.0 L564.6,6.0 L574.4,16.0 L584.2,6.0 L594.0,16.0 L594.0,984.0 L584.2,994.0 L574.4,984.0 L564.6,994.0 L554.8,984.0 L545.0,994.0 L535.2,984.0 L525.4,994.0 L515.6,984.0 L505.8,994.0 L496.0,984.0 L486.2,994.0 L476.4,984.0 L466.6,994.0 L456.8,984.0 L447.0,994.0 L437.2,984.0 L427.4,994.0 L417.6,984.0 L407.8,994.0 L398.0,984.0 L388.2,994.0 L378.4,984.0 L368.6,994.0 L358.8,984.0 L349.0,994.0 L339.2,984.0 L329.4,994.0 L319.6,984.0 L309.8,994.0 L300.0,984.0 L290.2,994.0 L280.4,984.0 L270.6,994.0 L260.8,984.0 L251.0,994.0 L241.2,984.0 L231.4,994.0 L221.6,984.0 L211.8,994.0 L202.0,984.0 L192.2,994.0 L182.4,984.0 L172.6,994.0 L162.8,984.0 L153.0,994.0 L143.2,984.0 L133.4,994.0 L123.6,984.0 L113.8,994.0 L104.0,984.0 L94.2,994.0 L84.4,984.0 L74.6,994.0 L64.8,984.0 L55.0,994.0 L45.2,984.0 L35.4,994.0 L25.6,984.0 L15.8,994.0 L6.0,984.0 Z" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="3"/>
+</svg>
