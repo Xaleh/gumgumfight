@@ -291,6 +291,7 @@ export function Menu({
   onAdmin,
   onTeamBot,
   onSealed,
+  onDraft,
   dev = false,
 }: {
   onStart: (s: GameSetup) => void;
@@ -316,6 +317,8 @@ export function Menu({
   onTeamBot?: () => void;
   /** Abre o Selado (boosters e deck de 40). */
   onSealed: () => void;
+  /** Abre a entrada do Draft (pods de coleção, Pack Rush ou Cubo). */
+  onDraft: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
@@ -1040,6 +1043,20 @@ export function Menu({
               live={sealedSets === null ? null : <Live off={!sealedSets}>{t('sealed.homeLive', { n: sealedSets })}</Live>}
               action={t('sealed.homeAction')}
               onAction={onSealed}
+              disabled={sealedSets === 0}
+            />
+            <ModeCard
+              mode="draft"
+              color="purple"
+              icon="deck"
+              kicker={t('sealed.homeKicker')}
+              title={t('draft.titlePlain')}
+              badge={t('draft.homeBadge')}
+              desc={t('draft.homeDesc')}
+              chips={[t('draft.homeChipPacks'), t('sealed.homeChipDeck'), t('draft.homeChipSource')]}
+              live={sealedSets === null ? null : <Live off={!sealedSets}>{t('sealed.homeLive', { n: sealedSets })}</Live>}
+              action={t('draft.homeAction')}
+              onAction={onDraft}
               disabled={sealedSets === 0}
             />
           </div>

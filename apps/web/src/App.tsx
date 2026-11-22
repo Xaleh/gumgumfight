@@ -50,7 +50,7 @@ type Screen =
   /** `sealed`: sala de Selado aberta pela tela do Selado (e volta para o deck dele). */
   | { name: 'online'; seat: OnlineSeat; tournament?: string; lobby?: boolean; sealed?: string }
   /** Selado (Pré-release): abrir boosters, montar o deck de 40 e jogar. `pool`: abre direto esse deck. */
-  | { name: 'sealed'; pool?: string }
+  | { name: 'sealed'; pool?: string; hub?: 'sealed' | 'draft' }
   /** Pod de Draft: sala de espera, escolhas e, no fim, a ida para a montagem do deck (tela do Selado). */
   | { name: 'draft'; pod: string };
 
@@ -247,8 +247,9 @@ function MainApp() {
   if (screen.name === 'sealed') {
     return (
       <Sealed
-        key={screen.pool ?? 'hub'}
+        key={screen.pool ?? `hub-${screen.hub ?? 'sealed'}`}
         openId={screen.pool}
+        hub={screen.hub}
         onExit={() => setScreen({ name: 'menu' })}
         onStart={(setup, pool) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'sealed', pool } })}
         onOnline={(seat, pool) => setScreen({ name: 'online', seat, sealed: pool })}
@@ -257,7 +258,7 @@ function MainApp() {
     );
   }
   if (screen.name === 'draft') {
-    return <Draft key={screen.pod} podId={screen.pod} onExit={() => setScreen({ name: 'sealed' })} onBuild={(pool) => setScreen({ name: 'sealed', pool })} />;
+    return <Draft key={screen.pod} podId={screen.pod} onExit={() => setScreen({ name: 'sealed', hub: 'draft' })} onBuild={(pool) => setScreen({ name: 'sealed', pool })} />;
   }
   if (screen.name === 'game') {
     const { setup } = screen;
@@ -293,7 +294,8 @@ function MainApp() {
       onTournamentMatch={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
       onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
       onTeamBot={isTeam(user) ? () => setScreen({ name: 'team' }) : undefined}
-      onSealed={() => setScreen({ name: 'sealed' })}
+      onSealed={() => setScreen({ name: 'sealed', hub: 'sealed' })}
+      onDraft={() => setScreen({ name: 'sealed', hub: 'draft' })}
       dev={dev}
     />
   );

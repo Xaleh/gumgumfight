@@ -231,6 +231,18 @@ const sealedPtBR = {
   'sealed.openHintMouse': 'Clique numa carta para virar',
   'sealed.openHintTouch': 'Toque numa carta para virar',
   'sealed.openFaceDown': 'Carta {n}, virada para baixo',
+  // ---- Draft com cartão e entrada próprios ----
+  'draft.hubKicker': 'Limitado · pod de 8',
+  'draft.homeBadge': 'Pod de 8',
+  'draft.homeDesc': 'Cada um abre um booster, fica com 1 carta e passa o resto. Jogue com amigos: os lugares vazios viram bots.',
+  'draft.homeChipPacks': '4 boosters por jogador',
+  'draft.homeChipSource': 'Coleção, Pack Rush ou Cubo',
+  'draft.homeAction': 'Draftar',
+  'draft.rushIntro': 'Escolha de {min} a {max} coleções. O booster de cada lugar, em cada rodada, é sorteado entre elas. Vale qualquer Líder do jogo.',
+  'draft.joinTitle': 'Tem um código?',
+  'draft.joinHint': 'Entre no pod que um amigo criou.',
+  'draft.myDecks': 'Seus decks de Draft',
+  'draft.noDecks': 'Você ainda não terminou nenhum draft.',
 };
 
 export default sealedPtBR;

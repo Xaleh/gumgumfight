@@ -389,12 +389,15 @@ qualquer cor, sem limite de cópias e sem banidas.
 - **Bot:** abre os próprios boosters, sorteados entre as mesmas coleções.
 - No banco, o deck de Pack Rush é uma linha de `sealed_pools` com `kind = 'rush'`, a chave das coleções em `set_code`
   ("OP01+OP05", em ordem) e a coleção de cada booster em `pack_sets`. Nas salas, essa chave vai em `sealedSet`.
-- O Pack Rush também vale no Draft (abaixo): com "Pack Rush" marcado, o pod drafta as coleções escolhidas.
+- O Pack Rush também vale no Draft (abaixo): na tela do Draft, com "Pack Rush" marcado, o pod drafta as coleções
+  escolhidas.
 
 ### Draft
 
-Na tela do Selado, **Criar pod de Draft** abre um **pod de 8 lugares** com a coleção marcada (ou, no Pack Rush, com
-as coleções marcadas). Quem criou recebe um **código de 6 letras**; os outros entram por "Entrar no pod". Quem criou
+O **Draft** tem cartão próprio em **Modos especiais**, ao lado do Selado, e uma tela só dele: escolher a fonte (uma
+coleção, Pack Rush ou Cubo), criar um pod ou entrar num pelo código, e a lista dos seus decks de Draft (os decks de
+boosters abertos ficam na tela do Selado). **Criar pod de Draft** abre um **pod de 8 lugares** com a coleção marcada
+(ou, no Pack Rush, com as coleções marcadas). Quem criou recebe um **código de 6 letras**; os outros entram por "Entrar no pod". Quem criou
 começa quando quiser, e **os lugares vazios viram bots**: dá para draftar sozinho contra 7 bots.
 
 - **Como é:** cada um abre um booster de 12 cartas, **fica com 1** e passa o resto para o vizinho, até o booster
@@ -408,9 +411,10 @@ começa quando quiser, e **os lugares vazios viram bots**: dá para draftar sozi
 - **Bots:** escolhem na hora, pela nota que a montagem automática usa (custo, poder, Counter, palavras-chave) mais um
   bônus de raridade e um pouco de acaso. Pegam no máximo um Líder.
 - **Sair e voltar:** sair no meio deixa o lugar escolhendo sozinho, e o deck fica guardado. Recarregar a página ou
-  fechar o app não tira ninguém: a tela do Selado mostra "Você está num pod de Draft" com o botão para voltar. Cada
+  fechar o app não tira ninguém: as telas do Draft e do Selado mostram "Você está num pod de Draft" com o botão para
+  voltar. Cada
   jogador fica em **um pod por vez**.
-- **O deck:** no fim, as 48 escolhas viram um deck selado (aparece na lista "Seus decks selados" como "Draft OP01") e
+- **O deck:** no fim, as 48 escolhas viram um deck selado (aparece na lista "Seus decks de Draft" como "Draft OP01") e
   a montagem é a do Selado: 40 cartas, qualquer cor, "Montar sozinho". O Líder é um dos que você pegou ou o Luffy de 6
   cores; no Pack Rush draft, qualquer Líder do jogo.
 - **Jogar:** a **sala privada** de um deck de Draft só aceita decks **do mesmo pod**. **Contra o bot**, o oponente é
@@ -427,7 +431,7 @@ começa quando quiser, e **os lugares vazios viram bots**: dá para draftar sozi
 
 ### Draft Cubo
 
-Na tela do Selado, a opção **Cubo** troca as coleções pelo **Cubo GumGum**: uma lista fixa de **420 cartas, uma cópia
+Na tela do Draft, a opção **Cubo** troca as coleções pelo **Cubo GumGum**: uma lista fixa de **420 cartas, uma cópia
 de cada, 70 por cor**, com as cartas mais usadas de One Piece em todas as coleções. "Ver a lista" mostra as 420, por
 cor, com o uso de cada uma; "Criar pod de Draft Cubo" abre um pod igual ao do Draft (8 lugares, bots nos vazios,
 código para chamar os amigos, 4 boosters de 12, o mesmo relógio).

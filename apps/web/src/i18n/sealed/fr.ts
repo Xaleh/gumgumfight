@@ -230,6 +230,18 @@ const sealed = {
   'sealed.openHintMouse': 'Cliquez sur une carte pour la retourner',
   'sealed.openHintTouch': 'Touchez une carte pour la retourner',
   'sealed.openFaceDown': 'Carte {n}, face cachée',
+  // ---- Draft com cartão e entrada próprios ----
+  'draft.hubKicker': 'Limité · pod de 8',
+  'draft.homeBadge': 'Pod de 8',
+  'draft.homeDesc': 'Chacun ouvre un booster, garde 1 carte et passe le reste. Jouez entre amis : les places vides sont prises par des bots.',
+  'draft.homeChipPacks': '4 boosters par joueur',
+  'draft.homeChipSource': 'Collection, Pack Rush ou Cube',
+  'draft.homeAction': 'Drafter',
+  'draft.rushIntro': 'Choisissez de {min} à {max} collections. Le booster de chaque place, à chaque manche, est tiré parmi elles. N’importe quel Leader du jeu est autorisé.',
+  'draft.joinTitle': 'Vous avez un code ?',
+  'draft.joinHint': 'Rejoignez le pod créé par un ami.',
+  'draft.myDecks': 'Vos decks de Draft',
+  'draft.noDecks': 'Vous n’avez encore terminé aucun draft.',
 };
 
 export default sealed;
