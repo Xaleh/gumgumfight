@@ -3218,6 +3218,11 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   if ((m = s.match(/^your (?:\{([^}]+)\} type )?Leader's base power becomes (\d+)$/i))) {
     return [{ ...base, aura: { kinds: ['leader'], power: 0, basePower: Number(m[2]), ...(m[1] ? { hasAnyType: [m[1]] } : {}) } }];
   }
+  // "set the base power of all of your {Five Elders} type Characters to 7000" (OP13-084 Ju Peter, [Your Turn]):
+  // o poder base passa a ser o valor, para mais ou para menos (Q&A OP17: o Five Elders de 12000 fica com 7000).
+  if ((m = s.match(/^set the base power of all of your \{([^}]+)\} type Characters to (\d+)$/i))) {
+    return [{ ...base, aura: { kinds: ['character'], power: 0, hasAnyType: [m[1]], basePower: Number(m[2]) } }];
+  }
   if ((m = s.match(/^All of your \[([^\]]+)\] cards and this Character gain \[(Rush|Blocker|Double Attack|Banish|Unblockable)\]$/i))) {
     const kw = KEYWORDS[m[2].toLowerCase()];
     return [{ ...base, aura: { kinds: ['leader', 'character'], power: 0, names: [m[1]], keyword: kw } }, { ...base, staticKeyword: kw }];

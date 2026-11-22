@@ -177,6 +177,14 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   // Kouzuki Oden: a API perde o "or Character card" e o efeito vira "Land of Wano E Whitebeard Pirates";
   // o ST32-002 (só Land of Wano) não podia ser jogado (card 84 do Trello, conferido na lista oficial).
   'OP17-007': [['{Land of Wano} type Character card with a type including', '{Land of Wano} type Character card or Character card with a type including']],
+  // St. Shepherd Ju Peter: na versão normal a API traz o [On Play] do St. Jaygarcia Saturn (OP13-083) no lugar
+  // do [Your Turn]; as versões _p1/_p2 da API e a lista oficial (conferida em 22/11/2026) trazem o certo.
+  'OP13-084': [
+    [
+      '[On Play] Look at 5 cards from the top of your deck; reveal up to 1 "Five Elders" type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.',
+      '[Your Turn] If you have 10 or more cards in your trash, set the base power of all of your {Five Elders} type Characters to 7000.',
+    ],
+  ],
   // Spoilers com erro de digitação (deduzidos; o leitor já tolerava).
   'EB05-039': [['{Vinsmoke Family}', '{The Vinsmoke Family}']], // Pink Hornet
   'EB05-048': [['with a cost of O cannot', 'with a cost of 0 cannot']], // Hedgehog Stinger
