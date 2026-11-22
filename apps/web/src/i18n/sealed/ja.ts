@@ -224,6 +224,12 @@ const sealed = {
   'sealed.filterShowing': '{total}枚中{n}枚を表示',
   'sealed.filterClear': 'フィルターを解除',
   'sealed.filterNone': 'この条件に合うカードはありません。',
+  'sealed.openSkip': 'スキップ',
+  'sealed.openRevealAll': 'すべて表にする',
+  'sealed.openContinue': '続ける',
+  'sealed.openHintMouse': 'カードをクリックして表にする',
+  'sealed.openHintTouch': 'カードをタップして表にする',
+  'sealed.openFaceDown': 'カード{n}（裏向き）',
 };
 
 export default sealed;

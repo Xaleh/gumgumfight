@@ -225,6 +225,12 @@ const sealedPtBR = {
   'sealed.filterShowing': 'Mostrando {n} de {total}',
   'sealed.filterClear': 'Limpar filtros',
   'sealed.filterNone': 'Nenhuma das suas cartas passa por esses filtros.',
+  'sealed.openSkip': 'Pular',
+  'sealed.openRevealAll': 'Revelar tudo',
+  'sealed.openContinue': 'Continuar',
+  'sealed.openHintMouse': 'Clique numa carta para virar',
+  'sealed.openHintTouch': 'Toque numa carta para virar',
+  'sealed.openFaceDown': 'Carta {n}, virada para baixo',
 };
 
 export default sealedPtBR;

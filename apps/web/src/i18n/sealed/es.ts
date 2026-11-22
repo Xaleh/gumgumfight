@@ -224,6 +224,12 @@ const sealed = {
   'sealed.filterShowing': 'Mostrando {n} de {total}',
   'sealed.filterClear': 'Quitar filtros',
   'sealed.filterNone': 'Ninguna de tus cartas pasa por esos filtros.',
+  'sealed.openSkip': 'Saltar',
+  'sealed.openRevealAll': 'Revelar todo',
+  'sealed.openContinue': 'Continuar',
+  'sealed.openHintMouse': 'Haz clic en una carta para girarla',
+  'sealed.openHintTouch': 'Toca una carta para girarla',
+  'sealed.openFaceDown': 'Carta {n}, boca abajo',
 };
 
 export default sealed;
