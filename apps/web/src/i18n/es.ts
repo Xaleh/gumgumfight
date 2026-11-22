@@ -8,6 +8,7 @@ import decks from './decks/es';
 import team from './team/es';
 import chamber from './chamber/es';
 import sealed from './sealed/es';
+import yonko from './yonko/es';
 
 export default {
   // ---- general ----
@@ -2458,6 +2459,14 @@ export default {
   'engine.optPeekOwnLife': 'Mirar tu Vida',
   'engine.optPeekOpponentLife': 'Mirar la Vida de tu rival',
   'engine.optDontPeek': 'No mirar',
+  // ---- mesa con más de dos jugadores (Yonko) ----
+  'engine.whoseDonToRest': '{source}: ¿girar 1 DON!! activo de qué rival?',
+  'engine.whoseDonSkipsRefresh': '{source}: ¿el DON!! girado de qué rival no se endereza?',
+  'engine.optRestDonOf': 'Girar 1 DON!! activo de {player}',
+  'engine.optSkipRefreshDonOf': '1 DON!! girado de {player}',
+  'engine.startCurve': '{player}: elige tu salida.',
+  'engine.optCurveOdd': '1 DON!! en el primer turno y robar 1 carta (1, 3, 5, 7, 9, 10)',
+  'engine.optCurveEven': '2 DON!! en el primer turno, sin robar (2, 4, 6, 8, 10)',
   'engine.optYesLifeTrash': 'Sí, descartar {n|# carta|# cartas} de la parte superior de mi Vida',
   'engine.optYesDiscard': 'Sí, descartar {n|# carta|# cartas} de mi mano',
   'engine.optYesReturnDon': 'Sí, devolver {n|# DON!! activo|# DON!! activos}',
@@ -2548,6 +2557,12 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Ambos jugadores terminaron el turno sin cartas en el mazo.',
   'log.winDeckOutLeaderRule': '{player} se quedó sin cartas en el mazo y gana por la regla de su Líder.',
   'log.winBothDeckOutLeaderRule': 'Ambos jugadores se quedaron sin cartas en el mazo y ganan por la regla de su Líder.',
+  // ---- mesa con más de dos jugadores (Yonko) ----
+  'log.winAllOut': 'Todos los jugadores que quedaban fueron derrotados al mismo tiempo.',
+  'log.eliminated': '{player} fue eliminado. {reason}',
+  'log.eliminationReward': '{player} roba {n|# carta|# cartas} por eliminar a {target}.',
+  'log.startCurveOdd': '{player} elige 1 DON!! en su primer turno y robar 1 carta.',
+  'log.startCurveEven': '{player} elige 2 DON!! en su primer turno, sin robar.',
   // ---- deshacer ----
   'log.cancelPlay': '{player} deshace la jugada de {card} (la carta vuelve a su mano).',
   'log.cancelActivate': '{player} deshace la activación de {card}.',
@@ -3092,5 +3107,6 @@ export default {
   ...team,
   ...chamber,
   ...sealed,
+  ...yonko,
 } satisfies Messages;
 

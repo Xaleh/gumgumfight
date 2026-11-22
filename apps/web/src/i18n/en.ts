@@ -8,6 +8,7 @@ import decks from './decks/en';
 import team from './team/en';
 import chamber from './chamber/en';
 import sealed from './sealed/en';
+import yonko from './yonko/en';
 
 export default {
   // ---- general ----
@@ -2458,6 +2459,14 @@ export default {
   'engine.optPeekOwnLife': 'Look at your Life',
   'engine.optPeekOpponentLife': "Look at your opponent's Life",
   'engine.optDontPeek': "Don't look",
+  // ---- table with more than two players (Yonko) ----
+  'engine.whoseDonToRest': '{source}: rest 1 active DON!! of which opponent?',
+  'engine.whoseDonSkipsRefresh': "{source}: which opponent's rested DON!! stays rested?",
+  'engine.optRestDonOf': "Rest 1 of {player}'s active DON!!",
+  'engine.optSkipRefreshDonOf': "1 of {player}'s rested DON!!",
+  'engine.startCurve': '{player}: choose your start.',
+  'engine.optCurveOdd': '1 DON!! on the first turn and draw a card (1, 3, 5, 7, 9, 10)',
+  'engine.optCurveEven': '2 DON!! on the first turn, no draw (2, 4, 6, 8, 10)',
   'engine.optYesLifeTrash': 'Yes, trash {n|# card|# cards} from the top of my Life',
   'engine.optYesDiscard': 'Yes, trash {n|# card|# cards} from my hand',
   'engine.optYesReturnDon': 'Yes, return {n|# active DON!!|# active DON!!}',
@@ -2548,6 +2557,12 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Both players ended the turn with no cards in their decks.',
   'log.winDeckOutLeaderRule': "{player} ran out of cards in their deck and wins by their Leader's rule.",
   'log.winBothDeckOutLeaderRule': "Both players ran out of cards in their decks and win by their Leader's rule.",
+  // ---- table with more than two players (Yonko) ----
+  'log.winAllOut': 'All remaining players were defeated at the same time.',
+  'log.eliminated': '{player} was eliminated. {reason}',
+  'log.eliminationReward': '{player} draws {n|# card|# cards} for eliminating {target}.',
+  'log.startCurveOdd': '{player} chooses 1 DON!! on their first turn and draws a card.',
+  'log.startCurveEven': '{player} chooses 2 DON!! on their first turn, without drawing.',
   // ---- undo ----
   'log.cancelPlay': '{player} undoes playing {card} (the card returns to their hand).',
   'log.cancelActivate': "{player} undoes activating {card}.",
@@ -3092,5 +3107,6 @@ export default {
   ...team,
   ...chamber,
   ...sealed,
+  ...yonko,
 } satisfies Messages;
 

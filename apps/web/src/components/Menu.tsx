@@ -292,6 +292,7 @@ export function Menu({
   onTeamBot,
   onSealed,
   onDraft,
+  onYonko,
   dev = false,
 }: {
   onStart: (s: GameSetup) => void;
@@ -319,6 +320,8 @@ export function Menu({
   onSealed: () => void;
   /** Abre a entrada do Draft (pods de coleção, Pack Rush ou Cubo). */
   onDraft: () => void;
+  /** Abre a sala do Yonko (mesa de todos contra todos). */
+  onYonko: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
@@ -1058,6 +1061,19 @@ export function Menu({
               action={t('draft.homeAction')}
               onAction={onDraft}
               disabled={sealedSets === 0}
+            />
+            <ModeCard
+              mode="yonko"
+              color="red"
+              icon="crown"
+              kicker={t('yonko.homeKicker')}
+              title={t('yonko.title')}
+              badge={t('yonko.homeBadge')}
+              desc={t('yonko.homeDesc')}
+              chips={[t('yonko.homeChipPlayers'), t('yonko.homeChipDeck'), t('yonko.homeChipBots')]}
+              live={null}
+              action={t('yonko.homeAction')}
+              onAction={onYonko}
             />
           </div>
         </section>

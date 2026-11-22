@@ -8,6 +8,7 @@ import decks from './decks/de';
 import team from './team/de';
 import chamber from './chamber/de';
 import sealed from './sealed/de';
+import yonko from './yonko/de';
 
 export default {
   // ---- Allgemein ----
@@ -2458,6 +2459,14 @@ export default {
   'engine.optPeekOwnLife': 'Dein Leben ansehen',
   'engine.optPeekOpponentLife': 'Leben des Gegners ansehen',
   'engine.optDontPeek': 'Nicht ansehen',
+  // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
+  'engine.whoseDonToRest': '{source}: Von welchem Gegner 1 aktive DON!! erschöpfen?',
+  'engine.whoseDonSkipsRefresh': '{source}: Bei welchem Gegner bleibt die erschöpfte DON!! erschöpft?',
+  'engine.optRestDonOf': '1 aktive DON!! von {player} erschöpfen',
+  'engine.optSkipRefreshDonOf': '1 erschöpfte DON!! von {player}',
+  'engine.startCurve': '{player}: Wähle deinen Start.',
+  'engine.optCurveOdd': '1 DON!! im ersten Zug und 1 Karte ziehen (1, 3, 5, 7, 9, 10)',
+  'engine.optCurveEven': '2 DON!! im ersten Zug, ohne zu ziehen (2, 4, 6, 8, 10)',
   'engine.optYesLifeTrash': 'Ja, {n|# Karte|# Karten} von oben aus meinem Leben ablegen',
   'engine.optYesDiscard': 'Ja, {n|# Karte|# Karten} von meiner Hand ablegen',
   'engine.optYesReturnDon': 'Ja, {n|# aktive DON!!|# aktive DON!!} zurücklegen',
@@ -2548,6 +2557,12 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Beide Spieler haben den Zug ohne Karten im Deck beendet.',
   'log.winDeckOutLeaderRule': '{player} hat keine Karten mehr im Deck und gewinnt durch die Regel seines Leaders.',
   'log.winBothDeckOutLeaderRule': 'Beide Spieler haben keine Karten mehr im Deck und gewinnen durch die Regel ihres Leaders.',
+  // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
+  'log.winAllOut': 'Alle verbliebenen Spieler wurden gleichzeitig besiegt.',
+  'log.eliminated': '{player} ist ausgeschieden. {reason}',
+  'log.eliminationReward': '{player} zieht {n|# Karte|# Karten} für das Ausschalten von {target}.',
+  'log.startCurveOdd': '{player} wählt 1 DON!! im ersten Zug und zieht 1 Karte.',
+  'log.startCurveEven': '{player} wählt 2 DON!! im ersten Zug, ohne zu ziehen.',
   // ---- Rückgängig ----
   'log.cancelPlay': '{player} macht das Spielen von {card} rückgängig (die Karte kehrt auf die Hand zurück).',
   'log.cancelActivate': '{player} macht das Aktivieren von {card} rückgängig.',
@@ -3092,5 +3107,6 @@ export default {
   ...team,
   ...chamber,
   ...sealed,
+  ...yonko,
 } satisfies Messages;
 

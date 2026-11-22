@@ -7,10 +7,12 @@
 //  - cada carta precisa ter ao menos uma cor em comum com o Líder;
 //  - com um formato informado, cartas banidas, pares proibidos e (no Standard)
 //    cartas rotacionadas também invalidam o deck (veja formats.ts).
+// O Yonko (mesa de todos contra todos) tem as suas: 60 cartas, uma cópia de cada (`validateYonkoDeck`).
 
 import { buildCardDef, needsManual } from './cards';
-import { DECK_SIZE, hasType } from './engine';
+import { DECK_SIZE, hasType, YONKO_DECK_SIZE } from './engine';
 import { formatIssues, type PlayFormat, type RuleParams } from './formats';
+import { nextRandom } from './rng';
 import type { CardData, DeckList, GameState, LeaderRule, PlayerId } from './types';
 import { HIDDEN_CARD, HIDDEN_REF } from './view';
 
@@ -81,6 +83,68 @@ export interface ValidateOptions {
   format?: PlayFormat;
   /** Data usada nas proibições com data marcada (padrão: agora). */
   now?: Date;
+  /** Tamanho do deck (padrão: `DECK_SIZE`). */
+  size?: number;
+  /**
+   * Máximo de cópias de cada carta (padrão: `MAX_COPIES`). Quando informado, vale para toda carta, inclusive
+   * as que dizem "you may have any number of this card in your deck" (o limite é do formato, não da carta).
+   */
+  maxCopies?: number;
+}
+
+/**
+ * Deck do Yonko (Four Emperors): 60 cartas, uma cópia de cada. A carta é o número dela ("the unique set code in
+ * the corner"): duas cartas de mesmo nome e números diferentes cabem juntas; duas artes do mesmo número, não
+ * (a lista do deck já junta as artes num número só). O resto é o de sempre: só cartas da cor do Líder.
+ */
+export function validateYonkoDeck(deck: DeckList, cards: Map<string, CardData> | Record<string, CardData>, options: ValidateOptions = {}): DeckReport {
+  return validateDeck(deck, cards, { ...options, size: YONKO_DECK_SIZE, maxCopies: 1 });
+}
+
+/**
+ * O deck que vai para a mesa do Yonko: um deck de 60 que fecha as regras do formato vai como está; um deck
+ * comum completo (50) vira o deck de teste de `yonkoDeckFrom`. `test` diz qual dos dois. `null`: o deck não
+ * serve (incompleto, ou sem cartas que cheguem para 60).
+ */
+export function yonkoTableDeck(deck: DeckList, cards: Iterable<CardData>, seed: number): { deck: DeckList; test: boolean } | null {
+  const byId = new Map<string, CardData>();
+  for (const c of cards) byId.set(c.id, c);
+  if (validateYonkoDeck(deck, byId).valid) return { deck, test: false };
+  if (!validateDeck(deck, byId).valid) return null;
+  const made = yonkoDeckFrom(deck, byId.values(), seed);
+  return made ? { deck: made, test: true } : null;
+}
+
+/**
+ * Deck de Yonko montado a partir de um deck comum, para experimentar a mesa enquanto o construtor não monta os
+ * de 60: o Líder do deck e uma cópia de cada carta dele, completado até 60 com cartas sorteadas de `cards` que
+ * o Líder aceita (cor e regra do Líder), sem Líderes e sem cartas de efeito ainda não automatizado. O sorteio
+ * sai da `seed`: mesma seed, mesmo deck. `null` quando não há cartas diferentes que cheguem para 60.
+ */
+export function yonkoDeckFrom(deck: Pick<DeckList, 'leader' | 'cards' | 'name' | 'id'> & { arts?: DeckList['arts'] }, cards: Iterable<CardData>, seed: number): DeckList | null {
+  const byId = new Map<string, CardData>();
+  for (const c of cards) byId.set(c.id, c);
+  const leader = byId.get(deck.leader);
+  if (!leader || leader.category !== 'leader') return null;
+  const fits = (c: CardData | undefined): c is CardData => Boolean(c && c.category !== 'leader' && isColorCompatible(leader, c) && leaderAllows(leader, c));
+  const picked: string[] = [];
+  for (const entry of deck.cards) {
+    if (picked.length < YONKO_DECK_SIZE && !picked.includes(entry.id) && fits(byId.get(entry.id))) picked.push(entry.id);
+  }
+  const pool = [...byId.values()]
+    .filter((c) => fits(c) && !picked.includes(c.id) && !needsManual(c))
+    .map((c) => c.id)
+    .sort();
+  if (picked.length + pool.length < YONKO_DECK_SIZE) return null;
+  const rng = { rng: seed | 0 };
+  while (picked.length < YONKO_DECK_SIZE) picked.push(pool.splice(Math.floor(nextRandom(rng) * pool.length), 1)[0]);
+  return {
+    id: deck.id,
+    name: deck.name,
+    leader: deck.leader,
+    cards: picked.map((id) => ({ id, count: 1 })),
+    ...(deck.arts ? { arts: deck.arts } : {}),
+  };
 }
 
 export function validateDeck(
@@ -104,10 +168,11 @@ export function validateDeck(
     error(`${leader.name} não é um Líder.`, 'notLeader', { name: leader.name }, leader.id);
   } else if (needsManual(leader)) unscripted.add(leader.id);
 
-  if (total < DECK_SIZE) {
-    error(`O deck tem ${total} cartas; faltam ${DECK_SIZE - total}.`, 'tooFewCards', { total, missing: DECK_SIZE - total });
-  } else if (total > DECK_SIZE) {
-    error(`O deck tem ${total} cartas; sobram ${total - DECK_SIZE}.`, 'tooManyCards', { total, extra: total - DECK_SIZE });
+  const size = options.size ?? DECK_SIZE;
+  if (total < size) {
+    error(`O deck tem ${total} cartas; faltam ${size - total}.`, 'tooFewCards', { total, missing: size - total });
+  } else if (total > size) {
+    error(`O deck tem ${total} cartas; sobram ${total - size}.`, 'tooManyCards', { total, extra: total - size });
   }
 
   const counts = new Map<string, number>();
@@ -122,8 +187,9 @@ export function validateDeck(
     const name = card.name;
     if (count < 1) error(`Quantidade inválida de ${name}.`, 'badCount', { name }, id);
     if (card.category === 'leader') error(`${name} é um Líder e não pode ir no deck.`, 'leaderInDeck', { name }, id);
-    if (count > MAX_COPIES && !anyNumberAllowed(card)) {
-      error(`${name} (${id}): máximo de ${MAX_COPIES} cópias.`, 'maxCopies', { name, id, n: MAX_COPIES }, id);
+    if (options.maxCopies !== undefined ? count > options.maxCopies : count > MAX_COPIES && !anyNumberAllowed(card)) {
+      const n = options.maxCopies ?? MAX_COPIES;
+      error(`${name} (${id}): máximo de ${n} ${n === 1 ? 'cópia' : 'cópias'}.`, 'maxCopies', { name, id, n }, id);
     }
     const broken = leader?.category === 'leader' ? leaderRuleBroken(leader, card) : undefined;
     if (broken?.kind === 'deckMaxCost') {

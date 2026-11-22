@@ -1,8 +1,11 @@
 # Plano: novos modos de jogo (All Blue, Selado, Pack Rush, Cubo e Yonko)
 
-> Status (21/11/2026): **All Blue, Pré-release (Selado de uma coleção), Pack Rush (selado e draft), Draft e Draft Cubo
-> implementados**; o README (seções "All Blue", "Selado", "Pack Rush", "Draft" e "Draft Cubo") descreve o que existe. Os outros modos seguem como proposta, na ordem da
-> seção 1.
+> Status (22/11/2026): **All Blue, Pré-release (Selado de uma coleção), Pack Rush (selado e draft), Draft e Draft Cubo
+> implementados**; o README (seções "All Blue", "Selado", "Pack Rush", "Draft" e "Draft Cubo") descreve o que existe.
+> **Yonko: fases 1, 2 e 3 feitas** (o motor com até 4 jogadores pelas regras do manual do formato, a mesa online
+> com código para até 4 pessoas e bots nos lugares vagos, a mesa local contra bots, e o construtor de decks de 60;
+> ver a seção 4, [`regras-yonko.md`](regras-yonko.md) e a seção "Yonko" do README). Falta a fase 4 (espectador e
+> replay) e o bot com busca.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
 > as imagens `.webp` da pasta são as mesmas telas). As cartas das telas são ilustrativas e os números são de exemplo.
 
@@ -15,7 +18,7 @@
 | **Selado: Draft** ✅ | Pod de 8 (bots nos lugares vazios): cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
 | **Pack Rush** ✅ (selado e draft) | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
 | **Draft Cubo** ✅ | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
-| **Yonko** | Mesa de 4, todos contra todos, formato da comunidade inspirado no Commander. | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
+| **Yonko** 🚧 (jogável online; falta espectador e replay) | Mesa de 4, todos contra todos, deck de 60 sem repetição: o formato da comunidade "Four Emperors". | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
 
 Em esforço relativo, com o All Blue valendo 1: Pré-release ≈ 3, Draft ≈ +2, Pack Rush ≈ +1, Cubo ≈ +1,5 e Yonko ≈ 8
 ou mais. O Yonko é o único que muda o motor de regras; os outros são regras de deck e telas novas em volta da partida
@@ -24,8 +27,9 @@ que já existe.
 **Ordem sugerida:** All Blue → Pré-release → Pack Rush selado → Draft (já com Pack Rush) → Cubo → Selado nos torneios →
 Yonko. Cada passo é entregável sozinho, e dá para parar depois de qualquer um.
 
-De onde vêm as regras: All Blue, Pack Rush, Cubo e Yonko são formatos de fã, definidos por você nesta conversa. O
-Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha encontrado, então a proposta é nossa.
+De onde vêm as regras: All Blue, Pack Rush e Cubo são formatos de fã, definidos por você nesta conversa. O Yonko
+segue o manual do formato da comunidade ("Four Emperors Play Sheet", resumido em [`regras-yonko.md`](regras-yonko.md)).
+O Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha encontrado, então a proposta é nossa.
 
 ## 2. All Blue
 
@@ -255,44 +259,35 @@ de cada, lista pelas estatísticas globais) e Draft (pod de 8 com bots completan
 ![Mesa de 4](mockups/modos-de-jogo/08-yonko-mesa.webp)
 ![No celular](mockups/modos-de-jogo/09-celular.webp)
 
-### Regras propostas ("Padrão GumGum v1")
+### Regras
 
-Partindo do que você descreveu, fechando os pontos que o formato da comunidade deixa em aberto:
+As regras são as do manual do formato, "Four Emperors Play Sheet". O resumo, regra a regra, com o que o motor faz
+em cada uma e o que é interpretação nossa, está em [`regras-yonko.md`](regras-yonko.md). Em poucas linhas:
 
-- **4 jogadores**, cada um com um deck construído normal (50 cartas), todos no mesmo formato.
-- **Ordem:** cada um rola o dado (o `DiceRoll` que já existe); o maior começa e a mesa segue no sentido horário.
-- **Início:** o 1º não compra no primeiro turno e recebe 1 DON!!, como hoje. Ninguém ataca no próprio primeiro turno.
-  O 3º e o 4º escolhem um bônus: **+1 carta na mão inicial** ou **+1 DON!! no primeiro turno**.
+- **4 jogadores**, deck de **60 cartas, uma cópia de cada** (a carta é o número dela), só da cor do Líder.
+- **Ordem:** sorteio de quem começa; a mesa segue no sentido horário.
+- **Largada:** antes das mãos, cada um escolhe o próprio primeiro turno: **1 DON!! e comprar 1 carta**, ou **2 DON!!
+  sem comprar**. Depois, mão inicial, mulligan normal e a Vida.
 - **Vida:** a impressa no Líder **+2**.
-- **Ataque:** cada ataque escolhe o alvo em qualquer mesa (Líder ou Personagem virado de qualquer oponente). Só o
-  defensor usa Blocker e Counter.
-- **Eliminação:** dano no Líder sem Vida, ou deck vazio. As cartas do eliminado saem do jogo e os efeitos dele acabam.
-  Quem deu o golpe final compra 1 carta. O último de pé vence; os outros ficam em 2º, 3º e 4º pela ordem de queda.
-- **Relógio:** 25 minutos por jogador (hoje são 17:30 no 1x1), correndo só nas decisões dele. Sem tempo ou 2 minutos
-  desconectado na própria decisão: eliminado, e a mesa segue.
+- **Ataque:** o alvo pode ser de qualquer oponente. O valor de Counter e o [Blocker] são só de quem foi atacado; quem
+  está de fora pode jogar Evento [Counter] e reage a ataques e bloqueios dos oponentes.
+- **Efeitos em "seu oponente":** alvo em campo é qualquer alvo legal de qualquer oponente; o que mexe na mão ou na
+  Vida vale para cada oponente; efeitos contínuos valem para todos; condição precisa de um oponente só.
+- **Duração:** "até o fim do turno do seu oponente" vira "até o começo do seu turno".
+- **Fim:** "you win the game" encerra a partida; fora isso, vence o último de pé.
 
-Vida extra, bônus de início, recompensa e relógio são opções da sala, com esses valores como padrão.
+O manual não fala de eliminação, relógio nem recompensa. No motor, quem leva dano no Líder sem Vida, fica sem deck,
+desiste ou estoura o tempo sai da mesa (as cartas dele saem do jogo) e a mesa segue. O relógio é assunto da fase 2:
+a proposta é 25 minutos por jogador (hoje são 17:30 no 1x1), correndo só nas decisões dele.
 
-### A regra dos efeitos em "seu oponente"
-
-É o ponto que decide o tamanho do trabalho. As cartas foram escritas para dois jogadores, e reescrever efeito por
-efeito não é viável. A proposta são três regras gerais, aplicadas pelo motor a qualquer carta:
-
-1. **Em batalha**, "seu oponente" é o outro jogador da batalha.
-2. **Fora de batalha**, quem usa o efeito **escolhe um oponente** quando o efeito começa a resolver. Todo "seu
-   oponente" daquele efeito (condições, alvos, descartes) aponta para o escolhido.
-3. **Efeitos contínuos** e **[Opponent's Turn]** valem para todos os oponentes e para o turno de qualquer um deles.
-
-Com dois jogadores as três regras dão o mesmo resultado de hoje, então o 1x1 não muda (replays, testes e
-estatísticas continuam idênticos).
+> A primeira versão da fase 1 seguia três regras propostas aqui antes de o manual chegar (quem usa o efeito
+> escolhia um oponente; em batalha só valia o outro jogador da batalha; bônus de +1 carta ou +1 DON!! para o 3º e o
+> 4º; deck de 50; comprar 1 por eliminação). O manual manda diferente e o motor foi ajustado: a tabela do "antes e
+> agora" está no fim de `regras-yonko.md`.
 
 ### O que muda no código
 
-- **Motor (`packages/engine`):** `PlayerId` deixa de ser `0 | 1` e o estado passa a ter N jogadores. A função
-  `opponent(p)` tem 56 usos em `engine.ts`; cada um vira uma de três funções (`battleOpponent`, `focusOpponent`,
-  `opponents`), conforme as regras acima. Entram: a decisão nova `chooseOpponent` (só abre com mais de um oponente
-  vivo), a ordem de turno que pula eliminados, a eliminação com limpeza das zonas, e a visão por jogador (`view.ts`)
-  para N lugares.
+- **Motor (`packages/engine`):** feito na fase 1 (ver abaixo).
 - **Servidor (`online/room.ts`, `lobby.ts`):** a sala assume 2 lugares (`seats.length !== 2`). Passa a N lugares, com
   relógio, reconexão, abandono que elimina em vez de encerrar, e a gravação para retomar depois de deploy.
 - **Interface:** uma mesa nova (`YonkoBoard`), não uma adaptação de `Board`/`WideBoard`: três oponentes compactos em
@@ -306,12 +301,118 @@ estatísticas continuam idênticos).
 
 ### Fases do Yonko, com ponto de parada
 
-1. **Motor com N jogadores, sem tela:** regras, eliminação, `chooseOpponent`, e uma simulação de milhares de partidas
-   de 4 bots simples para achar cartas que quebram. **Ponto de decisão:** se a lista de cartas problemáticas for longa
-   demais, paramos aqui sem ter gasto com tela.
-2. **Sala e servidor** para 4 humanos (sala privada com código).
-3. **Mesa** no computador e no celular.
-4. **Bot** para completar mesa, espectador e replay.
+1. ✅ **Motor com N jogadores, sem tela:** regras, eliminação, escolha de oponente, e uma simulação de milhares de
+   partidas de 4 bots simples para achar cartas que quebram. **Ponto de decisão:** se a lista de cartas problemáticas
+   for longa demais, paramos aqui sem ter gasto com tela. (Resultado abaixo: a lista veio vazia.)
+2. ✅ **Sala e servidor** para 4 humanos (sala privada com código), com bots nos lugares vagos (ver "Fase 2: como
+   ficou").
+3. ✅ **Mesa** no computador e no celular (feita antes da fase 2, como mesa local contra bots; ver "Fase 3: como
+   ficou").
+4. **Bot** para completar mesa (o bot simples já completa a mesa local), espectador e replay.
+
+### Fase 1: como ficou
+
+Tudo no motor (`packages/engine`); servidor e interface não mudaram, e nada disso aparece para o jogador ainda.
+Cada regra do manual tem a linha correspondente em [`regras-yonko.md`](regras-yonko.md).
+
+- **Mesa de 2 a 4 lugares.** `createGame` aceita até `MAX_PLAYERS` (4) jogadores e as regras da mesa em
+  `GameConfig.table` (`TableRules`: `extraLife`, `curveChoice`, `eliminationDraw`). `YONKO_TABLE` traz as do manual
+  (+2 de Vida e a escolha da largada). Com dois jogadores `table` é ignorado.
+- **Deck.** `validateYonkoDeck`: 60 cartas, uma cópia de cada número, cor do Líder.
+- **Preparação e turnos.** Sem `firstPlayer`, o sorteio escolhe um lugar e a ordem segue os lugares. Antes das mãos,
+  cada um escolhe a largada (uma escolha `option` com `curve`); depois as mãos, os mulligans na ordem e a Vida.
+  Ninguém ataca no próprio primeiro turno (`turnsTaken`), e a ordem pula quem saiu.
+- **Ataque e batalha.** O alvo pode ser o Líder ou um Personagem de qualquer oponente. Só o defensor bloqueia e usa
+  o valor de Counter. Na etapa de Counter, os outros oponentes do atacante podem usar Eventos [Counter] antes do
+  defensor (`counter` com `bystander`), e [On Your Opponent's Attack] dispara para todos os oponentes do atacante.
+- **"Seu oponente".** Alvo em campo: as cartas de todos os oponentes. Mão, Vida, deck e o que o oponente faz com
+  os próprios DON!! ("your opponent returns 1 DON!!"): o passo roda uma vez contra cada oponente (`eachOpponent`),
+  com a condição dele conferida contra cada um. DON!! que o efeito vira é um alvo: quem usa escolhe o oponente. Condição
+  num efeito que não atinge o oponente: basta um (`anyOpponent`). Auras e [Opponent's Turn]: todos os oponentes.
+- **Durações.** "Until the end of your opponent's next turn" vale até o seu turno recomeçar. O motor guarda de quem
+  é o turno que encerra o efeito (`Expiry`), porque com eliminações não dá para saber o número do turno de antemão.
+- **Eliminação.** Dano no Líder sem Vida, deck vazio, desistência ou tempo esgotado tiram o jogador da mesa
+  (`PlayerState.out`): as cartas dele saem do jogo, os efeitos dele acabam, a batalha em que estava termina e, se
+  era a vez dele, o turno passa. `state.eliminated` guarda a ordem de queda; o último de pé vence, e a mesa do fim
+  fica à vista. "You win the game" (efeito ou regra do Líder) encerra a partida na hora.
+- **O 1x1 não mudou.** Os 787 testes antigos passam, e 1.300 partidas 1x1 de bots (700 com as coleções do
+  repositório e 600 com a base completa do site) dão exatamente o mesmo estado antes e depois da mudança (comparado
+  a cada 25 ações e no fim de cada partida).
+
+**Simulação** (`npm run simulate:yonko -w @gumgum/engine -- [cartas] [partidas] [aleatoriedade] [jogadores]`): mesas
+de 4 bots simples com decks aleatórios de 60 cartas sem repetição, conferindo a cada ação as cartas e os DON!! de
+cada jogador, o limite de Personagens e que o motor nunca espera a decisão de um eliminado.
+Com a base completa do site (3.025 cartas, 155 Líderes) e 25% de ações aleatórias, 1.500 mesas terminaram sem travar,
+sem laço infinito e sem quebra de invariante: **nenhuma carta entrou na lista de problemáticas**. Média de 36
+turnos (9 por jogador). Vitórias pela posição na ordem, do 1º ao 4º: 389 / 350 / 388 / 373 (26%, 23%, 26% e 25%; os
+bots escolhem sempre a largada de 1 DON!! com compra e jogam mal, então vale medir de novo com gente jogando). A vez
+de Counter abriu para quem não era o defensor 6 vezes por partida, e 13 mesas (1 em 115) acabaram por "you win the
+game" com oponentes ainda de pé.
+
+O que a simulação **não** mede: se cada efeito faz o que um jogador esperaria numa mesa de 4. Ela prova que nada
+quebra; a leitura das cartas segue o manual, e os casos estranhos vão aparecer jogando. O bot simples também não usa
+Evento [Counter] na batalha dos outros; essa parte é exercitada só pelas ações aleatórias.
+
+**Ficou para as próximas fases:** o bot com busca, o replay, o espectador e o editor de cenários, que continuam de
+dois jogadores (`bot/planner.ts`, `replay.ts`, `motion.ts`, `scenario.ts`). O bot simples (`bot/simple.ts`) já joga
+em mesa: mira quem tem menos Vida.
+
+### Fase 2: como ficou
+
+A mesa online é uma sala própria (`apps/server/src/yonko/`), e não o `Room` das partidas de dois jogadores, que é
+feito de pares (relógios, revanche, torneio, Judge, espectadores). O transporte é o mesmo: SSE com a visão de cada
+lugar e POST para cada pedido. A seção "Yonko" do README descreve o que o jogador encontra.
+
+- **Sala de espera:** código de 6 letras e link `/?yonko=CÓDIGO`; 4 lugares; quem cria manda na mesa (regras,
+  bots, tirar alguém, começar). Cada um escolhe o deck (o de 60, ou um de 50 que vira deck de teste) e marca
+  "pronto". Começa com 3 ou 4 lugares ocupados e todos prontos. Quem cria sai: a mesa passa para a próxima pessoa;
+  sem ninguém, fecha. Cada pessoa espera numa mesa por vez.
+- **Partida:** o servidor é a autoridade (estado completo, cada navegador recebe a visão do seu lugar, com apelidos
+  para as cartas). Relógio de **25 minutos** por jogador, correndo só nas decisões dele; sem tempo, ou **2 minutos
+  desconectado** na própria decisão, o jogador sai da mesa (`timeout`) e ela segue. Os bots jogam no servidor
+  (bot simples, sobre a visão do lugar dele); sem nenhuma pessoa na partida, eles terminam sem esperar.
+- **Reconexão:** o token do lugar fica no navegador; recarregar volta para a mesa, e `/api/yonko/active` lista as
+  mesas da pessoa. A mesa é gravada no banco (`yonko_tables`) a cada mudança e refeita ao reiniciar o servidor.
+- **Fim:** sair no meio é desistir; no fim, quem criou a mesa a reabre com os mesmos lugares ("jogar de novo").
+  Mesas esquecidas fecham sozinhas (30 minutos sem ninguém na espera ou depois do fim).
+- **Testes:** `apps/server/test/yonko.test.ts` (sala, decks, partida até o fim com pessoas e bots, a visão de cada
+  lugar, relógio, abandono, reinício do servidor) e uma partida inteira com dois navegadores (computador e
+  celular), com recarga no meio e "jogar de novo".
+
+**Diferenças para a proposta:** sem formato de cartas nem escolha de relógio na sala (25 minutos fixos); sem chat,
+espectadores e avisos no celular; o bot é o simples.
+
+### Construtor de decks de 60
+
+O construtor ganhou a opção "Montar para o Yonko (60, 1 de cada)" (`validateYonkoDeck`), o servidor manda no resumo
+de cada deck o que o impede de ser usado no Yonko (`yonko`, `yonkoCodes`), e a biblioteca mostra o selo "Yonko".
+`yonkoTableDeck` (motor) decide o deck que vai para a mesa: o de 60 como está, ou o deck de teste a partir de um de
+50; o navegador (mesa local) e o servidor (mesa online) usam a mesma regra.
+
+### Fase 3: como ficou
+
+As telas foram feitas antes do servidor, para o modo poder ser jogado e visto: a mesa roda no navegador, com uma
+pessoa e três bots simples (`game/useYonkoGame.ts`). O README (seção "Yonko") descreve o que o jogador encontra.
+
+- **Tela inicial:** o cartão **Yonko** na fileira dos modos especiais, ao lado de Selado e Draft.
+- **Sala (`components/Yonko.tsx`):** os quatro lugares, o deck de quem joga (pelo seletor de decks de sempre) e
+  as regras da mesa. Diferenças para a tela da proposta: não há código nem convite (é local); as regras são as do
+  manual (Vida extra, largada, recompensa como regra da casa) e não as da proposta antiga; não há formato de
+  cartas nem relógio, que são do online.
+- **Deck de teste (`yonkoDeckFrom`, no motor):** o formato pede 60 cartas sem repetição e o construtor monta 50.
+  Até o construtor aprender o formato, a mesa monta o deck a partir do Líder e das cartas do deck escolhido.
+- **Mesa (`components/YonkoTable.tsx`):** uma tela própria, como o plano previa, e não uma adaptação da mesa de
+  dois: três painéis de oponente, a faixa de ação, a mesa de quem joga, a mão e a coluna com ordem dos turnos,
+  registro e carta em destaque. Reusa `CardView`, os textos traduzidos do motor e o painel de texto da carta. No
+  celular os oponentes viram abas. Diferenças para a tela da proposta: sem chat, sem contagem de espectadores e
+  sem relógio por jogador (online); no lugar do chat fica a carta em destaque.
+- **Idiomas:** os textos das telas estão nos seis idiomas (`i18n/yonko/`).
+- **Conferido no navegador:** partidas inteiras jogadas por roteiro, no computador (1440×900) e no celular
+  (390×844), da largada à classificação final. Um erro apareceu assim e foi corrigido no motor: as etiquetas de
+  duração dos efeitos (`status.ts`) ainda supunham dois jogadores.
+
+**Ficou de fora desta versão:** arrastar cartas, animações de voo e som; ver o descarte carta a carta; dar o valor
+de Counter a outra carta que não a atacada; desfazer além do "cancelar" do motor; replay e estatísticas.
 
 ### Fora da v1
 
@@ -319,10 +420,17 @@ Mesa de 3, fila pública, torneio de Yonko, alianças formais, 2 contra 2 e bot 
 
 ### Decisões que são suas
 
-5. **Regra dos efeitos:** as três regras acima servem, ou a sua mesa joga diferente (por exemplo, efeitos em área
-   atingindo todos os oponentes)?
-6. **Recompensa por eliminação:** comprar 1 carta, outra coisa, ou nada?
-7. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos?
+O manual fechou as antigas decisões 5 (regra dos efeitos) e 6 (recompensa por eliminação: não há). Ficam:
+
+5. **DON!! do oponente:** *decidido (22/11/2026): vale o texto da carta. "Your opponent returns 1 DON!!" vale para
+   cada oponente; "rest up to N of your opponent's DON!! cards" é um alvo, e quem usa escolhe de qual oponente;
+   comparação de DON!! basta um oponente. Detalhes no item 1 da seção 4 de [`regras-yonko.md`](regras-yonko.md).*
+6. **Counter de quem está de fora:** *decidido (22/11/2026): só quem foi atacado usa Counter por enquanto; a regra
+   do manual fica no motor, desligada (`TableRules.bystanderCounter`).*
+7. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos? *Implementado: quem cria a
+   mesa online escolhe se põe bots nos lugares vagos.*
+
+As outras interpretações, menores, estão na seção 4 de [`regras-yonko.md`](regras-yonko.md).
 
 ## 5. O que não muda
 

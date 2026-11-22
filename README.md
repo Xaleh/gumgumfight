@@ -481,6 +481,40 @@ código para chamar os amigos, 4 boosters de 12, o mesmo relógio).
   (arquivos), `apps/server/src/draft/cube-source.ts` e `apps/server/src/cube-cli.ts` (a coleta e o comando) e
   `apps/web/src/components/Cube.tsx` (a lista).
 
+## Yonko (mesa de 4, todos contra todos)
+
+Na tela inicial, o cartão **Yonko** abre a **Mesa dos 4 Imperadores**: o formato da comunidade "Four Emperors", em
+que quatro capitães jogam cada um por si e vence o último de pé. As regras seguem o manual do formato, resumido em
+[`docs/regras-yonko.md`](docs/regras-yonko.md). Há duas formas de jogar, e nenhuma entra nas estatísticas:
+
+- **Mesa online (com amigos):** quem cria recebe um **código de 6 letras** e um link de convite (`/?yonko=CÓDIGO`)
+  para até três pessoas. Na sala de espera cada um escolhe o deck e marca **"Estou pronto"**; quem criou a mesa
+  põe **bots** nos lugares vagos, tira alguém (ou um bot) da mesa, muda as regras e começa quando houver 3 ou 4
+  lugares ocupados e todos estiverem prontos. Cada jogador tem **25 minutos** para a partida inteira, e o relógio
+  só corre nas decisões dele. Quem fica sem tempo, ou **2 minutos desconectado** na própria decisão, sai da mesa e
+  ela segue. Recarregar a página (ou fechar e abrir o app) volta para a mesa; a tela do Yonko também mostra
+  "Voltar para a mesa" enquanto ela existir. No fim, quem criou a mesa pode **jogar de novo** com os mesmos
+  lugares. Sair no meio da partida é desistir.
+- **Mesa local (contra três bots):** a partida roda no navegador, sem servidor e sem relógio.
+
+**Deck:** o formato pede **60 cartas da cor do Líder, uma cópia de cada número**. No construtor, a opção **"Montar
+para o Yonko (60, 1 de cada)"** troca o alvo para 60 e o limite para uma cópia, com o selo "Yonko" quando o deck
+fecha as regras (ela liga sozinha ao abrir ou importar uma lista com mais de 50 cartas). Na biblioteca, esses decks
+aparecem com o selo **Yonko**. Um deck comum de 50 também serve: na mesa ele vira um **deck de teste** (o Líder e
+uma cópia de cada carta dele, completado até 60 com cartas sorteadas da mesma cor), e a sala mostra isso a todos.
+Os bots jogam com decks prontos montados do mesmo jeito.
+
+**Na mesa:** os oponentes ficam em painéis no alto, com tudo o que é público (Líder, Vida, mão, DON!!, deck,
+descarte, Personagens, Stage e, no online, o relógio e quem está desconectado); a sua mesa fica embaixo, e ao lado
+vêm a ordem dos turnos, o registro e a carta em destaque. Tudo é por clique: toque numa carta da mão para jogar,
+numa carta sua em campo para atacar, dar DON!! ou ativar; ao atacar, os alvos válidos acendem nas três mesas. Só quem foi
+atacado usa Counter (o manual também deixa os outros usarem Evento [Counter]; por ora isso fica desligado).
+**No celular**, os oponentes viram abas e o registro e a carta abrem em gavetas.
+
+O que ainda **não** tem: espectadores, replay, chat e avisos no celular na mesa online; arrastar cartas, animações e
+som da mesa de dois; ver o descarte carta a carta; dar o valor de Counter a outra carta que não a atacada; e o bot
+com busca (os bots são o bot simples, que completa a mesa mas joga mal).
+
 ## Estatísticas
 
 No menu, **📈 Estatísticas** mostra vitórias por Líder, por matchup (Líder x Líder) e por carta, com filtros por
@@ -1478,6 +1512,7 @@ pode chamar sem login nem token:
 | GET | `/api/stats/decks?leader=` | Decks de um Líder (mesmos filtros de `/api/stats`): cartas no deck, deck médio e decks populares |
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups de uma fila, tendência e a comparação com as partidas daqui (404 sem a chave) |
 | GET | `/api/online/stats` · `/api/online/live` · `/api/online/rooms/:id` | Contadores do menu, partidas para assistir e o resumo de uma sala |
+| GET · POST | `/api/yonko/active` · `/api/yonko/tables` · `/api/yonko/tables/join` · `/api/yonko/tables/:id/…` | Mesas online do Yonko: as suas (com o token), criar, entrar pelo código, o canal `events` (SSE) e os pedidos da mesa (`deck`, `ready`, `rules`, `bot`, `clear`, `start`, `action`, `reopen`, `leave`), todos com o token do lugar |
 | GET | `/api/tournaments` · `/api/tournaments/:id` | Torneios e o detalhe de um torneio (o que quem pede pode fazer vem na resposta) |
 | GET | `/api/sponsors` · `/api/support` · `/api/support/supporters` | Lojas parceiras, apoio ao projeto e lista pública de apoiadores |
 

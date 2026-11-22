@@ -2,7 +2,7 @@
 // plausíveis para testar a interface e o motor.
 
 import { legalActions } from '../actions';
-import { cardDef, counterValue, getPower, locate, opponent, targetCandidates } from '../engine';
+import { cardDef, counterValue, getPower, isMultiplayer, locate, opponent, opponentsOf, targetCandidates } from '../engine';
 import type { Action, EffectStep, GameState, PlayerId } from '../types';
 
 export function chooseBotAction(state: GameState, player: PlayerId): Action {
@@ -11,6 +11,24 @@ export function chooseBotAction(state: GameState, player: PlayerId): Action {
   const pending = state.pending;
   if (pending) return choosePending(state, player, actions);
   return chooseMain(state, player, actions);
+}
+
+/**
+ * O oponente que o bot mira. Com dois jogadores, o outro. Numa mesa maior, quem está mais perto de cair
+ * (menos Vida); no empate, quem ameaça mais (mais poder em campo). Serve para completar mesa, não para
+ * jogar bem: o bot não pesa quem o está atacando nem faz política.
+ */
+export function rivalOf(state: GameState, player: PlayerId): PlayerId {
+  if (!isMultiplayer(state)) return opponent(player);
+  const threat = (id: PlayerId) => state.players[id].characters.reduce((n, c) => n + getPower(state, c.uid), 0);
+  const others = opponentsOf(state, player);
+  let best = others[0] ?? opponent(player);
+  for (const id of others) {
+    const a = state.players[id];
+    const b = state.players[best];
+    if (a.life.length < b.life.length || (a.life.length === b.life.length && threat(id) > threat(best))) best = id;
+  }
+  return best;
 }
 
 function value(state: GameState, uid: string): number {
@@ -110,6 +128,8 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
     }
 
     case 'counter': {
+      // Mesa com mais de dois: o bot não se mete na batalha dos outros.
+      if (pending.bystander) return { type: 'pass', player };
       const b = state.battle!;
       const ap = getPower(state, b.attacker);
       const tp = getPower(state, b.target);
@@ -170,8 +190,8 @@ function chooseTargets(state: GameState, player: PlayerId, pending: SelectPendin
 
 function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Action {
   const me = state.players[player];
-  const opp = state.players[opponent(player)];
-  const canBattle = state.turn > 2;
+  const opp = state.players[rivalOf(state, player)];
+  const canBattle = isMultiplayer(state) ? (state.turnsTaken?.[player] ?? 0) > 1 : state.turn > 2;
   const find = <T extends Action['type']>(type: T, pred: (a: Extract<Action, { type: T }>) => boolean = () => true) =>
     actions.find((a): a is Extract<Action, { type: T }> => a.type === type && pred(a as Extract<Action, { type: T }>));
 
@@ -252,13 +272,17 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
     for (const fc of attackers) {
       const ap = getPower(state, fc.uid);
       const mine = attacks.filter((a) => a.attacker === fc.uid);
+      const isLeader = (uid: string) => locate(state, uid)?.zone === 'leader';
       const koTarget = mine
-        .filter((a) => a.target !== opp.leader.uid && getPower(state, a.target) <= ap)
+        .filter((a) => !isLeader(a.target) && getPower(state, a.target) <= ap)
         .sort((x, y) => value(state, y.target) - value(state, x.target))[0];
       if (koTarget && (cardDef(state, koTarget.target).cost ?? 0) >= 3) return koTarget;
       const leaderAttack = mine.find((a) => a.target === opp.leader.uid);
       if (leaderAttack && ap >= oppLeaderPower) return leaderAttack;
       if (koTarget) return koTarget;
+      // Mesa com mais de dois: sem como acertar o Líder que ele mira, serve o de outro oponente.
+      const otherLeader = mine.find((a) => isLeader(a.target) && a.target !== opp.leader.uid && ap >= getPower(state, a.target));
+      if (otherLeader) return otherLeader;
     }
 
     // 6) Habilidades de "desvirar" (ex.: líder Kid) depois dos ataques.

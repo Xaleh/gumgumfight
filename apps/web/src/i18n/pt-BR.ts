@@ -8,6 +8,7 @@ import decksPtBR from './decks/pt-BR';
 import teamPtBR from './team/pt-BR';
 import chamberPtBR from './chamber/pt-BR';
 import sealedPtBR from './sealed/pt-BR';
+import yonkoPtBR from './yonko/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -2460,6 +2461,14 @@ const ptBR = {
   'engine.optPeekOwnLife': 'Olhar a sua Vida',
   'engine.optPeekOpponentLife': 'Olhar a Vida do oponente',
   'engine.optDontPeek': 'Não olhar',
+  // ---- mesa com mais de dois jogadores (Yonko) ----
+  'engine.whoseDonToRest': '{source}: virar 1 DON!! ativo de qual oponente?',
+  'engine.whoseDonSkipsRefresh': '{source}: o DON!! virado de qual oponente não desvira?',
+  'engine.optRestDonOf': 'Virar 1 DON!! ativo de {player}',
+  'engine.optSkipRefreshDonOf': '1 DON!! virado de {player}',
+  'engine.startCurve': '{player}: escolha a sua largada.',
+  'engine.optCurveOdd': '1 DON!! no primeiro turno e comprar 1 carta (1, 3, 5, 7, 9, 10)',
+  'engine.optCurveEven': '2 DON!! no primeiro turno, sem comprar (2, 4, 6, 8, 10)',
   'engine.optYesLifeTrash': 'Sim, descartar {n|# carta|# cartas} do topo da Vida',
   'engine.optYesDiscard': 'Sim, descartar {n|# carta|# cartas} da mão',
   'engine.optYesReturnDon': 'Sim, devolver {n|# DON!! ativo|# DON!! ativos}',
@@ -2551,6 +2560,12 @@ const ptBR = {
   'log.winBothDeckOutEndOfTurn': 'Os dois terminaram o turno sem cartas no deck.',
   'log.winDeckOutLeaderRule': '{player} ficou sem cartas no deck e vence pela regra do Líder.',
   'log.winBothDeckOutLeaderRule': 'Os dois ficaram sem cartas no deck e vencem pela regra do Líder.',
+  // ---- mesa com mais de dois jogadores (Yonko) ----
+  'log.winAllOut': 'Todos os jogadores que restavam foram derrotados ao mesmo tempo.',
+  'log.eliminated': '{player} foi eliminado. {reason}',
+  'log.eliminationReward': '{player} compra {n|# carta|# cartas} por eliminar {target}.',
+  'log.startCurveOdd': '{player} escolhe 1 DON!! no primeiro turno e comprar 1 carta.',
+  'log.startCurveEven': '{player} escolhe 2 DON!! no primeiro turno, sem comprar.',
   // ---- desfazer ----
   'log.cancelPlay': '{player} cancela a jogada de {card} (a carta volta para a mão).',
   'log.cancelActivate': '{player} cancela a ativação de {card}.',
@@ -3100,6 +3115,8 @@ const ptBR = {
   ...chamberPtBR,
   // ==== Selado: boosters, deck de 40 e as partidas com ele (i18n/sealed) ====
   ...sealedPtBR,
+  // ==== Yonko: a sala e a mesa de todos contra todos (i18n/yonko) ====
+  ...yonkoPtBR,
 } as const;
 
 

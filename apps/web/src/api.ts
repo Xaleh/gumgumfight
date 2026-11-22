@@ -19,6 +19,7 @@ import {
   type PlayFormat,
   type PlayMode,
   type SpoilerRule,
+  type TableRules,
 } from '@gumgum/engine';
 
 export type { FormatId, PlayFormat, PlayMode };
@@ -43,6 +44,10 @@ export interface DeckSummary {
   formats: Record<FormatId, string[]>;
   /** Os mesmos motivos, na mesma ordem, com a chave `rules.…` para traduzir (servidores antigos não mandam). */
   formatCodes?: Record<FormatId, Array<{ code: string; params: Params }>>;
+  /** O que impede o deck de ser usado no Yonko (vazio = deck de 60, uma cópia de cada); servidores antigos não mandam. */
+  yonko?: string[];
+  /** Os mesmos motivos com a chave `rules.…` para traduzir. */
+  yonkoCodes?: Array<{ code: string; params: Params }>;
   unscripted: number;
   /** Cartas de spoiler, ainda não lançadas (servidores antigos não mandam): o deck não vale na ranqueada. */
   spoilers?: string[];
@@ -59,6 +64,47 @@ export interface DeckSummary {
   games?: number;
   /** Sua última partida com o deck (null = nunca jogou). */
   lastPlayedAt?: string | null;
+}
+
+/** Um lugar numa mesa do Yonko: a mesa, o código dela e o token do lugar (fica no navegador de quem senta). */
+export interface YonkoSeatRef {
+  id: string;
+  code: string;
+  token: string;
+  status?: 'waiting' | 'playing' | 'finished';
+}
+
+/** Um lugar da sala de espera do Yonko como o servidor descreve (null = vazio). */
+export interface YonkoSeatInfo {
+  name: string;
+  bot: boolean;
+  ready: boolean;
+  connected: boolean;
+  leader: string;
+  leaderName: string;
+  colors: string[];
+  deckName: string;
+  /** Deck de teste (montado a partir de um deck de 50). */
+  test: boolean;
+  you: boolean;
+}
+
+/** O resumo de uma mesa do Yonko que chega pelo canal (`state.room`). */
+export interface YonkoRoomInfo {
+  id: string;
+  code: string;
+  status: 'waiting' | 'playing' | 'finished';
+  host: number;
+  /** O lugar da sala de quem recebe. */
+  you: number | null;
+  rules: TableRules;
+  seats: Array<YonkoSeatInfo | null>;
+  /** Por que ainda não dá para começar (só na espera). */
+  problem: { code: string; text: string; params?: Params } | null;
+  /** Na partida: o jogador do motor de quem recebe. */
+  player: number | null;
+  players: Array<{ seat: number; name: string; bot: boolean; connected: boolean; leader: string; test: boolean }> | null;
+  clock: { remaining: number[]; running: number | null; total: number; awaySince: number | null; abandonMs: number } | null;
 }
 
 /** Deck com a mesma lista que o construtor tentou salvar (resposta 409 `deckDuplicate`). */
@@ -899,6 +945,25 @@ export const api = {
         `/api/reports?${new URLSearchParams({ ...(opts.tournament ? { tournament: opts.tournament } : {}), status: opts.status ?? 'open' })}`,
       ),
     resolve: (id: number, resolved: boolean, note?: string) => send<MatchReport>('PUT', `/api/reports/${id}`, { resolved, note }),
+  },
+  /** Mesas online do Yonko (todos contra todos): ver apps/server/src/yonko/. */
+  yonko: {
+    config: () => get<{ timeBankMs: number; abandonMs: number; seats: number; minPlayers: number }>('/api/yonko/config'),
+    /** As mesas em que este navegador (ou conta) tem lugar, com o token: voltar depois de recarregar. */
+    active: () => get<YonkoSeatRef[]>('/api/yonko/active'),
+    create: (deckId: string, rules: TableRules) => send<YonkoSeatRef>('POST', '/api/yonko/tables', { deckId, rules }),
+    join: (code: string, deckId: string) => send<YonkoSeatRef>('POST', '/api/yonko/tables/join', { code, deckId }),
+    deck: (id: string, t: string, deckId: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/deck`, { t, deckId }),
+    ready: (id: string, t: string, ready: boolean) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/ready`, { t, ready }),
+    rules: (id: string, t: string, rules: TableRules) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/rules`, { t, rules }),
+    bot: (id: string, t: string, seat?: number) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/bot`, { t, ...(seat !== undefined ? { seat } : {}) }),
+    clear: (id: string, t: string, seat: number) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/clear`, { t, seat }),
+    start: (id: string, t: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/start`, { t }),
+    action: (id: string, t: string, seq: number, action: Action) =>
+      send<{ ok: true; actionCount: number }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/action`, { t, seq, action }),
+    reopen: (id: string, t: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/reopen`, { t }),
+    leave: (id: string, t: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/leave`, { t }),
+    eventsUrl: (id: string, t: string) => `/api/yonko/tables/${encodeURIComponent(id)}/events?t=${encodeURIComponent(t)}`,
   },
   online: {
     config: () => get<{ timeBankMs: number; botRooms: boolean }>('/api/online/config'),

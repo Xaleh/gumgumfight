@@ -8,6 +8,7 @@ import decks from './decks/ja';
 import team from './team/ja';
 import chamber from './chamber/ja';
 import sealed from './sealed/ja';
+import yonko from './yonko/ja';
 
 export default {
   // ---- 全般 ----
@@ -2456,6 +2457,14 @@ export default {
   'engine.optPeekOwnLife': '自分のライフを見る',
   'engine.optPeekOpponentLife': '相手のライフを見る',
   'engine.optDontPeek': '見ない',
+  // ---- 3人以上の卓（四皇） ----
+  'engine.whoseDonToRest': '{source}：どの相手のアクティブのドン!!を1枚レストにしますか？',
+  'engine.whoseDonSkipsRefresh': '{source}：どの相手のレストのドン!!をアクティブにしませんか？',
+  'engine.optRestDonOf': '{player}のアクティブのドン!!を1枚レストにする',
+  'engine.optSkipRefreshDonOf': '{player}のレストのドン!!1枚',
+  'engine.startCurve': '{player}：スタートを選んでください。',
+  'engine.optCurveOdd': '最初のターンにドン!!1枚、カードを1枚引く（1, 3, 5, 7, 9, 10）',
+  'engine.optCurveEven': '最初のターンにドン!!2枚、ドローなし（2, 4, 6, 8, 10）',
   'engine.optYesLifeTrash': 'はい、ライフの上から{n|#枚}をトラッシュに置く',
   'engine.optYesDiscard': 'はい、手札を{n|#枚}トラッシュに置く',
   'engine.optYesReturnDon': 'はい、アクティブのドン!!を{n|#枚}戻す',
@@ -2546,6 +2555,12 @@ export default {
   'log.winBothDeckOutEndOfTurn': '両プレイヤーがデッキ0枚でターンを終了しました。',
   'log.winDeckOutLeaderRule': '{player}のデッキが0枚になり、リーダーのルールにより勝利します。',
   'log.winBothDeckOutLeaderRule': '両プレイヤーのデッキが0枚になり、リーダーのルールにより勝利します。',
+  // ---- 3人以上の卓（四皇） ----
+  'log.winAllOut': '残っていたプレイヤー全員が同時に敗北しました。',
+  'log.eliminated': '{player}が脱落しました。{reason}',
+  'log.eliminationReward': '{player}は{target}を脱落させたため、カードを{n}枚引きます。',
+  'log.startCurveOdd': '{player}は最初のターンにドン!!1枚とドロー1枚を選びました。',
+  'log.startCurveEven': '{player}は最初のターンにドン!!2枚（ドローなし）を選びました。',
   // ---- 取り消し ----
   'log.cancelPlay': '{player}は{card}のプレイを取り消します（カードは手札に戻ります）。',
   'log.cancelActivate': '{player}は{card}の発動を取り消します。',
@@ -3090,5 +3105,6 @@ export default {
   ...team,
   ...chamber,
   ...sealed,
+  ...yonko,
 } satisfies Messages;
 

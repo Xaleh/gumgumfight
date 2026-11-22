@@ -18,7 +18,9 @@ import {
   parseDeckList,
   spoilerCards,
   validateDeck,
+  validateYonkoDeck,
   withArt,
+  YONKO_DECK_SIZE,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type ApiCard, ApiError, type DeckDuplicate, type DeckSummary, isAdmin, spoilerText } from '../api';
@@ -94,7 +96,20 @@ function useMediaQuery(query: string) {
  * link (`/?deck=`): o editor abre com ela preenchida, como deck novo não salvo; `linkInvalid`:
  * havia um link, mas sem lista legível (só um aviso); `openId`: um deck salvo para abrir direto.
  */
-export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () => void; link?: DeckLink; linkInvalid?: boolean; openId?: string }) {
+export function DeckBuilder({
+  onExit,
+  link,
+  linkInvalid,
+  openId,
+  startYonko,
+}: {
+  onExit: () => void;
+  link?: DeckLink;
+  linkInvalid?: boolean;
+  openId?: string;
+  /** Abre direto um deck novo no modo Yonko (60 cartas, uma de cada), vindo da sala do Yonko. */
+  startYonko?: boolean;
+}) {
   const [allCards, setAllCards] = useState<ApiCard[]>([]);
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const auth = useAuth();
@@ -104,7 +119,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(t('deck.newDeckName')));
   const [dirty, setDirty] = useState(false);
   /** Biblioteca (galeria de decks) ou o editor de um deck. */
-  const [view, setView] = useState<'library' | 'editor'>(link || linkInvalid || openId ? 'editor' : 'library');
+  const [view, setView] = useState<'library' | 'editor'>(link || linkInvalid || openId || startYonko ? 'editor' : 'library');
   /** Desfazer/refazer (Líder, cartas e artes). */
   const [past, setPast] = useState<Snapshot[]>([]);
   const [future, setFuture] = useState<Snapshot[]>([]);
@@ -162,6 +177,16 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const [onlyAutomated, setOnlyAutomated] = useState(false);
   /** Montando para o All Blue: o catálogo só mostra o que vale nele e a lista marca o que não vale. */
   const [allBlue, setAllBlue] = useState(false);
+  /**
+   * Montando para o Yonko (mesa de todos contra todos): 60 cartas, uma cópia de cada (docs/regras-yonko.md). Liga
+   * sozinho ao abrir ou importar uma lista com mais de 50 cartas.
+   */
+  const [yonko, setYonko] = useState(Boolean(startYonko));
+  /** Tamanho do deck e cópias de cada carta no modo em uso. */
+  const target = yonko ? YONKO_DECK_SIZE : DECK_SIZE;
+  const copiesMax = yonko ? 1 : MAX_COPIES;
+  /** A carta já tem o máximo de cópias (no Yonko, nem "any number of this card" passa de 1). */
+  const atMax = (card: CardData | undefined, n: number) => (yonko ? n >= 1 : n >= MAX_COPIES && !(card && anyNumberAllowed(card)));
   const [limit, setLimit] = useState(PAGE);
 
   const byId = useMemo(() => new Map(allCards.map((c) => [c.id, c])), [allCards]);
@@ -191,6 +216,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
         if (link) applyLink(link, new Map(cards.map((c) => [c.id, c])));
         else if (linkInvalid) setNotice(t('deck.linkInvalid'));
         else if (openId) void openDeck(openId);
+        else if (startYonko) setNotice(t('deck.yonkoStart'));
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -209,11 +235,12 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     setDraft({ id: null, name: l.name ?? t('deck.newDeckName'), leader: parsed.leader ?? '', cards: new Map(parsed.cards.map((c) => [c.id, c.count])), arts: new Map(), kind: 'user' });
     setDirty(true);
     if (l.format === 'allblue') setAllBlue(true);
+    setYonko(total > DECK_SIZE);
     setNotice(l.format ? t('deck.linkImportedFormat', { format: formatLabel(l.format) }) : t('deck.linkImported'));
     setError(errors.length ? errors.join('\n') : null);
   };
 
-  useEffect(() => setLimit(PAGE), [query, colors, category, cost, set, onlyCompatible, onlyAutomated, allBlue, draft.leader]);
+  useEffect(() => setLimit(PAGE), [query, colors, category, cost, set, onlyCompatible, onlyAutomated, allBlue, yonko, draft.leader]);
 
   // Avisa antes de sair com alterações não salvas.
   useEffect(() => {
@@ -276,7 +303,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   /** Cartas do deck que têm arte alternativa, e se todas já estão com uma. */
   const artCards = useMemo(() => cardsWithArts(deckList, byId), [deckList, byId]);
   const allArts = artCards.length > 0 && artCards.length === Object.keys(cleanArts(deckList, byId) ?? {}).length;
-  const report = useMemo(() => validateDeck(deckList, byId), [deckList, byId]);
+  const report = useMemo(() => (yonko ? validateYonkoDeck(deckList, byId) : validateDeck(deckList, byId)), [deckList, byId, yonko]);
   /** Em quais formatos o deck pode ser usado, e por que não nos outros. */
   const legality = useMemo(
     () =>
@@ -292,8 +319,10 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     // Montando para o All Blue, só os avisos dele (banidas e rotação da Bandai não valem lá); fora
     // disso, só os dos formatos oficiais: num deck comum, cada SR viraria um aviso (o selo do
     // formato continua dizendo o motivo).
-    () => [...new Set([...legality.filter((f) => (f.id === 'allblue') === allBlue).flatMap((f) => f.texts), ...(spoilers.length ? [spoilerText(spoilers)] : [])])],
-    [legality, spoilers, allBlue],
+    // No Yonko não há lista de banidas nem ranqueada: só as regras do deck (em `report`).
+    () =>
+      yonko ? [] : [...new Set([...legality.filter((f) => (f.id === 'allblue') === allBlue).flatMap((f) => f.texts), ...(spoilers.length ? [spoilerText(spoilers)] : [])])],
+    [legality, spoilers, allBlue, yonko],
   );
 
   // ------------------------------------------------------------------ edição
@@ -380,8 +409,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       return;
     }
     const current = draft.cards.get(card.id) ?? 0;
-    if (current >= MAX_COPIES && !anyNumberAllowed(card)) {
-      setNotice(t('deck.maxCopies', { n: MAX_COPIES, name: card.name }));
+    if (atMax(card, current)) {
+      setNotice(t('deck.maxCopies', { n: copiesMax, name: card.name }));
       return;
     }
     edit(
@@ -412,6 +441,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       const { deck } = await api.deck(id);
       const cards = new Map(deck.cards.map((c) => [c.id, c.count]));
       const arts = new Map(Object.entries(deck.arts ?? {}));
+      // Lista de mais de 50 cartas: é um deck do Yonko.
+      setYonko(deck.cards.reduce((n, c) => n + c.count, 0) > DECK_SIZE);
       if (copy) {
         setDraft({ id: null, name: t('deck.copyName', { name: deck.name }), leader: deck.leader, cards, arts, kind: 'user' });
         setDirty(true);
@@ -475,7 +506,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       setDraft((d) => ({ ...d, id: saved.id, kind: 'user', name: saved.name }));
       setDirty(false);
       setDupe(null);
-      setNotice(saved.valid ? t('deck.savedReady') : t('deck.savedDraft'));
+      setNotice(yonko ? (saved.yonko?.length === 0 ? t('deck.savedReadyYonko') : t('deck.savedDraft')) : saved.valid ? t('deck.savedReady') : t('deck.savedDraft'));
       setError(null);
       await refreshDecks();
     } catch (e) {
@@ -548,6 +579,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
 
   const newDeck = () => {
     if (!confirmDiscard()) return;
+    setYonko(false);
     setDraft(emptyDraft(t('deck.newDeckName')));
     setDirty(false);
     resetHistory();
@@ -729,7 +761,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
             categories={choosingLeader ? [] : ['character', 'event', 'stage', 'leader']}
             sets={sets}
             spoilerSets={spoilerSets}
-            extraActive={[!onlyCompatible, onlyAutomated, allBlue].filter(Boolean).length}
+            extraActive={[!onlyCompatible, onlyAutomated, allBlue, yonko].filter(Boolean).length}
           >
             {leader && (
               <label className="check">
@@ -742,8 +774,26 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               {t('deck.onlyAutomated')}
             </label>
             <label className="check" title={t('deck.onlyAllBlueTitle')}>
-              <input type="checkbox" checked={allBlue} onChange={(e) => setAllBlue(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={allBlue}
+                onChange={(e) => {
+                  setAllBlue(e.target.checked);
+                  if (e.target.checked) setYonko(false);
+                }}
+              />
               {t('deck.onlyAllBlue')}
+            </label>
+            <label className="check" title={t('deck.buildYonkoTitle')}>
+              <input
+                type="checkbox"
+                checked={yonko}
+                onChange={(e) => {
+                  setYonko(e.target.checked);
+                  if (e.target.checked) setAllBlue(false);
+                }}
+              />
+              {t('deck.buildYonko')}
             </label>
           </CardFilterBar>
 
@@ -768,20 +818,20 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                   <StaticCard
                     card={c}
                     highlight={c.id === draft.leader ? 'selected' : n > 0 ? 'playable' : null}
-                    dimmed={Boolean(incompatible) || (n >= MAX_COPIES && c.category !== 'leader' && !anyNumberAllowed(c))}
+                    dimmed={Boolean(incompatible) || (c.category !== 'leader' && atMax(c, n))}
                     onClick={() => add(c)}
                     onContextMenu={() => remove(c.id)}
                     onHover={setHovered}
                     onLongPress={setZoom}
                     badge={
                       <>
-                        {n > 0 && <span className="copies">{n}/{MAX_COPIES}</span>}
+                        {n > 0 && <span className="copies">{n}/{copiesMax}</span>}
                         {needsManual(c) && (
                           <span className="manual-badge" title={t('deck.manualTitle')}>
                             ⚙
                           </span>
                         )}
-                        {!allBlue && <LegalityBadge id={c.id} />}
+                        {!allBlue && !yonko && <LegalityBadge id={c.id} />}
                       </>
                     }
                   />
@@ -852,8 +902,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
           </div>
 
           <div className="deck-stats">
-            <div className={['deck-total', report.total === DECK_SIZE ? 'ok' : ''].join(' ')}>
-              <b>{report.total}</b>/{DECK_SIZE}
+            <div className={['deck-total', report.total === target ? 'ok' : ''].join(' ')}>
+              <b>{report.total}</b>/{target}
             </div>
             <div className="curve" title={t('deck.costCurve')}>
               {curve.map((n, i) => (
@@ -889,7 +939,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                       <button
                         type="button"
                         onClick={() => e.card && add(e.card)}
-                        disabled={e.count >= MAX_COPIES && !anyNumberAllowed(e.card)}
+                        disabled={atMax(e.card, e.count)}
                         aria-label={t('deck.addOne')}
                       >
                         +
@@ -932,7 +982,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                     <div className="entry-group">{t(CATEGORY_LABEL[e.card.category])}</div>
                   )}
                   <div
-                    className={['entry', errorIds.has(e.id) || (allBlue ? notAllBlue(e.id) : cardLegality(e.id, 'egb') === 'banned') ? 'bad' : ''].join(' ')}
+                    className={['entry', errorIds.has(e.id) || (yonko ? false : allBlue ? notAllBlue(e.id) : cardLegality(e.id, 'egb') === 'banned') ? 'bad' : ''].join(' ')}
                     data-card={e.id}
                     onMouseEnter={(ev) => e.card && setHovered(shown(e.card), ev.currentTarget)}
                     onMouseLeave={() => setHovered(null)}
@@ -943,7 +993,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                       <small>
                         {e.id}
                         {e.card && needsManual(e.card) ? ` · ${t('deck.entryManual')}` : ''}
-                        {allBlue ? (notAllBlue(e.id) ? ` · ${t('deck.entryNotAllBlue')}` : '') : legalityNote(cardLegality(e.id, 'standard'), t)}
+                        {yonko ? '' : allBlue ? (notAllBlue(e.id) ? ` · ${t('deck.entryNotAllBlue')}` : '') : legalityNote(cardLegality(e.id, 'standard'), t)}
                       </small>
                     </span>
                     {e.card?.arts?.length ? (
@@ -963,7 +1013,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                     <button
                       className="qty"
                       onClick={() => e.card && add(e.card)}
-                      disabled={e.count >= MAX_COPIES && !(e.card && anyNumberAllowed(e.card))}
+                      disabled={atMax(e.card, e.count)}
                       aria-label={t('deck.addOne')}
                     >
                       +
@@ -977,7 +1027,12 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
 
           {(draft.leader || entries.length > 0) && (
             <div className="format-legality">
-              {legality.map((f) => (
+              {yonko && (
+                <span className={['format-chip', report.valid ? 'ok' : 'bad'].join(' ')} title={report.valid ? t('deck.yonkoReady') : t('deck.yonkoNotReady')}>
+                  {report.valid ? '✓' : '🚫'} {t('yonko.title')}
+                </span>
+              )}
+              {!yonko && legality.map((f) => (
                 <span
                   key={f.id}
                   className={['format-chip', f.issues.length ? 'bad' : 'ok'].join(' ')}
@@ -986,7 +1041,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                   {f.issues.length ? '🚫' : '✓'} {f.label}
                 </span>
               ))}
-              {spoilers.length > 0 && (
+              {!yonko && spoilers.length > 0 && (
                 <span className="format-chip bad" title={spoilerText(spoilers)}>
                   🚫 {t('deck.rankedChip')}
                 </span>
@@ -1072,6 +1127,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               leader: parsed.leader ?? d.leader,
               cards: new Map(parsed.cards.map((c) => [c.id, c.count])),
             }));
+            if (total > DECK_SIZE) setYonko(true);
             setNotice(skipped ? t('deck.importedSkipped', { n: total, skipped }) : t('deck.imported', { n: total }));
           }}
         />
@@ -1095,8 +1151,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
             {t('decks.builder.tabCatalog')}
           </button>
           <button type="button" className={mobileTab === 'deck' ? 'on' : ''} aria-current={mobileTab === 'deck' ? 'page' : undefined} onClick={() => setMobileTab('deck')}>
-            <b className={report.total === DECK_SIZE ? 'ok' : ''}>
-              {report.total}/{DECK_SIZE}
+            <b className={report.total === target ? 'ok' : ''}>
+              {report.total}/{target}
             </b>
             {t('decks.builder.tabDeck')}
           </button>

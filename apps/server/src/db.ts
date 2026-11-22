@@ -1072,6 +1072,13 @@ function migrateStats(db: DB) {
       data       TEXT NOT NULL,                 -- JSON (online/room.ts: RoomData)
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- Mesas de Yonko (todos contra todos) abertas ou em andamento: refeitas ao reiniciar o servidor.
+    CREATE TABLE IF NOT EXISTS yonko_tables (
+      id         TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,                 -- JSON (yonko/table.ts: YonkoTableData)
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
   const seatCols = (db.prepare('PRAGMA table_info(match_seats)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!seatCols.includes('listed')) {
@@ -1101,6 +1108,23 @@ export function deleteLiveMatch(db: DB, id: string) {
 
 export function listLiveMatches(db: DB): Array<{ id: string; data: string }> {
   return db.prepare('SELECT id, data FROM live_matches').all() as Array<{ id: string; data: string }>;
+}
+
+// ------------------------------------------------------------------ mesas de Yonko
+
+export function saveYonkoTable(db: DB, id: string, data: unknown) {
+  db.prepare(
+    `INSERT INTO yonko_tables (id, data, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+  ).run(id, JSON.stringify(data));
+}
+
+export function deleteYonkoTable(db: DB, id: string) {
+  db.prepare('DELETE FROM yonko_tables WHERE id = ?').run(id);
+}
+
+export function listYonkoTables(db: DB): Array<{ id: string; data: string }> {
+  return db.prepare('SELECT id, data FROM yonko_tables').all() as Array<{ id: string; data: string }>;
 }
 
 // ------------------------------------------------------------------ cartas

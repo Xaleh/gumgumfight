@@ -195,7 +195,7 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
 ### Modelo
 
 - **Estado** (`GameState`, `types.ts:1200`): JSON puro, sem classes. Campos principais: `turn`, `firstPlayer`,
-  `activePlayer`, `phase` (`mulligan | main | gameover`), `players[2]` (líder, personagens, stage, mão, deck, lixo,
+  `activePlayer`, `phase` (`mulligan | main | gameover`), `players` (dois; até quatro na mesa de Yonko: líder, personagens, stage, mão, deck, lixo,
   Vida, DON!! ativos/virados/no deck), `cards` (instâncias `uid → {cardId, owner}`), `defs` (definições das cartas
   usadas), `stack` (frames de efeito/batalha/dano), `pending` (decisão esperada: alvo, bloqueio, counter, carta de
   Vida, confirmação, opção, mulligan, quem começa), `modifiers`, `log`, `winner`, `winReason`, `actionCount`,
@@ -331,6 +331,63 @@ recente; `setCubeDir` para os testes). `DraftPods.create(..., { cube: true })` a
 `draft/cube-source.ts`: `listTournaments` e `tournamentDecks` (API do Limitless, cache em disco só com as cartas de
 cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores de cada trimestre) e `usageByCard`
 (fração de decks por trimestre; a nota é a média dos `USAGE_BEST_QUARTERS` melhores).
+
+### Mesa com mais de dois jogadores (Yonko)
+
+O motor, a mesa local e a mesa online (fases 1 a 3 de `docs/plano-modos-de-jogo.md`, seção 4; o servidor está em
+"Mesas do Yonko", na seção 11): replay, espectador e o bot com busca continuam de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
+é interpretação nossa. `createGame` aceita de 2 a `MAX_PLAYERS` (4) em `players`; `PlayerId` é o lugar (índice em
+`players`) e a ordem dos turnos segue os lugares. Com mais de dois (`isMultiplayer`), o estado ganha `table`
+(`TableRules`: `extraLife`, `curveChoice`, `eliminationDraw`; `YONKO_TABLE` é o do manual), `eliminated` (ordem de
+queda), `turnsTaken` (ninguém ataca no próprio primeiro turno), `curve` (a largada de cada um) e `dealt`. Com dois,
+nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`, `untilTurn` numérico): uma partida
+1x1 dá o mesmo estado que dava antes.
+
+- **Deck**: `validateYonkoDeck` (`deck.ts`) é `validateDeck` com `size: 60` e `maxCopies: 1`.
+- **Alvos**: `targetCandidates` com `side: 'opponent'` junta as cartas de todos os oponentes (`opponentSides`);
+  `side: 'any'` são as cartas de toda a mesa. As auras `side: 'opponent'` e os eventos "do oponente" já comparavam
+  dono com dono, então valem para todos os oponentes sem mudança.
+- **Mão, Vida, DON!! e deck "do oponente"**: em `stepEffect`, um passo `eachOpponent` (lista explícita de tipos de
+  passo) é trocado por uma cópia para cada oponente vivo, na ordem dos turnos, cada uma com `vs`. A cópia roda com
+  esse oponente fixado (`withOpponent`), a condição `if` dela inclusive; os passos que ela insere e os efeitos que
+  empilha herdam o oponente (`vs` nos passos, `focus` no frame). `opponentOf(state, p)` devolve o oponente fixado
+  (`fixedOpponent`: a cópia em execução, o `focus` do frame ou o único oponente vivo).
+- **DON!! do oponente** segue o texto da carta. Entram em `eachOpponent` os passos em que o oponente age
+  (`opponentReturnsDon`, `opponentAddDon`, `skipRefreshDon` com `atMainPhase`…). Os que viram DON!! do oponente são
+  um alvo: `restOpponentDon` pergunta, para cada DON!!, de qual oponente (`donTargetOpponent`, chave
+  `engine.whoseDonToRest`); `skipRefreshDon` sem `atMainPhase` faz o mesmo (`engine.whoseDonSkipsRefresh`);
+  `restDonOrCharacter` põe uma opção por oponente com DON!! (`engine.optRestDonOf`, memória `don:<id>`).
+  `donMatchOpponent` compara com o oponente que tem mais DON!! em campo.
+- **Condições**: `conditionHolds` sem oponente fixado vale se algum oponente cumpre (`anyOpponent`).
+- **Batalha**: o defensor é o dono do alvo atual. Só ele usa Counter. Com `TableRules.bystanderCounter` (desligado
+  por padrão), `stepBattle` percorre antes `battle.bystanders` (os oponentes do atacante que não são o defensor) e
+  abre `counter` com `bystander` para quem tem Evento [Counter] pagável (`bystanderCounterOptions`). [On Your
+  Opponent's Attack] é empilhado para todos os oponentes do atacante.
+- **Durações**: `setExpiry` (em `addModifier`, `restrict`, `negateOnPlay`). Na mesa, `untilTurn` fica em `FAR_TURN` e
+  `untilStartOf`/`untilEndOf` dizem de quem é o turno que encerra o efeito; `turnExpiries`, no começo de cada turno,
+  remove os primeiros e converte os segundos no número do turno em curso.
+- **Preparação**: `continueSetup` (largadas com a escolha `option`/`curve`, mãos, "at the start of the game",
+  mulligans na ordem, Vida, primeiro turno); `refreshDrawDon` lê a largada no primeiro turno de cada um.
+- **Eliminação**: `eliminate` substitui o antigo `defeat` (com dois jogadores, chama `gameOver` como antes).
+  `removePlayer` marca `out`, esvazia as áreas, encerra a batalha e os frames/efeitos do jogador, corta as cartas
+  dele das escolhas abertas dos outros e, se era a vez dele, deixa só um frame `endTurn` na pilha (o turno fecha
+  pelo caminho normal). `locate` não encontra o Líder de quem saiu; `alivePlayers` é a lista para percorrer a
+  mesa. O último a cair não é marcado `out`: a partida acabou e a mesa fica como estava. `concede` e `timeout`
+  eliminam (e seguem com `run`) em vez de encerrar.
+- **Deck**: `validateYonkoDeck` (60, uma cópia de cada, cor do Líder) e `yonkoTableDeck` (o deck que vai para a mesa:
+  o de 60 como está, ou o de teste de `yonkoDeckFrom` a partir de um de 50). O resumo dos decks no servidor traz
+  `yonko`/`yonkoCodes`, e o construtor tem o modo "Montar para o Yonko".
+- **Visão**: as referências a cartas escondidas (`~lugar:zona:posição`) aceitam qualquer lugar (`actionFromView`).
+- **Etiquetas de duração** (`status.ts`): `modifierUntilInfo` lê `untilStartOf`/`untilEndOf` e diz de quem é o turno
+  que encerra o efeito.
+- **Telas** (`apps/web`): `components/Yonko.tsx` (a sala) monta o `GameConfig` com `yonkoDeckFrom` (deck de teste de
+  60 a partir de um deck comum) e as regras escolhidas; `game/useYonkoGame.ts` roda a partida no navegador
+  (`createGame`/`applyAction`), faz os bots jogarem com `chooseSimpleBotAction` sobre a visão do lugar deles e
+  entrega à mesa a visão de quem joga (`viewFor`); `components/YonkoTable.tsx` é a mesa, por clique, sem as
+  animações de `Motion.tsx`. Os estilos ficam no fim de `styles.css` (prefixo `.yk-`), sempre no tema escuro; os
+  textos em `i18n/yonko/`.
+- **Diagnóstico**: `setOpponentProbe` avisa quando um passo consulta "o oponente" sem um fixado (um tipo de passo que
+  `eachOpponent` ainda não conhece). `scripts/simulate-yonko.ts` usa isso e confere os invariantes por jogador.
 
 ### Tradução
 
@@ -683,7 +740,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (34)
+### Tabelas (35)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -703,6 +760,7 @@ baixadas quando tocam) + `public/`.
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`, `listed` (0 = fora das estatísticas: Livre ou spoilers). Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
 | `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício (inclui `engineTexts`, os textos para o motor do começo da partida, para refazer e derivar as estatísticas com as mesmas regras) | lobby (a cada ação) |
+| `yonko_tables` | `id` (mesa) | **`data` (JSON `YonkoTableData`)**: regras, lugares (com os decks), seed de 128 bits e ações de uma mesa do Yonko aberta ou em andamento, para refazê-la após reinício | `YonkoTables` (a cada mudança; apagada quando a mesa fecha) |
 | `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
 | `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`) | servidor |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
@@ -1184,6 +1242,32 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   `MAX_ACTIONS = 5000` por partida.
 
 ---
+
+### Mesas do Yonko (`yonko/`)
+
+A mesa de todos contra todos tem sala e rotas próprias, separadas do `Lobby`/`Room` de dois jogadores:
+`yonko/table.ts` (`YonkoTable`: sala de espera, partida, relógio, bots e visões) e `yonko/routes.ts` (`YonkoTables`,
+o mapa das mesas e dos códigos, e as rotas `/api/yonko/...`). O transporte é o mesmo (SSE `events?t=token` e POST com
+o token no corpo); o evento `state` traz `room` (lugares, regras, `problem`, relógio, `player` = o `PlayerId` de quem
+recebe), `view` (`viewFor` do lugar; null na espera), as definições e as linhas do registro que a conexão ainda não
+tem, e `lastAction`.
+
+- **Lugares:** `seats` (4, na sala de espera) e, na partida, `players` (os ocupados, na ordem dos lugares) com
+  `seatOf`. O token identifica o lugar; bots não têm token. `tokenOf(ownerHash, userId)` devolve o lugar de quem já
+  está na mesa (entrar de novo pelo código volta para ele).
+- **Deck:** `tableDeck` lê o deck salvo e chama `yonkoTableDeck` com todas as cartas (relidas no máximo a cada
+  minuto): o deck de 60 como está, ou o deck de teste (`test: true`).
+- **Partida:** `start` sorteia `seed128` e o sal dos apelidos, grava os textos para o motor (`engineTexts`) e
+  `rebuild` cria o jogo (`table` = as regras da mesa) e refaz as ações. O relógio (`remaining`, por jogador) só corre
+  para a pessoa da vez; `tick` aplica `timeout` sem tempo ou depois de `YONKO_ABANDON_MS` sem conexão
+  (`abandoned`). Bots jogam com `chooseSimpleBotAction` sobre a própria visão (`identityAliases`) e a jogada volta
+  por `actionFromView`; sem pessoas na partida, sem espera.
+- **Faxina:** `sweep` (a cada minuto) fecha espera e fim sem ninguém conectado há 30 minutos e partidas sem
+  conexão há 6 horas. `reopen` (quem criou) volta a mesa terminada para a espera com os mesmos lugares.
+- **No app:** `components/Yonko.tsx` (entrada: deck, regras, criar/entrar, mesa local), `components/YonkoOnline.tsx`
+  (sala de espera e mesa online), `components/YonkoRules.tsx` (painel de regras), `game/useYonkoOnline.ts` (o canal
+  e as jogadas) e `components/YonkoTable.tsx` (a mesa, comum à local e à online). A tela `yonko-online` fica em
+  `sessionStorage` (recarregar volta para ela) e `/?yonko=CÓDIGO` abre a entrada com o código preenchido.
 
 ## 12. Torneios
 

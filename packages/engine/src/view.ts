@@ -160,7 +160,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
       ...(ps.lifeFaceUp ? { lifeFaceUp: refs(ps.lifeFaceUp) } : {}),
       ...(ps.id === viewer ? { unseen: unseenOf(ps) } : {}),
     }),
-  ) as [PlayerState, PlayerState];
+  );
 
   const usedKey = (k: string) => {
     const i = k.lastIndexOf(':');
@@ -376,8 +376,9 @@ export function actionFromView(state: GameState, aliases: Aliases, action: Actio
   const real = (ref: unknown): string | null => {
     if (typeof ref !== 'string') return null;
     if (ref.startsWith(HIDDEN_REF)) {
-      const m = /^~([01]):(hand|deck|life):(\d+)$/.exec(ref);
-      if (!m) return null;
+      // O lugar vai de 0 a 3 (mesa de Yonko); no jogo normal, 0 ou 1.
+      const m = /^~(\d):(hand|deck|life):(\d+)$/.exec(ref);
+      if (!m || !state.players[Number(m[1])]) return null;
       const uid = state.players[Number(m[1]) as PlayerId][m[2] as Zone][Number(m[3])];
       return uid ?? null;
     }
