@@ -17846,6 +17846,12 @@ div.dk-tile-main {
   transform-origin: 80% 90%;
   animation: po-half-right calc(var(--k) * 720ms) cubic-bezier(0.4, 0, 0.9, 0.6) calc(var(--k) * 1300ms) both;
 }
+/* Pack Rush: a arte do modo cobre o booster da coleção sorteada e some quando o brilho passa. */
+.po-cover {
+  position: absolute;
+  inset: 0;
+  animation: po-cover calc(var(--k) * 300ms) ease-in calc(var(--k) * 430ms) both;
+}
 .po-glint {
   position: absolute;
   inset: 1.5% 3%;
@@ -18148,6 +18154,20 @@ div.dk-tile-main {
   100% {
     transform: translate(95%, 75%) rotate(52deg);
     opacity: 0;
+  }
+}
+@keyframes po-cover {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.07);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
   }
 }
 @keyframes po-glint {

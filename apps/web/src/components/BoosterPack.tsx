@@ -1,5 +1,6 @@
 // O booster na tela: a arte do produto (`public/boosters/<COLEÇÃO>.webp`) quando existe, senão um
-// booster desenhado com a cor tirada do código da coleção. E a animação de abrir um booster: ele
+// booster desenhado com a cor tirada do código da coleção. Pack Rush fechado, Cubo e Draft têm arte
+// própria do GumGum Fight (`RUSH`, `CUBE` e `DRAFT`, desenhadas em `apps/web/art/boosters`). E a animação de abrir um booster: ele
 // chega ao centro, estoura em luz, a embalagem rasga e as cartas voam para a mesa viradas para baixo,
 // para o jogador virar (`BoosterOpening`).
 
@@ -21,20 +22,21 @@ export function Booster({ set, small, big, state, draft }: { set: string; small?
   const mixed = isRush(set);
   const cube = isCube(set);
   const hue = cube ? 168 : draft ? 280 : mixed ? 42 : (Number(set.replace(/\D/g, '')) * 47 + (set.startsWith('EB') ? 150 : set.startsWith('PRB') ? 270 : 190)) % 360;
-  const wantsArt = !cube && !draft && !mixed && isBoosterSet(set);
+  /** O arquivo da arte: a coleção, ou a arte própria do modo. */
+  const key = cube ? 'CUBE' : draft ? 'DRAFT' : mixed ? 'RUSH' : isBoosterSet(set) ? set : null;
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [set]);
-  const art = wantsArt && !failed && !missingArt.has(set);
+  useEffect(() => setFailed(false), [key]);
+  const art = key !== null && !failed && !missingArt.has(key);
   return (
     <span className={['sealed-pack', small ? 'small' : '', big ? 'big' : '', state ?? '', art ? 'art' : ''].join(' ')} style={{ ['--h' as string]: hue }} aria-hidden="true">
       <b>{cube ? 'CUBO' : draft ? 'DRAFT' : mixed ? 'RUSH' : set}</b>
       {art && (
         <img
-          src={boosterArt(set)}
+          src={boosterArt(key!)}
           alt=""
           draggable={false}
           onError={() => {
-            missingArt.add(set);
+            missingArt.add(key!);
             setFailed(true);
           }}
         />
@@ -104,6 +106,7 @@ function useTable(n: number) {
  */
 export function BoosterOpening({
   set,
+  cover,
   draft,
   label,
   cards = [],
@@ -113,6 +116,8 @@ export function BoosterOpening({
   onSkip,
 }: {
   set: string;
+  /** Pack Rush: a chave das coleções. O booster chega com a arte do modo e, no brilho, vira o da coleção sorteada (`set`). */
+  cover?: string;
   draft?: boolean;
   label: string;
   /** As cartas do booster, na ordem (sem elas, a abertura é só o estouro). */
@@ -226,6 +231,11 @@ export function BoosterOpening({
               <div className="po-half po-right">
                 <Booster set={set} draft={draft} big />
               </div>
+              {cover && cover !== set && (
+                <div className="po-cover">
+                  <Booster set={cover} big />
+                </div>
+              )}
               <span className="po-glint" />
             </div>
           </div>
