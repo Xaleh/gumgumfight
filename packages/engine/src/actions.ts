@@ -5,7 +5,7 @@ import {
   cardDef,
   detachDonError,
   isIdle,
-  opponent,
+  opponentsOf,
   playError,
 } from './engine';
 import type { Action, GameState, PlayerId } from './types';
@@ -49,8 +49,11 @@ export function legalActions(state: GameState, player: PlayerId): Action[] {
     if (!detachDonError(state, player, fc.uid)) out.push({ type: 'detachDon', player, target: fc.uid });
   }
 
-  const opp = state.players[opponent(player)];
-  const targets = [opp.leader.uid, ...opp.characters.map((c) => c.uid)];
+  // Cada ataque escolhe o alvo em qualquer mesa (com dois jogadores, a do oponente).
+  const targets = opponentsOf(state, player).flatMap((id) => {
+    const opp = state.players[id];
+    return [opp.leader.uid, ...opp.characters.map((c) => c.uid)];
+  });
   for (const fc of [ps.leader, ...ps.characters]) {
     for (const t of targets) {
       if (!attackError(state, player, fc.uid, t)) out.push({ type: 'attack', player, attacker: fc.uid, target: t });

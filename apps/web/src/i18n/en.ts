@@ -7,6 +7,8 @@ import recap from './recap/en';
 import decks from './decks/en';
 import team from './team/en';
 import chamber from './chamber/en';
+import sealed from './sealed/en';
+import yonko from './yonko/en';
 
 export default {
   // ---- general ----
@@ -356,6 +358,8 @@ export default {
   'menu.chipNoManual': 'No manual effects',
   'menu.chipReleasedOnly': 'Released cards only',
   'menu.rankedNeedsLogin': 'Sign in with Google to play ranked.',
+  'menu.rankedNotInFormat': '{format} has no ranked queue. Play it in quick match.',
+  'menu.allBlueChip': 'C, UC, R and promo only',
   'menu.rankedSpoilers': "{n|This deck has # spoiler card that isn't released yet: ranked only allows released cards.|This deck has # spoiler cards that aren't released yet: ranked only allows released cards.}",
   'menu.rankedManualCards':
     '{n|The deck has # card with a manual effect (⚙), which ranked does not allow.|The deck has # cards with manual effects (⚙), which ranked does not allow.}',
@@ -542,6 +546,35 @@ export default {
   'deck.storageSignIn': 'Sign in with Google from the menu to keep them in your account.',
   // ---- catalog and filters ----
   'deck.searchPlaceholder': 'Search by name, number, type or text…',
+  'deck.searchHelp': 'Search shortcuts',
+  'deck.searchHelp.hint': 'Tap a shortcut to add it to the search (tap again to remove it). You can combine several: c3 c2000 blocker.',
+  'deck.searchHelp.numbers': 'Numbers',
+  'deck.searchHelp.card': 'Card',
+  'deck.searchHelp.effect': 'Effect',
+  'deck.searchHelp.deck': 'Deck',
+  'deck.searchHelp.operators': 'Operators',
+  'deck.searchHelp.cost': 'Cost 3',
+  'deck.searchHelp.costRange': 'Cost 3 or more · 3 or less · 2 to 4',
+  'deck.searchHelp.counter': 'Counter +2000',
+  'deck.searchHelp.noCounter': 'No Counter',
+  'deck.searchHelp.power': 'Power 5000 · 6000 or more (p5 works too)',
+  'deck.searchHelp.life': 'Leader with 4 Life',
+  'deck.searchHelp.color': 'Color, or its letter: r, g, u (blue), p, b (black), y. Two colors show only the two-color cards',
+  'deck.searchHelp.category': 'Card type',
+  'deck.searchHelp.attribute': 'Attribute',
+  'deck.searchHelp.rarity': 'Rarity',
+  'deck.searchHelp.set': 'Set',
+  'deck.searchHelp.keyword': 'Keyword the card has',
+  'deck.searchHelp.timing': 'When the effect happens',
+  'deck.searchHelp.don': '[DON!! x2] · DON!! −2',
+  'deck.searchHelp.vanilla': 'No effect',
+  'deck.searchHelp.indeck': 'Already in the deck',
+  'deck.searchHelp.legality': 'In Standard: banned · legal · rotated out',
+  'deck.searchHelp.allBlue': 'Legal in All Blue (C, UC, R and promo)',
+  'deck.searchHelp.new': 'Unreleased (spoiler)',
+  'deck.searchHelp.not': 'Leaves out what matches',
+  'deck.searchHelp.phrase': 'Exact phrase',
+  'deck.searchHelp.field': 'Name only · type only',
   'deck.filters': 'Filters',
   'deck.color.red': 'Red',
   'deck.color.green': 'Green',
@@ -569,7 +602,7 @@ export default {
   'deck.manualTitle': 'Effect not automated yet',
   'deck.showMore': 'Show more ({n})',
   'deck.loadingCards': 'Loading cards…',
-  'deck.bannedTitle': 'Banned: not legal in any format',
+  'deck.bannedTitle': 'Banned: not legal in Standard or Extra Grand Battle',
   'deck.rotatedTitle': 'Block ①: rotated out, legal only in Extra Grand Battle',
   // ---- current deck ----
   'deck.leader': 'Leader',
@@ -584,6 +617,9 @@ export default {
   'deck.entryManual': '⚙ manual',
   'deck.entryRotated': '① rotated (EGB only)',
   'deck.entryBanned': '🚫 banned',
+  'deck.entryNotAllBlue': 'not in All Blue',
+  'deck.onlyAllBlue': 'Build for All Blue',
+  'deck.onlyAllBlueTitle': 'Shows only cards legal in All Blue (C, UC, R and promo; any Leader) and flags the ones in your list that are not.',
   'deck.removeOne': 'Remove one',
   'deck.addOne': 'Add one',
   'deck.allowedIn': 'Legal in {format}',
@@ -2423,6 +2459,14 @@ export default {
   'engine.optPeekOwnLife': 'Look at your Life',
   'engine.optPeekOpponentLife': "Look at your opponent's Life",
   'engine.optDontPeek': "Don't look",
+  // ---- table with more than two players (Yonko) ----
+  'engine.whoseDonToRest': '{source}: rest 1 active DON!! of which opponent?',
+  'engine.whoseDonSkipsRefresh': "{source}: which opponent's rested DON!! stays rested?",
+  'engine.optRestDonOf': "Rest 1 of {player}'s active DON!!",
+  'engine.optSkipRefreshDonOf': "1 of {player}'s rested DON!!",
+  'engine.startCurve': '{player}: choose your start.',
+  'engine.optCurveOdd': '1 DON!! on the first turn and draw a card (1, 3, 5, 7, 9, 10)',
+  'engine.optCurveEven': '2 DON!! on the first turn, no draw (2, 4, 6, 8, 10)',
   'engine.optYesLifeTrash': 'Yes, trash {n|# card|# cards} from the top of my Life',
   'engine.optYesDiscard': 'Yes, trash {n|# card|# cards} from my hand',
   'engine.optYesReturnDon': 'Yes, return {n|# active DON!!|# active DON!!}',
@@ -2513,6 +2557,12 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Both players ended the turn with no cards in their decks.',
   'log.winDeckOutLeaderRule': "{player} ran out of cards in their deck and wins by their Leader's rule.",
   'log.winBothDeckOutLeaderRule': "Both players ran out of cards in their decks and win by their Leader's rule.",
+  // ---- table with more than two players (Yonko) ----
+  'log.winAllOut': 'All remaining players were defeated at the same time.',
+  'log.eliminated': '{player} was eliminated. {reason}',
+  'log.eliminationReward': '{player} draws {n|# card|# cards} for eliminating {target}.',
+  'log.startCurveOdd': '{player} chooses 1 DON!! on their first turn and draws a card.',
+  'log.startCurveEven': '{player} chooses 2 DON!! on their first turn, without drawing.',
   // ---- undo ----
   'log.cancelPlay': '{player} undoes playing {card} (the card returns to their hand).',
   'log.cancelActivate': "{player} undoes activating {card}.",
@@ -2817,6 +2867,7 @@ export default {
   'errors.tooManyRoomsRecently': 'You opened too many matches in a short time; wait a few minutes.',
   'errors.alreadyPlaying': "You're already in an online match.",
   'errors.rankedLoginRequired': 'Ranked is only for players signed in with a Google account.',
+  'errors.rankedNotInFormat': '{format} has no ranked queue.',
   'errors.invalidRoomCode': 'Invalid room code.',
   'errors.roomNotFound': 'Room not found or already started.',
   'errors.ownRoom': 'This is your room: send the code to someone else.',
@@ -2960,6 +3011,7 @@ export default {
   'labels.deckGroup.mine': 'My decks',
   'labels.deckGroup.community': 'Community decks',
   'labels.deckGroup.builtin': 'Starter Decks',
+  'labels.deckGroup.allBlue': 'All Blue decks',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Quarterfinals',
@@ -2984,9 +3036,12 @@ export default {
   'rules.leaderColor': '{name} ({id}) does not share a color with the Leader.',
   'rules.unscripted': '{n|# card|# cards} with an effect not automated yet (applied by hand, with the manual tools).',
   // ---- formats (formatIssues) ----
-  'rules.banned': '{id} is banned (not legal in any format).',
+  'rules.banned': '{id} is banned (not legal in Standard or Extra Grand Battle).',
   'rules.rotated': '{id} has block ① and rotated out: not legal in {format}.',
   'rules.bannedPair': '{a} and {b} cannot be used together in the same deck.',
+  'rules.bannedIn': '{id} is banned in {format}.',
+  'rules.rarity': '{id} is {rarity}: not legal in {format} (C, UC, R and promo only).',
+  'rules.rarityUnknown': '{id} has no known rarity: not legal in {format}.',
   'rules.spoiler': '{n|Card not released yet (spoiler)|Cards not released yet (spoilers)}: {ids}. Spoilers are only allowed in the casual queue and in private rooms, bot practice and tournaments with spoilers.',
   'rules.spoilerNotNext': '{n|Spoiler card from another set|Spoiler cards from other sets}: {ids}. With spoilers, outside Free, only the next set to be released is allowed ({set}); the others are Free only.',
   // ---- text list (parseDeckList) ----
@@ -3051,5 +3106,7 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...sealed,
+  ...yonko,
 } satisfies Messages;
 

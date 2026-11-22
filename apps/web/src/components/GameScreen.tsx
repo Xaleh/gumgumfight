@@ -246,7 +246,8 @@ export function GameScreen({
   // Partida gravada no servidor: o relato de bug aponta para ela (e para o replay dela).
   const [matchId, setMatchId] = useState<number | null>(null);
   useEffect(() => {
-    if (game.state.phase !== 'gameover' || saved.current || setup.mode === 'replay') return;
+    // O treino do Selado não é gravado: o servidor só aceita decks construídos nesta rota, e o Selado fica fora das estatísticas.
+    if (game.state.phase !== 'gameover' || saved.current || setup.mode === 'replay' || setup.format === 'sealed') return;
     saved.current = true;
     void api
       .saveMatch({

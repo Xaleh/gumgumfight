@@ -120,7 +120,7 @@ gumgumfight/
 │   ├── src/rng.ts               mulberry32 (32 bits) e sfc32 (128 bits)
 │   ├── src/replay.ts            REPLAY_VERSION, upgrade de replays antigos
 │   ├── src/deck.ts              validateDeck, parse/format de listas
-│   ├── src/formats.ts           Standard / Extra Grand Battle, banidas, rotação
+│   ├── src/formats.ts           Standard / Extra Grand Battle / All Blue, banidas, rotação
 │   ├── src/errata.ts, source-fixes.ts   correções de dados (errata oficial / erros da optcgapi)
 │   ├── src/cards/parser.ts      texto da carta → habilidades (DSL) (3.180 linhas)
 │   ├── src/cards/scripts.ts     scripts escritos à mão (62 cartas, prioridade sobre o parser)
@@ -195,7 +195,7 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
 ### Modelo
 
 - **Estado** (`GameState`, `types.ts:1200`): JSON puro, sem classes. Campos principais: `turn`, `firstPlayer`,
-  `activePlayer`, `phase` (`mulligan | main | gameover`), `players[2]` (líder, personagens, stage, mão, deck, lixo,
+  `activePlayer`, `phase` (`mulligan | main | gameover`), `players` (dois; até quatro na mesa de Yonko: líder, personagens, stage, mão, deck, lixo,
   Vida, DON!! ativos/virados/no deck), `cards` (instâncias `uid → {cardId, owner}`), `defs` (definições das cartas
   usadas), `stack` (frames de efeito/batalha/dano), `pending` (decisão esperada: alvo, bloqueio, counter, carta de
   Vida, confirmação, opção, mulligan, quem começa), `modifiers`, `log`, `winner`, `winReason`, `actionCount`,
@@ -253,12 +253,141 @@ volta a ação feita sobre a visão.
 
 ### Formatos (`formats.ts`)
 
-`standard` e `egb` (`FormatId`, os oficiais: filas, selos do deck e estatísticas) e `free`, o Livre (`PlayFormat`: só
-torneios, salas privadas e treino contra o bot), em que `cardLegality`/`formatIssues` aceitam tudo. `PlayMode` =
+`standard`, `egb` e `allblue` (`FormatId`: os que têm fila e selo no deck) e `free`, o Livre (`PlayFormat`: só
+torneios, salas privadas e treino contra o bot), em que `cardLegality`/`formatIssues` aceitam tudo. `standard` e `egb`
+são os oficiais (`OFFICIAL_FORMATS`): só eles têm ranqueada (`hasRanked`) e estatísticas. O `allblue` é o All Blue,
+formato da comunidade: valem C, UC, R e promo (`ALL_BLUE_RARITIES`, lidas com `rarityCode`) e qualquer Líder; as
+banidas, os pares e a rotação da Bandai não se aplicam (lista própria `ALL_BLUE_BANNED`, vazia). Como a regra depende
+da raridade, `cardLegality(id, formato, agora, carta)` e `formatIssues(deck, formato, agora, catálogo)` recebem as
+cartas, e carta sem raridade conhecida não vale (`rules.rarityUnknown`). Os decks prontos do All Blue
+(`data/decks/allblue`) entram no banco com `deck_group = 'allblue'`. `PlayMode` =
 formato + `spoilers` (`playMode` liga os spoilers no Livre); `countsInStats` diz se a partida entra nas estatísticas
-(só Standard e EGB puros, sem spoilers). Banidas (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação
+(só Standard e EGB puros, sem spoilers). Banidas dos formatos oficiais (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação
 do bloco ① em Standard (`/^(OP0[1-4]|ST0[1-9])-/`, exceto 20 ids). `validateDeck` confere 50 cartas, 4 cópias, cor do Líder e
 regras especiais do Líder.
+
+### Selado (`sealed.ts`)
+
+Modo limitado (Pré-release): `openBoosters(cartas da coleção, seed, 6)` sorteia os boosters com o RNG do motor (seed de
+32 bits ou as 4 palavras do sfc32) pelo `BoosterModel` da coleção (`boosterModelOf`: `BOOSTER_MODELS.early` para OP01 a
+OP03, `.extra` para EB, `.main` para o resto): vagas fixas de C, UC e R, uma vaga de destaque (SR ou SEC com as chances de
+`hits`, senão R) e o Líder no lugar de uma comum (`leaderChance`; com `leaderTakesHit`, Líder e destaque são fatias do
+mesmo sorteio e não saem juntos; `leaderChancePerLeader` limita a chance nas coleções com poucos Líderes). Todo modelo dá
+12 cartas (`boosterSize`), e `boosterOdds` devolve as chances que a tela mostra (`pack`, em `/api/sealed/sets`).
+`boosterReady(cartas, modelo)` diz se a coleção está completa no banco; `validateLimitedDeck(deck, catálogo, cartas abertas)` confere
+40 cartas (`LIMITED_DECK_SIZE`), Líder que saiu ou o de 6 cores, e nenhuma carta além das cópias abertas, sem cor e sem
+limite de cópias; `autoBuildLimited` monta um deck por nota e curva de custo (o "Montar sozinho" e o deck do bot).
+`createGame` aceita deck de 50 ou de 40. O formato da partida é `sealed` (`PlayFormat`, fora de `isPlayFormat`: só as
+rotas do Selado o criam), com `PlayMode.sealedSet`; nele `cardLegality`/`formatIssues` aceitam tudo. O Líder de 6 cores
+(`SEALED_LEADER_ID`) tem `CardDef.wild` (qualquer nome, tipo e atributo em `hasName`/`hasType`/`hasAttribute`, e também em
+`typeIncludes`/`nameIncludes`, as condições "type includes"/"name includes") e é
+`eventOnly` nos formatos de deck construído. No servidor (`sealed/store.ts`, `sealed/routes.ts`), a tabela
+`sealed_pools` guarda dono, coleção, seed, boosters, deck e placar; nas salas, o `deckId` de um assento do Selado é
+`sealed:<id>` e o deck é conferido contra as cartas abertas (`sealedDeckFor`, em `online/routes.ts`). **Pack Rush**
+(`kind = 'rush'`): `openMixedBoosters` sorteia a coleção de cada booster entre as escolhidas, `rushKey` dá a chave
+("OP01+OP05", gravada em `set_code` e usada como `sealedSet` da sala); `pack_sets` guarda a coleção de cada booster.
+O Líder segue `poolRules` (`sealed/store.ts`): `LimitedRules.leaders = 'any'` (qualquer Líder do jogo; `anyLeaderAllowed`:
+os de spoiler, só das coleções da chave) vale só nos drafts em que os boosters não trazem Líder, o Draft de Pack Rush
+(`openDraftBoosters` com mais de uma coleção) e o Draft Cubo. No Selado, de uma coleção ou Pack Rush, e no Draft de uma
+coleção, o Líder é um dos que saíram ou o de 6 cores, que vale em todos.
+
+A busca e os filtros de cartas são um componente só (`apps/web/src/components/CardFilterBar.tsx`), usado no construtor
+de decks e na montagem do Selado: `CardFilterBar` (a barra, com o painel de atalhos), `CardFilters` (o estado, guardado
+por quem usa), `matchesCardFilters` (cores, categoria, custo, coleção e a busca de `cardSearch.ts`) e `useSearchAliases`
+(nomes de cores e categorias no idioma em vigor). O construtor acrescenta as caixas dele como `children`.
+
+### Draft (`draft.ts`)
+
+`openDraftBoosters` abre os boosters de todos os lugares (`DRAFT_SEATS = 8`, `DRAFT_ROUNDS = 4`; no Pack Rush, uma
+coleção sorteada por rodada, igual para o pod). `DraftState` é o rodízio puro: cada lugar tem uma fila de boosters;
+`draftPick` tira a carta do booster da frente e o põe na fila do vizinho (`draftPassTo`: o sentido inverte a cada
+rodada), e a rodada seguinte abre quando todos os boosters acabam. `draftChoice` é a escolha dos bots e a automática
+(`limitedScore` + bônus de raridade + acaso do RNG do motor; só um Líder). `draftPickSeconds(n) = 10 + 3n`.
+
+No servidor, `DraftPods` (`draft/pods.ts`) guarda os pods em memória e em `draft_pods` (estado inteiro em JSON, para
+voltar depois de um deploy com prazos novos). `advance` faz os bots e os lugares ausentes escolherem e dá prazo a quem
+recebeu booster; `tick` (a cada segundo) escolhe por quem deixou o prazo acabar. Um lugar vira `away` depois de
+`AWAY_AFTER_TIMEOUTS` prazos seguidos só se a pessoa não consulta o pod há `AWAY_UNSEEN_MS`; `touch` (toda consulta)
+desfaz. `view` devolve a cada jogador só o booster da frente da própria fila. No fim, `finish` cria uma linha de
+`sealed_pools` por pessoa (`kind = 'draft'`, `pod_id`, as escolhas por rodada no lugar dos boosters) e monta os decks
+dos bots (`autoBuildLimited`), que ficam no pod para o treino (`podBotDecks`). Nas salas, `PlayMode.sealedPod` leva o
+id do pod: `sealedDeckFor` só aceita deck com o mesmo `pod_id` (`sealedRoomIsDraft` / `sealedRoomNotDraft`).
+
+### Draft Cubo (`cube.ts`)
+
+O Cubo usa o lugar da coleção nos modos limitados com uma chave própria: `cubeKey('T1')` = `"CUBE:T1"` (`isCube`,
+em `formats.ts`), que vai em `draft_pods`, `sealed_pools.set_code` e `PlayMode.sealedSet`. `openCubeBoosters` embaralha
+a lista e a reparte (`packs[rodada][assento]`, o formato de `openDraftBoosters`), então nenhuma carta se repete no
+pod; `cubeCardsNeeded(8, 4)` = 384. `pickCube(uso, cartas, formato)` escolhe a lista: por cor, o mínimo de cada faixa
+de custo, depois as de maior uso dentro dos tetos (`DEFAULT_CUBE_SHAPE`: 70 por cor, 14 Eventos, 2 Stages), e os
+tetos cedem se a cor não tem cartas usadas o bastante. `cubeEligible` deixa de fora Líder e carta com `needsManual`.
+Em `draftChoice`, o quinto argumento (`usage`) troca o bônus de raridade pelo uso da carta.
+
+No servidor, `draft/cubes.ts` lê `data/cubes/*.json` (`CubeFile`), fica com as cartas que o banco tem e que são
+`cubeEligible`, e descarta o Cubo que não dá um pod (`cubes`, memo de 1 minuto; `currentCube` = `publishedAt` mais
+recente; `setCubeDir` para os testes). `DraftPods.create(..., { cube: true })` abre o pod com a chave do Cubo em uso;
+`begin` sorteia com `openCubeBoosters`; `poolRules` devolve `{ leaders: 'any', sets: [] }` para chave de Cubo, e
+`botDeck` sem bots do pod tira 48 cartas do Cubo. A lista é gerada por `cube-cli.ts` (`npm run cube:build`), com
+`draft/cube-source.ts`: `listTournaments` e `tournamentDecks` (API do Limitless, cache em disco só com as cartas de
+cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores de cada trimestre) e `usageByCard`
+(fração de decks por trimestre; a nota é a média dos `USAGE_BEST_QUARTERS` melhores).
+
+### Mesa com mais de dois jogadores (Yonko)
+
+O motor, a mesa local e a mesa online (fases 1 a 3 de `docs/plano-modos-de-jogo.md`, seção 4; o servidor está em
+"Mesas do Yonko", na seção 11): replay, espectador e o bot com busca continuam de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
+é interpretação nossa. `createGame` aceita de 2 a `MAX_PLAYERS` (4) em `players`; `PlayerId` é o lugar (índice em
+`players`) e a ordem dos turnos segue os lugares. Com mais de dois (`isMultiplayer`), o estado ganha `table`
+(`TableRules`: `extraLife`, `curveChoice`, `eliminationDraw`; `YONKO_TABLE` é o do manual), `eliminated` (ordem de
+queda), `turnsTaken` (ninguém ataca no próprio primeiro turno), `curve` (a largada de cada um) e `dealt`. Com dois,
+nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`, `untilTurn` numérico): uma partida
+1x1 dá o mesmo estado que dava antes.
+
+- **Deck**: `validateYonkoDeck` (`deck.ts`) é `validateDeck` com `size: 60` e `maxCopies: 1`.
+- **Alvos**: `targetCandidates` com `side: 'opponent'` junta as cartas de todos os oponentes (`opponentSides`);
+  `side: 'any'` são as cartas de toda a mesa. As auras `side: 'opponent'` e os eventos "do oponente" já comparavam
+  dono com dono, então valem para todos os oponentes sem mudança.
+- **Mão, Vida, DON!! e deck "do oponente"**: em `stepEffect`, um passo `eachOpponent` (lista explícita de tipos de
+  passo) é trocado por uma cópia para cada oponente vivo, na ordem dos turnos, cada uma com `vs`. A cópia roda com
+  esse oponente fixado (`withOpponent`), a condição `if` dela inclusive; os passos que ela insere e os efeitos que
+  empilha herdam o oponente (`vs` nos passos, `focus` no frame). `opponentOf(state, p)` devolve o oponente fixado
+  (`fixedOpponent`: a cópia em execução, o `focus` do frame ou o único oponente vivo).
+- **DON!! do oponente** segue o texto da carta. Entram em `eachOpponent` os passos em que o oponente age
+  (`opponentReturnsDon`, `opponentAddDon`, `skipRefreshDon` com `atMainPhase`…). Os que viram DON!! do oponente são
+  um alvo: `restOpponentDon` pergunta, para cada DON!!, de qual oponente (`donTargetOpponent`, chave
+  `engine.whoseDonToRest`); `skipRefreshDon` sem `atMainPhase` faz o mesmo (`engine.whoseDonSkipsRefresh`);
+  `restDonOrCharacter` põe uma opção por oponente com DON!! (`engine.optRestDonOf`, memória `don:<id>`).
+  `donMatchOpponent` compara com o oponente que tem mais DON!! em campo.
+- **Condições**: `conditionHolds` sem oponente fixado vale se algum oponente cumpre (`anyOpponent`).
+- **Batalha**: o defensor é o dono do alvo atual. Só ele usa Counter. Com `TableRules.bystanderCounter` (desligado
+  por padrão), `stepBattle` percorre antes `battle.bystanders` (os oponentes do atacante que não são o defensor) e
+  abre `counter` com `bystander` para quem tem Evento [Counter] pagável (`bystanderCounterOptions`). [On Your
+  Opponent's Attack] é empilhado para todos os oponentes do atacante.
+- **Durações**: `setExpiry` (em `addModifier`, `restrict`, `negateOnPlay`). Na mesa, `untilTurn` fica em `FAR_TURN` e
+  `untilStartOf`/`untilEndOf` dizem de quem é o turno que encerra o efeito; `turnExpiries`, no começo de cada turno,
+  remove os primeiros e converte os segundos no número do turno em curso.
+- **Preparação**: `continueSetup` (largadas com a escolha `option`/`curve`, mãos, "at the start of the game",
+  mulligans na ordem, Vida, primeiro turno); `refreshDrawDon` lê a largada no primeiro turno de cada um.
+- **Eliminação**: `eliminate` substitui o antigo `defeat` (com dois jogadores, chama `gameOver` como antes).
+  `removePlayer` marca `out`, esvazia as áreas, encerra a batalha e os frames/efeitos do jogador, corta as cartas
+  dele das escolhas abertas dos outros e, se era a vez dele, deixa só um frame `endTurn` na pilha (o turno fecha
+  pelo caminho normal). `locate` não encontra o Líder de quem saiu; `alivePlayers` é a lista para percorrer a
+  mesa. O último a cair não é marcado `out`: a partida acabou e a mesa fica como estava. `concede` e `timeout`
+  eliminam (e seguem com `run`) em vez de encerrar.
+- **Deck**: `validateYonkoDeck` (60, uma cópia de cada, cor do Líder) e `yonkoTableDeck` (o deck que vai para a mesa:
+  o de 60 como está, ou o de teste de `yonkoDeckFrom` a partir de um de 50). O resumo dos decks no servidor traz
+  `yonko`/`yonkoCodes`, e o construtor tem o modo "Montar para o Yonko".
+- **Visão**: as referências a cartas escondidas (`~lugar:zona:posição`) aceitam qualquer lugar (`actionFromView`).
+- **Etiquetas de duração** (`status.ts`): `modifierUntilInfo` lê `untilStartOf`/`untilEndOf` e diz de quem é o turno
+  que encerra o efeito.
+- **Telas** (`apps/web`): `components/Yonko.tsx` (a sala) monta o `GameConfig` com `yonkoDeckFrom` (deck de teste de
+  60 a partir de um deck comum) e as regras escolhidas; `game/useYonkoGame.ts` roda a partida no navegador
+  (`createGame`/`applyAction`), faz os bots jogarem com `chooseSimpleBotAction` sobre a visão do lugar deles e
+  entrega à mesa a visão de quem joga (`viewFor`); `components/YonkoTable.tsx` é a mesa, por clique, sem as
+  animações de `Motion.tsx`. Os estilos ficam no fim de `styles.css` (prefixo `.yk-`), sempre no tema escuro; os
+  textos em `i18n/yonko/`.
+- **Diagnóstico**: `setOpponentProbe` avisa quando um passo consulta "o oponente" sem um fixado (um tipo de passo que
+  `eachOpponent` ainda não conhece). `scripts/simulate-yonko.ts` usa isso e confere os invariantes por jogador.
 
 ### Tradução
 
@@ -611,11 +740,12 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (33)
+### Tabelas (35)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
 | `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`. Índice `cards_set`. | importador, seed, sync de spoilers |
+| `set_releases` | `set_code` | Coleções que viraram oficiais pela lista oficial da Bandai no dia do lançamento e que a optcgapi ainda não publicou: `source` (domínio da lista), `released_at` | `syncSpoilers` (entra quando a lista torna oficial, sai quando a API publica) |
 | `card_translations` | `(card_id, lang)` | `text`, `trigger` revisados à mão | seed (de `data/translations`) |
 | `card_engine_texts` | `card_id` | Texto para o motor: `text`, `trigger`, `base_key` (hash do texto oficial quando foi escrito; diferente = não vale), `author_id`, `author_name`, `updated_at` | `PUT/DELETE /api/dev/engine-texts/:id` |
 | `card_engine_text_history` | `id` | Cada gravação (`action = set`, com o texto) e remoção (`remove`) do texto para o motor, com quem e quando | idem |
@@ -630,6 +760,7 @@ baixadas quando tocam) + `public/`.
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`, `listed` (0 = fora das estatísticas: Livre ou spoilers). Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
 | `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício (inclui `engineTexts`, os textos para o motor do começo da partida, para refazer e derivar as estatísticas com as mesmas regras) | lobby (a cada ação) |
+| `yonko_tables` | `id` (mesa) | **`data` (JSON `YonkoTableData`)**: regras, lugares (com os decks), seed de 128 bits e ações de uma mesa do Yonko aberta ou em andamento, para refazê-la após reinício | `YonkoTables` (a cada mudança; apagada quando a mesa fecha) |
 | `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
 | `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`) | servidor |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
@@ -692,7 +823,7 @@ limite relevante é o tempo das consultas de estatísticas (seção 15).
 | Efeito automatizado (DSL) | **não é gravado**: `buildCardDef` calcula a partir do texto (parser) ou de `CARD_SCRIPTS` em tempo de execução | — |
 | Erratas e correções de fonte | código (`errata.ts`, `source-fixes.ts`), aplicadas ao ler e ao gravar (`fixCard`) | — |
 | Imagem | **não é armazenada**: só a URL em `data.imageUrl`; o navegador baixa do site de origem | URL |
-| Artes alternativas | `data.arts` (`CardArt[]`: `id` = nome do arquivo da imagem, `imageUrl`, `label`); a importação parcial junta às já gravadas (`keepArts`) | JSON |
+| Artes alternativas | `data.arts` (`CardArt[]`: `id` = nome do arquivo da imagem, `imageUrl`, `label`, `spoiler` = coleção do feed de spoilers de onde veio, se veio de um); a importação parcial junta às já gravadas (`keepArts`) | JSON |
 | Arte escolhida no deck | `decks.arts` (número da carta -> `CardArt.id`), fora de `decks.cards` (não muda o `deckHash`) | JSON |
 | Cartas provisórias (antes da primeira importação) | `data/cards/*.json` (750 cartas escritas de memória, `provisional: true`) | JSON `{set, title, provisional, note, cards: CardData[]}` |
 | Tipos conhecidos | `data/card-types.json` (172) | JSON |
@@ -733,8 +864,14 @@ Fluxo do `npm run cards:import -- [coleções | --all | --file x.json] [--dry-ru
    imagem e artes da primeira fonte com imagem. Fonte que mistura spoilers (Cardkaizoku) só traz coleções confirmadas
    por outra fonte oficial ou pelo banco, e promos que outra fonte tem ou que estão à venda (`products` não vazio).
    Relatório (fonte por coleção, campos completados, divergências) no console e em `card-source-diff.json` ao lado do banco.
-6. `upsertCards(provisional: false, source: 'api:<fonte vencedora>', raw)` numa transação. Cartas oficiais **substituem**
-   provisórias e spoilers; o inverso nunca acontece.
+6. `upsertCards(provisional: false, source: 'api:<fonte vencedora>', raw, artOnly)` numa transação. Cartas oficiais
+   **substituem** provisórias e spoilers; o inverso nunca acontece.
+7. **Impressões de outra coleção** (`artOnly`): a resposta de uma coleção só traz as cartas antigas reimpressas nela com
+   arte nova (SP) sem a impressão original (grupo sem linha `primary` nem `ownSet`). `mapApiResponse` devolve esses
+   números em `artOnly`, com todas as artes em `arts`; `resolveChain` mantém a marca quando nenhuma fonte tem a carta
+   inteira. No `upsertCards`, a carta que já é oficial só ganha as artes novas (`addArts`: dados, imagem e `source` não
+   mudam); a que o banco não tem (ou só como provisória) entra inteira. Uma arte oficial nova tira as de spoiler
+   (`CardArt.spoiler`) da carta, tanto no `addArts` quanto no `keepArts`.
 
 Em produção a importação roda na VPS: manualmente (`node release/server/import-cards.mjs` com o `DB_PATH`
 compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama o importador depois do deploy).
@@ -749,9 +886,14 @@ compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama
 - Arquivo: `{set, title, release, feed: true, source, url, cards: []}` (`feed: "optcgleaks"` dos arquivos antigos também liga). `cards` aceita cartas escritas à mão
   (mesmo `CardData`), com prioridade sobre o feed; cartas sem id válido (`/^[A-Z]+\d*-\d+$/`), nome ou categoria são
   ignoradas e logadas.
-- Feed: `https://images.optcgleaks.com/<set>/<set>.json`. Só o array `cards` é usado (`sp_cards` e `unknown_id_cards`
-  ficam de fora). Mapeamento em `spoiler-feed.ts`: entidades HTML, `<br>`, `NOTE:` → `notes`, `<Blocker>` → `[Blocker]`,
-  imagem `https://images.optcgleaks.com/<set>/images/<image.id>.webp`, `spoiler: {source: 'optcgleaks.com', url}`.
+- Feed: `https://images.optcgleaks.com/<set>/<set>.json`. As cartas vêm do array `cards` (`unknown_id_cards` fica de
+  fora). Mapeamento em `spoiler-feed.ts`: entidades HTML, aspas tipográficas, `<br>`, `NOTE:` → `notes`, `<Blocker>` →
+  `[Blocker]`, imagem `https://images.optcgleaks.com/<set>/images/<image.id>.webp` (a "Base Art"),
+  `spoiler: {source: 'optcgleaks.com', url}`. As outras imagens de `images` viram `arts` com `spoiler: '<SET>'`
+  ("Alt-Art" → `label` "Alternate Art", "SP Alt-Art" → "SP"). `sp_cards` (cartas reimpressas na coleção com arte nova):
+  a da própria coleção soma a arte à carta; as de outras coleções saem em `extraArts` e `syncSpoilerArts` as põe na
+  carta já gravada (oficial ou não), sem mexer no resto. Uma rodada completa tira as artes de spoiler que o site não
+  traz mais; com uma fonte fora do ar, nada sai.
 - `refreshSpoilerFeeds`: busca a coleção em cada fonte de `SPOILER_SOURCES` (404 = a fonte não tem) e junta com
   `resolveChain`; pula a coleção se já há cartas oficiais dela (menos `P`, que sai carta a carta); resposta vazia ou
   qualquer fonte com erro não apaga nada; grava com `provisional = 1`, `source = 'spoiler:feed:<fonte vencedora>'` e
@@ -760,6 +902,22 @@ compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama
   `/sets/card/<primeiro id>/` e, achando, busca as demais uma a uma; promos pendentes buscam `/allPromos/`. 404 = "ainda
   não publicada". O que vier passa pela cadeia de `CARD_SOURCES` (as outras fontes só nas coleções que a API publicou)
   e é importado como oficial (`provisional = 0`); a etiqueta SPOILER some sem mexer nos decks (o número não muda).
+- **Lista oficial no lançamento** (`officialList`; `CARD_RELEASE_SOURCE`, padrão ligado): para a coleção que a API não
+  trouxe, com data de lançamento menor ou igual à data de hoje em Brasília (`brasiliaDate`) e ainda sem cartas
+  oficiais. A data vem de `officialReleaseDates` (`<lista>/products/?subcategory=boosters&page=1`, e `decks` para os
+  `ST`: o `datetime` do `<time class="newsDate">` de cada `<li class="linkListColBox">`, pelo código entre colchetes
+  do título), consultada só enquanto há coleção em spoiler esperando; sem a página ou sem a coleção nela, vale o
+  `release` do arquivo de spoilers (`SpoilerSyncResult.releases` traz as duas, e a rodada avisa no log quando
+  divergem). Com a data vencida, `bandaiSource` (`card-sources/bandai.ts`) lê `<lista>/cardlist/` e a página `?series=<id>` da coleção;
+  cada `<dl class="modalCol">` vira uma linha no formato da optcgapi (`parseListRows`: Vida do Líder, poder "-" de
+  Personagem = 0, `[Trigger]` no fim do texto, "−" → "-", "(Alternate Art)"/"(SP)"/"(TR)" no nome das impressões
+  `_p*`) e passa por `mapApiBodies`, como uma resposta da API. A camada da lista entra logo depois da optcgapi em
+  `resolveChain` e a coleção fica em `set_releases`. Sem a CDN própria a fonte não traz imagem nem artes (a lista
+  responde `Cross-Origin-Resource-Policy: same-site`) e `upsertCards(keepImage)` mantém as que a carta tinha. Coleções
+  em `set_releases` continuam sendo procuradas na API (pela primeira carta oficial delas) e relidas da lista a cada
+  rodada; quando a API publica, a importação dela vale e a linha sai. Tráfego por rodada: 1 ou 2 páginas de produtos
+  enquanto há coleção em spoiler com lançamento por vir, e 2 requisições à lista de cartas (com 1 s entre elas)
+  enquanto há coleção lançada esperando a API.
 - Agendamento: dentro do processo da API, 15 s após subir e depois a cada `SPOILER_SYNC` horas (padrão 6, `off`
   desliga). Tráfego: ~2 requisições ao optcgleaks + 2 à optcgapi por rodada (mais uma por carta pendente quando a
   coleção aparece). Também executável à mão: `npm run cards:import -- --spoilers`.
@@ -860,14 +1018,14 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
 - **Time** (`users.team`): marca à parte do perfil e do plano (a sincronização da Apoia.se não a toca): joga contra o Bot do
   Time, vê a tela "Bot do Time" e envia correções (`isTeam`; admins também, para testar).
 - **Plano de apoio** (`users.supporter_tier`, `supporter_until`, `supporter_source`, `supporter_public`): Grumete,
-  Tripulante, Capitão ou Almirante (`apps/server/src/support/tiers.ts`). Vem da Apoia.se (`support/apoiase.ts`): o
+  Capitão ou Almirante (`apps/server/src/support/tiers.ts`). Vem da Apoia.se (`support/apoiase.ts`): o
   servidor consulta `GET https://api.apoia.se/backers/charges/<e-mail>` no login, em `POST /api/support/apoiase/sync`
   e a cada 6 h para quem tem plano de lá; o plano sai do valor pago no mês e vale até o dia 10 do mês seguinte. Também
   pode vir do webhook do Ko-fi (opcional, `POST /api/support/kofi`) ou ser dado à mão pelo admin.
-  O que cada plano libera: Tripulante,
-  Estatísticas Pro (`/api/stats*` restringe a `queue=casual` sem o plano, salvo `mine=1`) e homologação
-  (`ACCESS=supporters`, `support/access.ts`); Capitão e Almirante, 5 torneios por mês de até 64 jogadores
-  (`tournament_quota`); Almirante, inscrição antecipada de 48 h nos torneios do time (`tournaments.priority_until`).
+  O que cada plano libera: Capitão e Almirante,
+  Estatísticas Pro (`/api/stats*` restringe a `queue=casual` sem o plano, salvo `mine=1`) e
+  5 torneios por mês de até 64 jogadores (`tournament_quota`); Almirante, inscrição antecipada de 48 h nos torneios
+  do time (`tournaments.priority_until`).
   Admins têm todos os benefícios. Sem nenhuma variável `SUPPORT_*`, nada disso é exigido (estatísticas abertas).
 - **Lojas parceiras** (`sponsors`, logo em BLOB validado pelos bytes, só PNG/JPEG/WebP): `GET /api/sponsors`,
   cadastro em `/api/admin/sponsors`. O torneio do time (`tournaments.official`, `prize`, `sponsor_id`) é marcado só
@@ -918,13 +1076,13 @@ aqui, o desenho:
   `GET /api/matches/:id/replay` (`replayDenied` em `reports/routes.ts`) e devolve `/replay/<id>?t=<token>&embed=1`
   (+ `lang`, `layout`). Token `<exp base 36>.<HMAC-SHA256 base64url de "replay:<id>:<exp>">`, 1 h, segredo em
   `REPLAY_LINK_SECRET` ou `server_keys` (`replay_link`, gerado na primeira vez); conferido com `timingSafeEqual`.
-  `GET /api/replay/:id?t=` (sem `config.scope`: Bearer recebe 403; aberto no `ACCESS=supporters`) confere o token,
+  `GET /api/replay/:id?t=` (sem `config.scope`: Bearer recebe 403) confere o token,
   fecha torneio em andamento (403 `replayTournamentRunning` mesmo com link válido) e responde
   `{ replay, cards, origins }` com só as cartas usadas. `GET /replay/:id` entrega o `index.html` com
   `frame-ancestors 'self' <REPLAY_EMBED_ORIGINS>` e `Referrer-Policy: no-referrer`; um hook `onSend` em `app.ts` põe
   `frame-ancestors 'none'` + `X-Frame-Options: DENY` em toda resposta que não definiu a própria CSP. No web,
-  `embed.ts` lê o endereço e os comandos, `main.tsx` pula o service worker e aplica o `lang` do link, o `AccessGate`
-  não bloqueia o caminho, `ReplayEmbed.tsx` monta a partida (`setupFromReplay` com as cartas recebidas) e a
+  `embed.ts` lê o endereço e os comandos, `main.tsx` pula o service worker e aplica o `lang` do link,
+  `ReplayEmbed.tsx` monta a partida (`setupFromReplay` com as cartas recebidas) e a
   `GameScreen` recebe `embed` (`bare` esconde menu, sair e baixar; `layout` liga a visão do Streamer em pé ou lateral;
   `useEmbedBridge` faz o postMessage `seek/play/pause` ↔ `ready/pos/ended`, conferindo `e.source === parent` e a origem).
 - **Nginx**: `PARTNER_IPS` no `deploy.env` tira os IPs dos parceiros do limite por IP (`geo`/`map` nos scripts de
@@ -1084,6 +1242,32 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   `MAX_ACTIONS = 5000` por partida.
 
 ---
+
+### Mesas do Yonko (`yonko/`)
+
+A mesa de todos contra todos tem sala e rotas próprias, separadas do `Lobby`/`Room` de dois jogadores:
+`yonko/table.ts` (`YonkoTable`: sala de espera, partida, relógio, bots e visões) e `yonko/routes.ts` (`YonkoTables`,
+o mapa das mesas e dos códigos, e as rotas `/api/yonko/...`). O transporte é o mesmo (SSE `events?t=token` e POST com
+o token no corpo); o evento `state` traz `room` (lugares, regras, `problem`, relógio, `player` = o `PlayerId` de quem
+recebe), `view` (`viewFor` do lugar; null na espera), as definições e as linhas do registro que a conexão ainda não
+tem, e `lastAction`.
+
+- **Lugares:** `seats` (4, na sala de espera) e, na partida, `players` (os ocupados, na ordem dos lugares) com
+  `seatOf`. O token identifica o lugar; bots não têm token. `tokenOf(ownerHash, userId)` devolve o lugar de quem já
+  está na mesa (entrar de novo pelo código volta para ele).
+- **Deck:** `tableDeck` lê o deck salvo e chama `yonkoTableDeck` com todas as cartas (relidas no máximo a cada
+  minuto): o deck de 60 como está, ou o deck de teste (`test: true`).
+- **Partida:** `start` sorteia `seed128` e o sal dos apelidos, grava os textos para o motor (`engineTexts`) e
+  `rebuild` cria o jogo (`table` = as regras da mesa) e refaz as ações. O relógio (`remaining`, por jogador) só corre
+  para a pessoa da vez; `tick` aplica `timeout` sem tempo ou depois de `YONKO_ABANDON_MS` sem conexão
+  (`abandoned`). Bots jogam com `chooseSimpleBotAction` sobre a própria visão (`identityAliases`) e a jogada volta
+  por `actionFromView`; sem pessoas na partida, sem espera.
+- **Faxina:** `sweep` (a cada minuto) fecha espera e fim sem ninguém conectado há 30 minutos e partidas sem
+  conexão há 6 horas. `reopen` (quem criou) volta a mesa terminada para a espera com os mesmos lugares.
+- **No app:** `components/Yonko.tsx` (entrada: deck, regras, criar/entrar, mesa local), `components/YonkoOnline.tsx`
+  (sala de espera e mesa online), `components/YonkoRules.tsx` (painel de regras), `game/useYonkoOnline.ts` (o canal
+  e as jogadas) e `components/YonkoTable.tsx` (a mesa, comum à local e à online). A tela `yonko-online` fica em
+  `sessionStorage` (recarregar volta para ela) e `/?yonko=CÓDIGO` abre a entrada com o código preenchido.
 
 ## 12. Torneios
 
@@ -1645,6 +1829,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | `CARD_IMAGES` | `on` | `off` remove as URLs de imagem das respostas |
 | `CARD_API_BASE` | `https://optcgapi.com/api` | importador e sync |
 | `SPOILER_SYNC` | `6` (horas) | `off` desliga; nunca roda em testes |
+| `CARD_RELEASE_SOURCE` | `bandai` | `off`: a coleção só vira oficial quando a optcgapi a publica |
 | `GOOGLE_CLIENT_ID` | vazio (login desligado) | OAuth Web client |
 | `ADMIN_EMAILS` | vazio | contas que viram Admin ao entrar |
 | `ONLINE_BOT_ROOMS` | `on` | transmitir o treino contra o bot (servidor joga pelo bot; exige login) |
@@ -1674,8 +1859,7 @@ Quem chama, na coluna da direita:
 | Método | Rota | Descrição | Quem chama |
 |--------|------|-----------|------------|
 | GET | `/api/health` | Verificação de saúde | Pública |
-| GET | `/api/config` | Configurações públicas (imagens, Client ID do Google, chave das notificações, apoio, acesso) | Pública |
-| GET | `/api/access` | Acesso ao site na homologação só para apoiadores (`{ allowed, reason }`) | Pública |
+| GET | `/api/config` | Configurações públicas (imagens, Client ID do Google, chave das notificações, apoio) | Pública |
 | GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (por coleção) e uma carta | Pública |
 | GET | `/api/coverage` | Cobertura dos efeitos automatizados por coleção | Pública |
 | GET | `/api/translations/pending` | Cartas com tradução automática parcial | Pública |
@@ -1736,6 +1920,19 @@ Quem chama, na coluna da direita:
 | GET | `/api/players/me` | Perfil de jogador (nome, recompensa, tier, `apprentice`) | Navegador; Token (`profile`) |
 | PUT | `/api/players/me` | Troca o nome público (`{ name }`) | Navegador |
 | GET | `/api/players/me/matches?since=&limit=&cursor=` | Partidas do jogador, mais novas primeiro, paginadas | Sessão; Token (`matches:read`) |
+| GET | `/api/sealed/sets` | Coleções disponíveis no Selado (cartas, Líderes, parte automatizada, vagas e chances do booster) | Pública |
+| GET | `/api/sealed/pools` · POST | Decks selados de quem pede; `{ set }` abre 6 boosters | Navegador |
+| GET | `/api/sealed/pools/:id` · DELETE | Os boosters e o deck de uma abertura | Dono |
+| PUT | `/api/sealed/pools/:id/deck` | Salva o deck (`{ leader, cards }`), conferido contra as cartas abertas | Dono |
+| POST | `/api/sealed/pools/:id/bot` | Deck do bot para o treino no navegador (boosters próprios da mesma coleção; num deck de Draft, o de um bot do pod) | Dono |
+| GET | `/api/draft/active` | O pod de Draft em que quem pede está (esperando ou draftando), ou `null` | Navegador |
+| GET | `/api/draft/cube` | O Cubo em uso: nome, fonte e a lista com o uso de cada carta (ou `null`) | Pública |
+| POST | `/api/draft/pods` | Abre um pod (`{ sets }`: uma coleção, ou várias no Pack Rush draft; `{ cube: true }`: Draft Cubo) | Navegador |
+| POST | `/api/draft/pods/join` | Entra num pod à espera pelo código (`{ code }`) | Navegador |
+| GET | `/api/draft/pods/:id` | O pod como quem pede o vê: lugares, o booster na mão, prazo e escolhas | Quem está no pod |
+| POST | `/api/draft/pods/:id/start` | Começa o draft; os lugares vazios viram bots | Quem criou |
+| POST | `/api/draft/pods/:id/pick` | Fica com uma carta do booster na mão (`{ card }`) | Quem está no pod |
+| POST | `/api/draft/pods/:id/leave` | Sai do pod (no meio do draft, o lugar passa a escolher sozinho) | Quem está no pod |
 | GET | `/api/tutorial/progress` · PUT | Progresso do tutorial (`{ done, dismissed, completed, reset? }`) | Navegador |
 | POST | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event }`) | Pública |
 | GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |
@@ -1781,7 +1978,6 @@ Quem chama, na coluna da direita:
 | PUT | `/api/support/me` | Aparecer na lista de apoiadores (`{ public }`) | Sessão |
 | POST | `/api/support/apoiase/sync` | Consulta agora o apoio na Apoia.se | Sessão |
 | POST | `/api/support/kofi` | Webhook do Ko-fi (token de verificação no corpo) | Ko-fi (`KOFI_WEBHOOK_TOKEN`) |
-| GET | `/api/internal/supporter?email=` | Plano de uma conta, consultado pela homologação | `INTERNAL_TOKEN` em `Authorization: Bearer` |
 
 Corpos, filtros, erros e o fluxo OAuth dos parceiros estão descritos no `README.md` (seções "API" e "API para parceiros").
 

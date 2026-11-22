@@ -18,16 +18,20 @@ import {
   parseDeckList,
   spoilerCards,
   validateDeck,
+  validateYonkoDeck,
   withArt,
+  YONKO_DECK_SIZE,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type ApiCard, ApiError, type DeckDuplicate, type DeckSummary, isAdmin, spoilerText } from '../api';
 import { useAuth } from '../auth';
+import { matchesCardQuery, parseCardQuery } from '../cardSearch';
 import { deckNumbers } from '../deckLibrary';
 import type { DeckLink } from '../deeplink';
 import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { CardHoverPreview, fillSlots, StaticCardZoom } from './CardInfo';
+import { CardFilterBar, SPOILER_SET as SPOILERS } from './CardFilterBar';
 import { StaticCard } from './CardView';
 import { DeckLibrary } from './DeckLibrary';
 import { CostCurve, useFavoriteToggle } from './DeckTile';
@@ -69,8 +73,6 @@ const CATEGORY_LABEL: Record<CardData['category'], MessageKey> = {
 };
 
 const PAGE = 60;
-/** Valor do filtro de coleção que mostra só as cartas de spoiler. */
-const SPOILERS = '__spoilers';
 
 /** Carta sob o mouse e o elemento dela (âncora do popover ampliado). */
 interface Hovered {
@@ -94,7 +96,20 @@ function useMediaQuery(query: string) {
  * link (`/?deck=`): o editor abre com ela preenchida, como deck novo não salvo; `linkInvalid`:
  * havia um link, mas sem lista legível (só um aviso); `openId`: um deck salvo para abrir direto.
  */
-export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () => void; link?: DeckLink; linkInvalid?: boolean; openId?: string }) {
+export function DeckBuilder({
+  onExit,
+  link,
+  linkInvalid,
+  openId,
+  startYonko,
+}: {
+  onExit: () => void;
+  link?: DeckLink;
+  linkInvalid?: boolean;
+  openId?: string;
+  /** Abre direto um deck novo no modo Yonko (60 cartas, uma de cada), vindo da sala do Yonko. */
+  startYonko?: boolean;
+}) {
   const [allCards, setAllCards] = useState<ApiCard[]>([]);
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const auth = useAuth();
@@ -104,7 +119,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(t('deck.newDeckName')));
   const [dirty, setDirty] = useState(false);
   /** Biblioteca (galeria de decks) ou o editor de um deck. */
-  const [view, setView] = useState<'library' | 'editor'>(link || linkInvalid || openId ? 'editor' : 'library');
+  const [view, setView] = useState<'library' | 'editor'>(link || linkInvalid || openId || startYonko ? 'editor' : 'library');
   /** Desfazer/refazer (Líder, cartas e artes). */
   const [past, setPast] = useState<Snapshot[]>([]);
   const [future, setFuture] = useState<Snapshot[]>([]);
@@ -131,7 +146,6 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
   /** Tela estreita: os filtros ficam escondidos atrás do botão "Filtros" para sobrar espaço para as cartas. */
   const narrow = useMediaQuery('(max-width: 1100px)');
-  const [filtersOpen, setFiltersOpen] = useState(false);
   // Toque longo numa linha do deck atual: abre a carta dela (um só handler para a lista toda).
   const entryPress = useLongPress<HTMLDivElement>((e) => {
     const id = (e.target as HTMLElement).closest<HTMLElement>('.entry')?.dataset.card;
@@ -161,6 +175,18 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const [set, setSet] = useState('');
   const [onlyCompatible, setOnlyCompatible] = useState(true);
   const [onlyAutomated, setOnlyAutomated] = useState(false);
+  /** Montando para o All Blue: o catálogo só mostra o que vale nele e a lista marca o que não vale. */
+  const [allBlue, setAllBlue] = useState(false);
+  /**
+   * Montando para o Yonko (mesa de todos contra todos): 60 cartas, uma cópia de cada (docs/regras-yonko.md). Liga
+   * sozinho ao abrir ou importar uma lista com mais de 50 cartas.
+   */
+  const [yonko, setYonko] = useState(Boolean(startYonko));
+  /** Tamanho do deck e cópias de cada carta no modo em uso. */
+  const target = yonko ? YONKO_DECK_SIZE : DECK_SIZE;
+  const copiesMax = yonko ? 1 : MAX_COPIES;
+  /** A carta já tem o máximo de cópias (no Yonko, nem "any number of this card" passa de 1). */
+  const atMax = (card: CardData | undefined, n: number) => (yonko ? n >= 1 : n >= MAX_COPIES && !(card && anyNumberAllowed(card)));
   const [limit, setLimit] = useState(PAGE);
 
   const byId = useMemo(() => new Map(allCards.map((c) => [c.id, c])), [allCards]);
@@ -190,6 +216,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
         if (link) applyLink(link, new Map(cards.map((c) => [c.id, c])));
         else if (linkInvalid) setNotice(t('deck.linkInvalid'));
         else if (openId) void openDeck(openId);
+        else if (startYonko) setNotice(t('deck.yonkoStart'));
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,11 +234,13 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     }
     setDraft({ id: null, name: l.name ?? t('deck.newDeckName'), leader: parsed.leader ?? '', cards: new Map(parsed.cards.map((c) => [c.id, c.count])), arts: new Map(), kind: 'user' });
     setDirty(true);
+    if (l.format === 'allblue') setAllBlue(true);
+    setYonko(total > DECK_SIZE);
     setNotice(l.format ? t('deck.linkImportedFormat', { format: formatLabel(l.format) }) : t('deck.linkImported'));
     setError(errors.length ? errors.join('\n') : null);
   };
 
-  useEffect(() => setLimit(PAGE), [query, colors, category, cost, set, onlyCompatible, onlyAutomated, draft.leader]);
+  useEffect(() => setLimit(PAGE), [query, colors, category, cost, set, onlyCompatible, onlyAutomated, allBlue, yonko, draft.leader]);
 
   // Avisa antes de sair com alterações não salvas.
   useEffect(() => {
@@ -228,34 +257,38 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const canDelete = draft.id !== null && (draft.kind === 'user' || renaming);
 
   const sets = useMemo(() => [...new Set(allCards.map((c) => c.set ?? c.id.split('-')[0]))].sort(), [allCards]);
-  /** Quantos filtros estão fora do padrão (selo do botão "Filtros" no celular). */
-  const activeFilters = [colors.length > 0, category !== '', cost !== '', set !== '', !onlyCompatible, onlyAutomated].filter(Boolean).length;
   /** Coleções que ainda têm cartas de spoiler (não lançadas na API oficial). */
   const spoilerSets = useMemo(() => new Set(allCards.filter((c) => c.spoiler).map((c) => c.set ?? c.id.split('-')[0])), [allCards]);
 
   /** Sem Líder escolhido, a lista mostra só Líderes. */
   const choosingLeader = !draft.leader;
 
+  /** Nomes das cores e das categorias no idioma em vigor também valem como atalho da busca ("rouge", "eventos"). */
+  const searchAliases = useMemo(() => {
+    const aliases: Record<string, string> = {};
+    for (const c of COLORS) aliases[t(c.label)] = c.id;
+    for (const cat of ['leader', 'character', 'event', 'stage'] as const) aliases[t(CATEGORY_LABEL[cat])] = cat;
+    return aliases;
+  }, [t]);
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = parseCardQuery(query, searchAliases);
+    const ctx = { inDeck: (id: string) => id === draft.leader || draft.cards.has(id) };
     return allCards
       .filter((c) => {
         if (choosingLeader && c.category !== 'leader') return false;
         if (!choosingLeader && category && c.category !== category) return false;
-        if (!choosingLeader && !category && c.category === 'leader') return false;
+        if (!choosingLeader && !category && c.category === 'leader' && !q.wantsLeaders) return false;
         if (colors.length && !c.colors.some((col) => colors.includes(col))) return false;
         if (cost !== '' && (cost === '10' ? (c.cost ?? -1) < 10 : c.cost !== Number(cost))) return false;
         if (set === SPOILERS ? !c.spoiler : set && (c.set ?? c.id.split('-')[0]) !== set) return false;
         if (onlyCompatible && leader && c.category !== 'leader' && (!isColorCompatible(leader, c) || !leaderAllows(leader, c))) return false;
         if (onlyAutomated && needsManual(c)) return false;
-        if (q) {
-          const hay = `${c.id} ${c.name} ${c.types.join(' ')} ${c.text} ${c.i18n?.pt?.text ?? ''}`.toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
-        return true;
+        if (allBlue && cardLegality(c.id, 'allblue', undefined, c) !== 'legal') return false;
+        return matchesCardQuery(c, q, ctx);
       })
       .sort((a, b) => a.id.localeCompare(b.id));
-  }, [allCards, query, colors, category, cost, set, onlyCompatible, onlyAutomated, leader, choosingLeader]);
+  }, [allCards, query, searchAliases, colors, category, cost, set, onlyCompatible, onlyAutomated, allBlue, leader, choosingLeader, draft.leader, draft.cards]);
 
   const deckList = useMemo(
     () => ({
@@ -270,21 +303,26 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   /** Cartas do deck que têm arte alternativa, e se todas já estão com uma. */
   const artCards = useMemo(() => cardsWithArts(deckList, byId), [deckList, byId]);
   const allArts = artCards.length > 0 && artCards.length === Object.keys(cleanArts(deckList, byId) ?? {}).length;
-  const report = useMemo(() => validateDeck(deckList, byId), [deckList, byId]);
+  const report = useMemo(() => (yonko ? validateYonkoDeck(deckList, byId) : validateDeck(deckList, byId)), [deckList, byId, yonko]);
   /** Em quais formatos o deck pode ser usado, e por que não nos outros. */
   const legality = useMemo(
     () =>
       FORMATS.map((f) => {
-        const issues = formatIssues(deckList, f.id);
+        const issues = formatIssues(deckList, f.id, undefined, byId);
         return { ...f, issues, texts: issues.map((i) => tryT(i.code, i.params) ?? i.message) };
       }),
-    [deckList, tryT],
+    [deckList, byId, tryT],
   );
   /** Cartas de spoiler (ainda não lançadas): o deck não vale na ranqueada nem em torneio sem spoilers. */
   const spoilers = useMemo(() => spoilerCards(deckList, byId), [deckList, byId]);
   const formatProblems = useMemo(
-    () => [...new Set([...legality.flatMap((f) => f.texts), ...(spoilers.length ? [spoilerText(spoilers)] : [])])],
-    [legality, spoilers],
+    // Montando para o All Blue, só os avisos dele (banidas e rotação da Bandai não valem lá); fora
+    // disso, só os dos formatos oficiais: num deck comum, cada SR viraria um aviso (o selo do
+    // formato continua dizendo o motivo).
+    // No Yonko não há lista de banidas nem ranqueada: só as regras do deck (em `report`).
+    () =>
+      yonko ? [] : [...new Set([...legality.filter((f) => (f.id === 'allblue') === allBlue).flatMap((f) => f.texts), ...(spoilers.length ? [spoilerText(spoilers)] : [])])],
+    [legality, spoilers, allBlue, yonko],
   );
 
   // ------------------------------------------------------------------ edição
@@ -371,8 +409,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       return;
     }
     const current = draft.cards.get(card.id) ?? 0;
-    if (current >= MAX_COPIES && !anyNumberAllowed(card)) {
-      setNotice(t('deck.maxCopies', { n: MAX_COPIES, name: card.name }));
+    if (atMax(card, current)) {
+      setNotice(t('deck.maxCopies', { n: copiesMax, name: card.name }));
       return;
     }
     edit(
@@ -403,6 +441,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       const { deck } = await api.deck(id);
       const cards = new Map(deck.cards.map((c) => [c.id, c.count]));
       const arts = new Map(Object.entries(deck.arts ?? {}));
+      // Lista de mais de 50 cartas: é um deck do Yonko.
+      setYonko(deck.cards.reduce((n, c) => n + c.count, 0) > DECK_SIZE);
       if (copy) {
         setDraft({ id: null, name: t('deck.copyName', { name: deck.name }), leader: deck.leader, cards, arts, kind: 'user' });
         setDirty(true);
@@ -466,7 +506,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       setDraft((d) => ({ ...d, id: saved.id, kind: 'user', name: saved.name }));
       setDirty(false);
       setDupe(null);
-      setNotice(saved.valid ? t('deck.savedReady') : t('deck.savedDraft'));
+      setNotice(yonko ? (saved.yonko?.length === 0 ? t('deck.savedReadyYonko') : t('deck.savedDraft')) : saved.valid ? t('deck.savedReady') : t('deck.savedDraft'));
       setError(null);
       await refreshDecks();
     } catch (e) {
@@ -539,6 +579,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
 
   const newDeck = () => {
     if (!confirmDiscard()) return;
+    setYonko(false);
     setDraft(emptyDraft(t('deck.newDeckName')));
     setDirty(false);
     resetHistory();
@@ -601,6 +642,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   }, [entries]);
 
   const errorIds = new Set(report.issues.filter((i) => i.level === 'error' && i.cardId).map((i) => i.cardId));
+  /** Montando para o All Blue: a carta do deck que não vale nele (SR, SEC ou sem raridade conhecida). */
+  const notAllBlue = (id: string) => allBlue && cardLegality(id, 'allblue', undefined, byId.get(id)) !== 'legal';
   const numbers = useMemo(() => deckNumbers(deckList.cards, byId), [deckList, byId]);
   const toggleFavorite = useFavoriteToggle(setDecks, setError);
   const storageHint = auth.user ? t('deck.storageAccount') : `${t('deck.storageBrowser')}${auth.clientId ? ` ${t('deck.storageSignIn')}` : ''}`;
@@ -705,65 +748,21 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
         {/* ------------------------------------------------ catálogo */}
         <section className="builder-catalog">
           <div className="catalog-top">
-          <div className="filters">
-            <div className="search-row">
-              <input
-                className="search"
-                placeholder={t('deck.searchPlaceholder')}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              {narrow && (
-                <button
-                  type="button"
-                  className={['btn small filters-toggle', filtersOpen ? 'on' : ''].join(' ')}
-                  aria-expanded={filtersOpen}
-                  onClick={() => setFiltersOpen((v) => !v)}
-                >
-                  {t('deck.filters')}
-                  {activeFilters > 0 && <span className="filters-count">{activeFilters}</span>}
-                </button>
-              )}
-            </div>
-            <div className={['filters-more', narrow && !filtersOpen ? 'hidden' : ''].join(' ')}>
-            <div className="color-chips">
-              {COLORS.map((c) => (
-                <button
-                  key={c.id}
-                  className={['chip', `c-${c.id}`, colors.includes(c.id) ? 'on' : ''].join(' ')}
-                  title={t(c.label)}
-                  onClick={() => setColors((cs) => (cs.includes(c.id) ? cs.filter((x) => x !== c.id) : [...cs, c.id]))}
-                >
-                  {t(c.label)}
-                </button>
-              ))}
-            </div>
-            {!choosingLeader && (
-              <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
-                <option value="">{t('deck.allCategories')}</option>
-                <option value="character">{t('deck.cat.character')}</option>
-                <option value="event">{t('deck.cat.event')}</option>
-                <option value="stage">{t('deck.cat.stage')}</option>
-                <option value="leader">{t('deck.cat.leader')}</option>
-              </select>
-            )}
-            <select value={cost} onChange={(e) => setCost(e.target.value)}>
-              <option value="">{t('deck.anyCost')}</option>
-              {Array.from({ length: 11 }, (_, i) => (
-                <option key={i} value={String(i)}>
-                  {t('deck.costOption', { n: i === 10 ? '10+' : i })}
-                </option>
-              ))}
-            </select>
-            <select value={set} onChange={(e) => setSet(e.target.value)}>
-              <option value="">{t('deck.allSets')}</option>
-              {spoilerSets.size > 0 && <option value={SPOILERS}>{t('deck.onlySpoilers')}</option>}
-              {sets.map((s) => (
-                <option key={s} value={s}>
-                  {spoilerSets.has(s) ? t('deck.setWithSpoilers', { set: s }) : s}
-                </option>
-              ))}
-            </select>
+          <CardFilterBar
+            value={{ query, colors, category, cost, set }}
+            onChange={(p) => {
+              if (p.query !== undefined) setQuery(p.query);
+              if (p.colors !== undefined) setColors(p.colors);
+              if (p.category !== undefined) setCategory(p.category);
+              if (p.cost !== undefined) setCost(p.cost);
+              if (p.set !== undefined) setSet(p.set);
+            }}
+            narrow={narrow}
+            categories={choosingLeader ? [] : ['character', 'event', 'stage', 'leader']}
+            sets={sets}
+            spoilerSets={spoilerSets}
+            extraActive={[!onlyCompatible, onlyAutomated, allBlue, yonko].filter(Boolean).length}
+          >
             {leader && (
               <label className="check">
                 <input type="checkbox" checked={onlyCompatible} onChange={(e) => setOnlyCompatible(e.target.checked)} />
@@ -774,8 +773,29 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               <input type="checkbox" checked={onlyAutomated} onChange={(e) => setOnlyAutomated(e.target.checked)} />
               {t('deck.onlyAutomated')}
             </label>
-            </div>
-          </div>
+            <label className="check" title={t('deck.onlyAllBlueTitle')}>
+              <input
+                type="checkbox"
+                checked={allBlue}
+                onChange={(e) => {
+                  setAllBlue(e.target.checked);
+                  if (e.target.checked) setYonko(false);
+                }}
+              />
+              {t('deck.onlyAllBlue')}
+            </label>
+            <label className="check" title={t('deck.buildYonkoTitle')}>
+              <input
+                type="checkbox"
+                checked={yonko}
+                onChange={(e) => {
+                  setYonko(e.target.checked);
+                  if (e.target.checked) setAllBlue(false);
+                }}
+              />
+              {t('deck.buildYonko')}
+            </label>
+          </CardFilterBar>
 
           <div className="catalog-hint muted small">
             {choosingLeader
@@ -798,20 +818,20 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                   <StaticCard
                     card={c}
                     highlight={c.id === draft.leader ? 'selected' : n > 0 ? 'playable' : null}
-                    dimmed={Boolean(incompatible) || (n >= MAX_COPIES && c.category !== 'leader' && !anyNumberAllowed(c))}
+                    dimmed={Boolean(incompatible) || (c.category !== 'leader' && atMax(c, n))}
                     onClick={() => add(c)}
                     onContextMenu={() => remove(c.id)}
                     onHover={setHovered}
                     onLongPress={setZoom}
                     badge={
                       <>
-                        {n > 0 && <span className="copies">{n}/{MAX_COPIES}</span>}
+                        {n > 0 && <span className="copies">{n}/{copiesMax}</span>}
                         {needsManual(c) && (
                           <span className="manual-badge" title={t('deck.manualTitle')}>
                             ⚙
                           </span>
                         )}
-                        <LegalityBadge id={c.id} />
+                        {!allBlue && !yonko && <LegalityBadge id={c.id} />}
                       </>
                     }
                   />
@@ -882,8 +902,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
           </div>
 
           <div className="deck-stats">
-            <div className={['deck-total', report.total === DECK_SIZE ? 'ok' : ''].join(' ')}>
-              <b>{report.total}</b>/{DECK_SIZE}
+            <div className={['deck-total', report.total === target ? 'ok' : ''].join(' ')}>
+              <b>{report.total}</b>/{target}
             </div>
             <div className="curve" title={t('deck.costCurve')}>
               {curve.map((n, i) => (
@@ -909,7 +929,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               {entries.length === 0 && <div className="muted small">{canHover ? t('deck.emptyMouse') : t('deck.emptyTouch')}</div>}
               {entries.map((e) =>
                 e.card ? (
-                  <div key={e.id} className={['dk-deck-cell', errorIds.has(e.id) ? 'bad' : ''].join(' ')}>
+                  <div key={e.id} className={['dk-deck-cell', errorIds.has(e.id) || notAllBlue(e.id) ? 'bad' : ''].join(' ')}>
                     <StaticCard card={shown(e.card)} onHover={setHovered} onLongPress={setZoom} onContextMenu={() => remove(e.id)} />
                     <div className="dk-qty">
                       <button type="button" onClick={() => remove(e.id)} aria-label={t('deck.removeOne')}>
@@ -919,7 +939,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                       <button
                         type="button"
                         onClick={() => e.card && add(e.card)}
-                        disabled={e.count >= MAX_COPIES && !anyNumberAllowed(e.card)}
+                        disabled={atMax(e.card, e.count)}
                         aria-label={t('deck.addOne')}
                       >
                         +
@@ -962,7 +982,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                     <div className="entry-group">{t(CATEGORY_LABEL[e.card.category])}</div>
                   )}
                   <div
-                    className={['entry', errorIds.has(e.id) || cardLegality(e.id, 'egb') === 'banned' ? 'bad' : ''].join(' ')}
+                    className={['entry', errorIds.has(e.id) || (yonko ? false : allBlue ? notAllBlue(e.id) : cardLegality(e.id, 'egb') === 'banned') ? 'bad' : ''].join(' ')}
                     data-card={e.id}
                     onMouseEnter={(ev) => e.card && setHovered(shown(e.card), ev.currentTarget)}
                     onMouseLeave={() => setHovered(null)}
@@ -973,7 +993,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                       <small>
                         {e.id}
                         {e.card && needsManual(e.card) ? ` · ${t('deck.entryManual')}` : ''}
-                        {legalityNote(cardLegality(e.id, 'standard'), t)}
+                        {yonko ? '' : allBlue ? (notAllBlue(e.id) ? ` · ${t('deck.entryNotAllBlue')}` : '') : legalityNote(cardLegality(e.id, 'standard'), t)}
                       </small>
                     </span>
                     {e.card?.arts?.length ? (
@@ -993,7 +1013,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                     <button
                       className="qty"
                       onClick={() => e.card && add(e.card)}
-                      disabled={e.count >= MAX_COPIES && !(e.card && anyNumberAllowed(e.card))}
+                      disabled={atMax(e.card, e.count)}
                       aria-label={t('deck.addOne')}
                     >
                       +
@@ -1007,7 +1027,12 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
 
           {(draft.leader || entries.length > 0) && (
             <div className="format-legality">
-              {legality.map((f) => (
+              {yonko && (
+                <span className={['format-chip', report.valid ? 'ok' : 'bad'].join(' ')} title={report.valid ? t('deck.yonkoReady') : t('deck.yonkoNotReady')}>
+                  {report.valid ? '✓' : '🚫'} {t('yonko.title')}
+                </span>
+              )}
+              {!yonko && legality.map((f) => (
                 <span
                   key={f.id}
                   className={['format-chip', f.issues.length ? 'bad' : 'ok'].join(' ')}
@@ -1016,7 +1041,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                   {f.issues.length ? '🚫' : '✓'} {f.label}
                 </span>
               ))}
-              {spoilers.length > 0 && (
+              {!yonko && spoilers.length > 0 && (
                 <span className="format-chip bad" title={spoilerText(spoilers)}>
                   🚫 {t('deck.rankedChip')}
                 </span>
@@ -1102,6 +1127,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               leader: parsed.leader ?? d.leader,
               cards: new Map(parsed.cards.map((c) => [c.id, c.count])),
             }));
+            if (total > DECK_SIZE) setYonko(true);
             setNotice(skipped ? t('deck.importedSkipped', { n: total, skipped }) : t('deck.imported', { n: total }));
           }}
         />
@@ -1125,8 +1151,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
             {t('decks.builder.tabCatalog')}
           </button>
           <button type="button" className={mobileTab === 'deck' ? 'on' : ''} aria-current={mobileTab === 'deck' ? 'page' : undefined} onClick={() => setMobileTab('deck')}>
-            <b className={report.total === DECK_SIZE ? 'ok' : ''}>
-              {report.total}/{DECK_SIZE}
+            <b className={report.total === target ? 'ok' : ''}>
+              {report.total}/{target}
             </b>
             {t('decks.builder.tabDeck')}
           </button>
@@ -1145,8 +1171,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
 }
 
 /** Nota na linha do deck atual para carta rotacionada ou banida (no Standard). */
-function legalityNote(legality: 'legal' | 'rotated' | 'banned', t: Translate): string {
-  return legality === 'legal' ? '' : ` · ${t(legality === 'rotated' ? 'deck.entryRotated' : 'deck.entryBanned')}`;
+function legalityNote(legality: ReturnType<typeof cardLegality>, t: Translate): string {
+  return legality === 'rotated' ? ` · ${t('deck.entryRotated')}` : legality === 'banned' ? ` · ${t('deck.entryBanned')}` : '';
 }
 
 /** Selo no catálogo para cartas banidas ou rotacionadas (bloco ①). */

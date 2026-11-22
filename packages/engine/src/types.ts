@@ -2,7 +2,11 @@
 // O estado do jogo é um objeto serializável (JSON puro): nada de classes ou funções,
 // para que possa ser enviado pela rede, salvo como replay ou comparado em testes.
 
-export type PlayerId = 0 | 1;
+/**
+ * Lugar na mesa: 0 e 1 no jogo normal; até `MAX_PLAYERS - 1` na mesa de todos contra todos (Yonko). É o índice em
+ * `GameState.players`, e a ordem dos turnos segue os lugares (sentido horário).
+ */
+export type PlayerId = number;
 
 export type Color = 'red' | 'green' | 'blue' | 'purple' | 'black' | 'yellow';
 export type CardCategory = 'leader' | 'character' | 'event' | 'stage';
@@ -63,6 +67,11 @@ export interface CardArt {
   imageUrl: string;
   /** Versão da impressão ("Parallel", "Manga", "Winner Pack Vol. 5"…), em inglês, como vem da fonte. */
   label?: string;
+  /**
+   * Arte vinda de um site de spoilers: a coleção do feed em que saiu ("OP18"). É provisória: sai
+   * quando a fonte oficial traz as artes novas da carta (a mesma arte chega com outro identificador).
+   */
+  spoiler?: string;
 }
 
 export interface CardSpoiler {
@@ -424,7 +433,21 @@ export type RestrictionKind =
   /** "cannot activate [Blocker]": nenhum [Blocker] do jogador pode ser ativado. */
   | 'noBlocker';
 
-export interface Restriction {
+/**
+ * Quando acaba um efeito "until the end of your opponent's next turn" / "until the start of your next turn" numa mesa
+ * com mais de dois jogadores. Com dois, o turno em que acaba se calcula na hora (`untilTurn` = turno atual + 1 ou
+ * + 2). Com mais, não dá para saber o número do turno de antemão (eliminações, turnos extras): `untilTurn` fica em
+ * `FAR_TURN` e um destes dois campos diz de quem é o turno que encerra o efeito.
+ */
+export interface Expiry {
+  untilTurn?: number;
+  /** Acaba quando começa o próximo turno deste jogador. */
+  untilStartOf?: PlayerId;
+  /** Acaba no fim do próximo turno deste jogador (o turno em curso não conta). */
+  untilEndOf?: PlayerId;
+}
+
+export interface Restriction extends Expiry {
   /** Quem fica restrito: o controlador do efeito ("you cannot …") ou o oponente dele ("your opponent cannot …"). */
   player: PlayerId;
   kind: RestrictionKind;
@@ -891,7 +914,16 @@ type EffectStepBody =
  * `afterIf`: o passo vem de um "Then, …" depois de um "If X, …": se o último "if" do efeito
  * falhou, ele também não acontece (CR 4-10-2).
  */
-export type EffectStep = EffectStepBody & { if?: StepCondition; afterIf?: true };
+export type EffectStep = EffectStepBody & {
+  if?: StepCondition;
+  afterIf?: true;
+  /**
+   * Mesa com mais de dois jogadores: o oponente contra o qual esta cópia do passo roda. O motor a cria
+   * durante a resolução, uma por oponente, para os passos que valem para cada um (`eachOpponent`); as
+   * cartas não trazem o campo.
+   */
+  vs?: PlayerId;
+};
 
 
 
@@ -1097,6 +1129,8 @@ export interface CardDef extends CardData {
   scripted: boolean;
   /** Tem efeito resolvido manualmente (sem script). */
   manual: boolean;
+  /** "Treated as a card with all card names, types, and attributes" (o Líder de 6 cores do Selado). */
+  wild?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1139,6 +1173,11 @@ export interface PlayerState {
   donActive: number;
   donRested: number;
   mulliganDone: boolean;
+  /**
+   * Eliminado (só com mais de dois jogadores): o lugar continua na lista, com as áreas vazias, mas está fora da
+   * partida. O Líder fica só como registro: não está em campo (`locate` não o encontra).
+   */
+  out?: true;
   /** Cartas de Vida viradas para cima. */
   lifeFaceUp?: string[];
   /**
@@ -1174,6 +1213,9 @@ export interface Modifier {
   amount: number;
   /** Para 'nextOpponentTurn': o efeito acaba no fim deste turno. */
   untilTurn?: number;
+  /** Com mais de dois jogadores, no lugar de `untilTurn`: ver `Expiry`. */
+  untilStartOf?: PlayerId;
+  untilEndOf?: PlayerId;
   keyword?: Keyword;
   /** kind 'attribute': o atributo ganho. */
   attribute?: string;
@@ -1198,6 +1240,11 @@ export interface BattleState {
   endFired?: boolean;
   /** "at the end of this battle, …" */
   after?: Array<{ controller: PlayerId; source: string; steps: EffectStep[]; last?: string[] }>;
+  /**
+   * Mesa com mais de dois jogadores, na etapa de Counter: os oponentes do atacante que não são o defensor e
+   * ainda não passaram a vez de usar um Evento [Counter] (o defensor decide depois deles).
+   */
+  bystanders?: PlayerId[];
 }
 
 /** De onde sai um DON!! do campo: área de custo (ativo ou virado) ou a carta (uid) a que está dado. */
@@ -1267,7 +1314,16 @@ export type Pending =
    * Etapa de Counter do defensor. Abre sempre, mesmo sem carta de Counter na mão
    * (`options` vazio): pular a etapa contaria ao atacante que a mão não tem Counter.
    */
-  | { kind: 'counter'; player: PlayerId; options: string[] }
+  | {
+      kind: 'counter';
+      player: PlayerId;
+      options: string[];
+      /**
+       * Mesa com mais de dois jogadores: quem responde não é o defensor. Só pode usar Eventos [Counter]
+       * (as opções), não o valor de Counter das cartas; `pass` devolve a vez.
+       */
+      bystander?: true;
+    }
   /**
    * Carta que saiu da Vida, mostrada só ao dono. `answer` yes ativa o [Trigger] (só
    * vale quando a carta tem um); no coloca a carta na mão. Abre para toda carta de
@@ -1305,6 +1361,11 @@ export type Pending =
       order?: number[];
       don?: DonSource[];
       shown?: string[];
+      /**
+       * Mesa com mais de dois jogadores: a largada de `player`, escolhida antes das mãos iniciais. Opção 0 =
+       * 1 DON!! no primeiro turno e comprar 1 carta (curva 1, 3, 5…); 1 = 2 DON!! sem comprar (2, 4, 6…).
+       */
+      curve?: true;
     }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
@@ -1336,6 +1397,12 @@ export type Frame =
       /** O último passo com condição da carta ("If X, …") não a cumpriu (para o "Then" seguinte, CR 4-10-2). */
       ifFailed?: boolean;
       /**
+       * Mesa com mais de dois jogadores: o único oponente a que este efeito se refere. São os passos que um
+       * oponente escolheu em "Your opponent chooses one", ou os que um passo `vs` empilhou: todo "your
+       * opponent" deles aponta para esse jogador.
+       */
+      focus?: PlayerId;
+      /**
        * Efeito de [Trigger]: a carta (`source`) fica fora de qualquer área enquanto ele resolve
        * (`GameState.limbo`) e vai para o descarte quando o frame termina, se o efeito não a moveu
        * (10-1-5-3).
@@ -1357,6 +1424,8 @@ export type Frame =
       zero?: boolean;
       /** A substituição de dano já foi oferecida para este dano. */
       replaceAsked?: boolean;
+      /** Mesa com mais de dois jogadores: quem causou o dano (leva a recompensa se ele eliminar o defensor). */
+      by?: PlayerId;
     }
   | {
       kind: 'play';
@@ -1430,7 +1499,8 @@ export interface GameState {
   rollWinner?: PlayerId;
   activePlayer: PlayerId;
   phase: 'mulligan' | 'main' | 'gameover';
-  players: [PlayerState, PlayerState];
+  /** Dois no jogo normal; até `MAX_PLAYERS` na mesa de todos contra todos. O índice é o `PlayerId`. */
+  players: PlayerState[];
   cards: Record<string, CardInstance>;
   defs: Record<string, CardDef>;
   battle: BattleState | null;
@@ -1462,7 +1532,7 @@ export interface GameState {
    * "[On Play] effects are negated" até o turno indicado (inclusive). `source` é a carta cujo efeito anulou
    * (o Líder [Marshall.D.Teach], OP09-081): a interface marca nela "efeito usado" e no Líder de `player` "sem On Play".
    */
-  onPlayNegated?: Array<{ player: PlayerId; untilTurn: number; source?: string }>;
+  onPlayNegated?: Array<{ player: PlayerId; untilTurn: number; source?: string; untilStartOf?: PlayerId; untilEndOf?: PlayerId }>;
   /** Cartas que batalharam com um Personagem do oponente neste turno. */
   battledCharacter?: string[];
   /**
@@ -1495,6 +1565,22 @@ export interface GameState {
   donSkipRefresh?: Array<{ player: PlayerId; count: number }>;
   /** DON!! ativos que o jogador vira no início da próxima Fase Principal dele (PRB02-005). */
   donRestAtMain?: Array<{ player: PlayerId; count: number }>;
+  /**
+   * Regras da mesa com mais de dois jogadores (`GameConfig.table`); ausente no jogo normal. Os campos seguintes
+   * (`eliminated`, `turnsTaken`, `curve`, `dealt`) também só existem nessas mesas.
+   */
+  table?: TableRules;
+  /** Eliminados, na ordem em que caíram (o primeiro da lista ficou em último lugar). */
+  eliminated?: PlayerId[];
+  /** Turnos que cada jogador já começou (ninguém ataca no próprio primeiro turno). */
+  turnsTaken?: number[];
+  /**
+   * A largada que cada jogador escolheu (`TableRules.curveChoice`), pelo lugar: 'odd' = 1 DON!! no primeiro
+   * turno e a compra; 'even' = 2 DON!! sem comprar. null = ainda não escolheu.
+   */
+  curve?: Array<'odd' | 'even' | null>;
+  /** As mãos iniciais já foram compradas (na mesa, só depois das escolhas de largada). */
+  dealt?: true;
   /** Vencedor. Com `phase` 'gameover', null é empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
   winner: PlayerId | null;
   winReason: string | null;
@@ -1558,8 +1644,8 @@ export interface CancelInfo {
 export type StateSnapshot = Omit<GameState, 'defs' | 'cards' | 'log' | 'actionCount' | 'cancel' | 'checkpoint'>;
 
 export interface Checkpoint {
-  /** Cartas visíveis quando a ação começou, para cada jogador (0, 1) e para os espectadores (2). */
-  seen: [string[], string[], string[]];
+  /** Cartas visíveis quando a ação começou, para cada jogador (pelo lugar) e, por último, para os espectadores. */
+  seen: string[][];
   snap: StateSnapshot;
 }
 
@@ -1631,9 +1717,35 @@ export interface PlayerSetup {
   isBot?: boolean;
 }
 
+/**
+ * Regras da mesa de todos contra todos (o formato Yonko, "Four Emperors"). São opções da sala: o motor aplica
+ * o que vier aqui, e `YONKO_TABLE` traz as do manual do formato. Sem um campo, a regra correspondente fica
+ * desligada.
+ */
+export interface TableRules {
+  /** Vida a mais que a impressa no Líder (manual: +2). */
+  extraLife?: number;
+  /**
+   * Antes das mãos iniciais, cada jogador escolhe a própria largada: 1 DON!! no primeiro turno e comprar 1
+   * carta, ou 2 DON!! sem comprar (manual). Desligado, vale o do jogo normal: quem começa não compra e recebe
+   * 1 DON!!; os outros compram e recebem 2.
+   */
+  curveChoice?: boolean;
+  /** Cartas que compra quem dá o golpe final num oponente (regra da casa; o manual não tem recompensa). */
+  eliminationDraw?: number;
+  /**
+   * Quem está fora da batalha também pode usar Evento [Counter] (o manual permite). Desligado (padrão da casa),
+   * só quem foi atacado usa Counter.
+   */
+  bystanderCounter?: boolean;
+}
+
 export interface GameConfig {
   seed: number;
-  players: [PlayerSetup, PlayerSetup];
+  /** Dois jogadores no jogo normal; de 3 a `MAX_PLAYERS` na mesa de todos contra todos. */
+  players: PlayerSetup[];
+  /** Regras da mesa com mais de dois jogadores (ignorado com dois). */
+  table?: TableRules;
   cards: CardData[];
   /** Se omitido, decidido pelo RNG (equivalente ao pedra-papel-tesoura). */
   firstPlayer?: PlayerId;

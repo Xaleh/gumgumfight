@@ -2,7 +2,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { AuthProvider } from './auth';
-import { AccessGate } from './components/AccessGate';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { isReplayPath, parseReplayEmbed } from './embed';
 import { loadLocale, t } from './i18n';
@@ -29,9 +28,7 @@ loadLocale(locale)
         <SettingsProvider locale={linkLocale}>
           <AuthProvider>
             <ErrorBoundary title={t('app.error')}>
-              <AccessGate>
-                <App />
-              </AccessGate>
+              <App />
             </ErrorBoundary>
           </AuthProvider>
         </SettingsProvider>

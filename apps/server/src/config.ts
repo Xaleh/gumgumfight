@@ -39,11 +39,6 @@ export interface ServerOptions {
   /** Apoio ao projeto (Pix, Apoia.se, meta do mês). Sem nada configurado, o item "Apoiar" some do site. */
   support?: SupportOptions;
   /**
-   * ACCESS=supporters: o site só abre para apoiadores Tripulante ou acima (e admins).
-   * Usado na homologação, que consulta o plano na produção (SUPPORT_SOURCE_URL).
-   */
-  access?: AccessOptions;
-  /**
    * REPLAY_EMBED_ORIGINS: sites (origens, separadas por vírgula ou espaço, ex.: https://sweetapp.com.br)
    * que podem pôr a página `/replay/<id>` num iframe e mandar comandos por postMessage. Vazio = só o próprio site.
    */
@@ -108,16 +103,6 @@ export interface SupportOptions {
   apoiaseUrl?: string | null;
   /** KOFI_WEBHOOK_TOKEN: token de verificação do webhook do Ko-fi (sem ele, o webhook fica desligado). */
   kofiToken?: string | null;
-  /** INTERNAL_TOKEN: token da consulta de plano feita pela homologação (sem ele, a consulta fica desligada). */
-  internalToken?: string | null;
-}
-
-export interface AccessOptions {
-  mode: 'open' | 'supporters';
-  /** SUPPORT_SOURCE_URL: site onde os planos são consultados (a produção). Vazio = só os planos deste servidor. */
-  sourceUrl?: string | null;
-  /** INTERNAL_TOKEN usado na consulta à produção. */
-  token?: string | null;
 }
 
 const positiveInt = (v: string | undefined) => {
@@ -155,15 +140,6 @@ export function supportOptions(env = process.env): SupportOptions {
     apoiaseSecret: text(env.APOIASE_API_SECRET),
     apoiaseUrl: link(env.APOIASE_API_URL)?.replace(/\/+$/, '') ?? 'https://api.apoia.se',
     kofiToken: text(env.KOFI_WEBHOOK_TOKEN),
-    internalToken: text(env.INTERNAL_TOKEN),
-  };
-}
-
-export function accessOptions(env = process.env): AccessOptions {
-  return {
-    mode: /^supporters?$/i.test(env.ACCESS ?? '') ? 'supporters' : 'open',
-    sourceUrl: link(env.SUPPORT_SOURCE_URL)?.replace(/\/+$/, '') ?? null,
-    token: text(env.INTERNAL_TOKEN),
   };
 }
 
@@ -197,7 +173,6 @@ export const serverOptions: ServerOptions = {
   onlineBotRooms: !off(process.env.ONLINE_BOT_ROOMS),
   onlineLimits: { maxRooms: positiveInt(process.env.ONLINE_MAX_ROOMS), maxBotRooms: positiveInt(process.env.ONLINE_MAX_BOT_ROOMS) },
   support: supportOptions(),
-  access: accessOptions(),
   push: !off(process.env.PUSH),
   vapidKeys: { publicKey: process.env.VAPID_PUBLIC_KEY?.trim() || null, privateKey: process.env.VAPID_PRIVATE_KEY?.trim() || null },
   vapidSubject: process.env.VAPID_SUBJECT?.trim() || undefined,
@@ -221,6 +196,15 @@ export function globalStatsSyncHours(env = process.env): number | null {
  * SPOILER_SYNC: de quantas em quantas horas o servidor procura na API as cartas de
  * spoiler que viraram oficiais (padrão 6). "off" desliga. Nunca roda nos testes.
  */
+/**
+ * CARD_RELEASE_SOURCE: no dia do lançamento, a coleção que a optcgapi ainda não publicou vira
+ * oficial pela lista oficial da Bandai em inglês (padrão "bandai"). "off" desliga: a coleção
+ * continua em spoiler até a optcgapi publicar.
+ */
+export function releaseFromOfficialList(env = process.env): boolean {
+  return !off(env.CARD_RELEASE_SOURCE);
+}
+
 export function spoilerSyncHours(env = process.env): number | null {
   if (off(env.SPOILER_SYNC) || env.NODE_ENV === 'test' || env.VITEST) return null;
   const hours = Number(env.SPOILER_SYNC ?? 6);

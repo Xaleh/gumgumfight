@@ -7,6 +7,8 @@ import recapPtBR from './recap/pt-BR';
 import decksPtBR from './decks/pt-BR';
 import teamPtBR from './team/pt-BR';
 import chamberPtBR from './chamber/pt-BR';
+import sealedPtBR from './sealed/pt-BR';
+import yonkoPtBR from './yonko/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -356,6 +358,8 @@ const ptBR = {
   'menu.chipNoManual': 'Sem efeitos manuais',
   'menu.chipReleasedOnly': 'Só cartas lançadas',
   'menu.rankedNeedsLogin': 'Entre com o Google para jogar a ranqueada.',
+  'menu.rankedNotInFormat': 'O {format} não tem ranqueada. Jogue na partida rápida.',
+  'menu.allBlueChip': 'Só C, UC, R e promo',
   'menu.rankedSpoilers': '{n|O deck tem # carta de spoiler, ainda não lançada: a ranqueada só aceita cartas lançadas.|O deck tem # cartas de spoiler, ainda não lançadas: a ranqueada só aceita cartas lançadas.}',
   'menu.rankedManualCards':
     '{n|O deck tem # carta com efeito manual (⚙), que a ranqueada não permite.|O deck tem # cartas com efeito manual (⚙), que a ranqueada não permite.}',
@@ -543,6 +547,35 @@ const ptBR = {
   'deck.storageSignIn': 'Entre com o Google no menu para guardá-los na sua conta.',
   // ---- catálogo e filtros ----
   'deck.searchPlaceholder': 'Buscar por nome, número, tipo ou texto…',
+  'deck.searchHelp': 'Atalhos da busca',
+  'deck.searchHelp.hint': 'Toque num atalho para pôr na busca (toque de novo para tirar). Dá para combinar vários: c3 c2000 blocker.',
+  'deck.searchHelp.numbers': 'Números',
+  'deck.searchHelp.card': 'Carta',
+  'deck.searchHelp.effect': 'Efeito',
+  'deck.searchHelp.deck': 'Deck',
+  'deck.searchHelp.operators': 'Operadores',
+  'deck.searchHelp.cost': 'Custo 3',
+  'deck.searchHelp.costRange': 'Custo 3 ou mais · até 3 · de 2 a 4',
+  'deck.searchHelp.counter': 'Counter +2000',
+  'deck.searchHelp.noCounter': 'Sem Counter',
+  'deck.searchHelp.power': 'Poder 5000 · 6000 ou mais (p5 também vale)',
+  'deck.searchHelp.life': 'Líder com 4 de vida',
+  'deck.searchHelp.color': 'Cor, também em português (vermelho, azul…) ou pela letra: r, g, u (azul), p, b (preto), y. Duas cores trazem só as bicolores',
+  'deck.searchHelp.category': 'Categoria',
+  'deck.searchHelp.attribute': 'Atributo',
+  'deck.searchHelp.rarity': 'Raridade',
+  'deck.searchHelp.set': 'Coleção',
+  'deck.searchHelp.keyword': 'Palavra-chave que a carta tem',
+  'deck.searchHelp.timing': 'Momento do efeito',
+  'deck.searchHelp.don': '[DON!! x2] · DON!! −2',
+  'deck.searchHelp.vanilla': 'Sem efeito',
+  'deck.searchHelp.indeck': 'Já está no deck',
+  'deck.searchHelp.legality': 'No Standard: banida · permitida · rotacionada',
+  'deck.searchHelp.allBlue': 'Vale no All Blue (C, UC, R e promo)',
+  'deck.searchHelp.new': 'Ainda não lançada (spoiler)',
+  'deck.searchHelp.not': 'Tira o que casar',
+  'deck.searchHelp.phrase': 'Frase exata',
+  'deck.searchHelp.field': 'Só no nome · só no tipo',
   'deck.filters': 'Filtros',
   'deck.color.red': 'Vermelho',
   'deck.color.green': 'Verde',
@@ -570,7 +603,7 @@ const ptBR = {
   'deck.manualTitle': 'Efeito ainda não automatizado',
   'deck.showMore': 'Mostrar mais ({n})',
   'deck.loadingCards': 'Carregando cartas…',
-  'deck.bannedTitle': 'Banida: não vale em nenhum formato',
+  'deck.bannedTitle': 'Banida: não vale no Standard nem no Extra Grand Battle',
   'deck.rotatedTitle': 'Bloco ①: rotacionada, vale só no Extra Grand Battle',
   // ---- deck atual ----
   'deck.leader': 'Líder',
@@ -585,6 +618,9 @@ const ptBR = {
   'deck.entryManual': '⚙ manual',
   'deck.entryRotated': '① rotacionada (só EGB)',
   'deck.entryBanned': '🚫 banida',
+  'deck.entryNotAllBlue': 'fora do All Blue',
+  'deck.onlyAllBlue': 'Montar para o All Blue',
+  'deck.onlyAllBlueTitle': 'Mostra só as cartas que valem no All Blue (C, UC, R e promo; Líder livre) e marca na lista as que não valem.',
   'deck.removeOne': 'Remover uma',
   'deck.addOne': 'Adicionar uma',
   'deck.allowedIn': 'Permitido no {format}',
@@ -2425,6 +2461,14 @@ const ptBR = {
   'engine.optPeekOwnLife': 'Olhar a sua Vida',
   'engine.optPeekOpponentLife': 'Olhar a Vida do oponente',
   'engine.optDontPeek': 'Não olhar',
+  // ---- mesa com mais de dois jogadores (Yonko) ----
+  'engine.whoseDonToRest': '{source}: virar 1 DON!! ativo de qual oponente?',
+  'engine.whoseDonSkipsRefresh': '{source}: o DON!! virado de qual oponente não desvira?',
+  'engine.optRestDonOf': 'Virar 1 DON!! ativo de {player}',
+  'engine.optSkipRefreshDonOf': '1 DON!! virado de {player}',
+  'engine.startCurve': '{player}: escolha a sua largada.',
+  'engine.optCurveOdd': '1 DON!! no primeiro turno e comprar 1 carta (1, 3, 5, 7, 9, 10)',
+  'engine.optCurveEven': '2 DON!! no primeiro turno, sem comprar (2, 4, 6, 8, 10)',
   'engine.optYesLifeTrash': 'Sim, descartar {n|# carta|# cartas} do topo da Vida',
   'engine.optYesDiscard': 'Sim, descartar {n|# carta|# cartas} da mão',
   'engine.optYesReturnDon': 'Sim, devolver {n|# DON!! ativo|# DON!! ativos}',
@@ -2516,6 +2560,12 @@ const ptBR = {
   'log.winBothDeckOutEndOfTurn': 'Os dois terminaram o turno sem cartas no deck.',
   'log.winDeckOutLeaderRule': '{player} ficou sem cartas no deck e vence pela regra do Líder.',
   'log.winBothDeckOutLeaderRule': 'Os dois ficaram sem cartas no deck e vencem pela regra do Líder.',
+  // ---- mesa com mais de dois jogadores (Yonko) ----
+  'log.winAllOut': 'Todos os jogadores que restavam foram derrotados ao mesmo tempo.',
+  'log.eliminated': '{player} foi eliminado. {reason}',
+  'log.eliminationReward': '{player} compra {n|# carta|# cartas} por eliminar {target}.',
+  'log.startCurveOdd': '{player} escolhe 1 DON!! no primeiro turno e comprar 1 carta.',
+  'log.startCurveEven': '{player} escolhe 2 DON!! no primeiro turno, sem comprar.',
   // ---- desfazer ----
   'log.cancelPlay': '{player} cancela a jogada de {card} (a carta volta para a mão).',
   'log.cancelActivate': '{player} cancela a ativação de {card}.',
@@ -2821,6 +2871,7 @@ const ptBR = {
   'errors.tooManyRoomsRecently': 'Você abriu partidas demais em pouco tempo; espere alguns minutos.',
   'errors.alreadyPlaying': 'Você já está numa partida online.',
   'errors.rankedLoginRequired': 'A ranqueada é só para quem entrou com a conta Google.',
+  'errors.rankedNotInFormat': 'O {format} não tem fila ranqueada.',
   'errors.invalidRoomCode': 'Código de sala inválido.',
   'errors.roomNotFound': 'Sala não encontrada ou já começou.',
   'errors.ownRoom': 'Esta sala é sua: envie o código para outra pessoa.',
@@ -2964,6 +3015,7 @@ const ptBR = {
   'labels.deckGroup.mine': 'Meus decks',
   'labels.deckGroup.community': 'Decks da comunidade',
   'labels.deckGroup.builtin': 'Starter Decks',
+  'labels.deckGroup.allBlue': 'Decks do All Blue',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Quartas de final',
@@ -2988,9 +3040,12 @@ const ptBR = {
   'rules.leaderColor': '{name} ({id}) não tem a cor do Líder.',
   'rules.unscripted': '{n|# carta|# cartas} com efeito ainda não automatizado (aplicado à mão, com as ferramentas manuais).',
   // ---- formatos (formatIssues) ----
-  'rules.banned': '{id} está banida (não vale em nenhum formato).',
+  'rules.banned': '{id} está banida (não vale no Standard nem no Extra Grand Battle).',
   'rules.rotated': '{id} tem o bloco ① e rotacionou: não vale no {format}.',
   'rules.bannedPair': '{a} e {b} não podem ser usadas juntas no mesmo deck.',
+  'rules.bannedIn': '{id} está banida no {format}.',
+  'rules.rarity': '{id} é {rarity}: não vale no {format} (só C, UC, R e promo).',
+  'rules.rarityUnknown': '{id} não tem raridade conhecida: não vale no {format}.',
   'rules.spoiler': '{n|Carta ainda não lançada (spoiler)|Cartas ainda não lançadas (spoilers)}: {ids}. Spoilers só valem na fila casual e nas salas privadas, treinos contra o bot e torneios com spoilers.',
   'rules.spoilerNotNext': '{n|Carta de spoiler de outra coleção|Cartas de spoiler de outras coleções}: {ids}. Com spoilers, fora do Livre, só vale a próxima coleção a ser lançada ({set}); as demais, só no Livre.',
   // ---- lista em texto (parseDeckList) ----
@@ -3058,6 +3113,10 @@ const ptBR = {
   ...teamPtBR,
   // ==== Sala do Tempo: torneio simulado do Time com jogadores virtuais (i18n/chamber) ====
   ...chamberPtBR,
+  // ==== Selado: boosters, deck de 40 e as partidas com ele (i18n/sealed) ====
+  ...sealedPtBR,
+  // ==== Yonko: a sala e a mesa de todos contra todos (i18n/yonko) ====
+  ...yonkoPtBR,
 } as const;
 
 

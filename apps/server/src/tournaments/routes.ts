@@ -2384,7 +2384,8 @@ export function registerTournamentRoutes(
     if ('error' in deck) return reply.code(deck.code).send(fail(deck.errorCode, deck.error, deck.errorParams));
     // O deck precisa valer também no dia do torneio (banimento com data antes do início).
     const at = legalAt(t);
-    const later = !late && at.getTime() > now() ? formatIssues(deck, t.format, at)[0] : undefined;
+    const laterCards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c] as const));
+    const later = !late && at.getTime() > now() ? formatIssues(deck, t.format, at, laterCards)[0] : undefined;
     if (later) {
       const date = brDate(at);
       return reply.code(400).send(

@@ -11,8 +11,9 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { type CardArt, type CardData, type DeckList, fixCard, needsManual } from '@gumgum/engine';
 import { DatabaseSync } from 'node:sqlite';
-import { baseCardId } from './optcgapi';
+import { artId, baseCardId } from './optcgapi';
 import { DB_PATH } from './paths';
+import { migrateSealed } from './sealed/store';
 
 export type DB = DatabaseSync;
 
@@ -84,6 +85,13 @@ function migrate(db: DB) {
       checked_at TEXT NOT NULL,
       PRIMARY KEY (region, series)
     );
+    -- Coleções que viraram oficiais pela lista oficial da Bandai no dia do lançamento, antes de a
+    -- optcgapi as publicar: a sincronização continua procurando na API e sai daqui quando acha.
+    CREATE TABLE IF NOT EXISTS set_releases (
+      set_code    TEXT PRIMARY KEY,
+      source      TEXT NOT NULL,
+      released_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
     CREATE TABLE IF NOT EXISTS decks (
       id         TEXT PRIMARY KEY,
@@ -136,6 +144,7 @@ function migrate(db: DB) {
   migrateCardIds(db);
   migrateSupport(db);
   migrateTutorial(db);
+  migrateSealed(db);
   migratePartners(db);
   migrateEngineTexts(db);
   migrateCardGaps(db);
@@ -502,7 +511,7 @@ function migratePartners(db: DB) {
  */
 function migrateSupport(db: DB) {
   const userCols = (db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
-  // supporter_tier: grumete | tripulante | capitao | almirante (null = sem plano).
+  // supporter_tier: grumete | capitao | almirante (null = sem plano).
   if (!userCols.includes('supporter_tier')) db.exec('ALTER TABLE users ADD COLUMN supporter_tier TEXT');
   // supporter_until: até quando o plano vale (ISO; null = sem prazo, dado à mão pelo admin).
   if (!userCols.includes('supporter_until')) db.exec('ALTER TABLE users ADD COLUMN supporter_until TEXT');
@@ -513,7 +522,7 @@ function migrateSupport(db: DB) {
   // team: faz parte do Time do bot (joga contra o Bot do Time e envia correções). Marca à parte do perfil
   // e do plano: a sincronização da Apoia.se sobrescreve o plano, não esta coluna.
   if (!userCols.includes('team')) db.exec('ALTER TABLE users ADD COLUMN team INTEGER NOT NULL DEFAULT 0');
-  // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago ou consultado pela homologação).
+  // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago).
   if (!userCols.includes('email_verified')) {
     db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
     // Contas de antes desta coluna: endereços do Gmail são sempre confirmados pelo Google; os outros
@@ -561,6 +570,9 @@ function migrateSupport(db: DB) {
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+  // O plano Tripulante (R$ 15) deixou de existir: pelo valor pago, quem o tinha fica no Grumete.
+  db.exec("UPDATE users SET supporter_tier = 'grumete' WHERE supporter_tier = 'tripulante'");
+  db.exec("UPDATE supporter_payments SET tier = 'grumete' WHERE tier = 'tripulante'");
   const tCols = (db.prepare('PRAGMA table_info(tournaments)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   // official: torneio do time (Torneio da Tripulação), marcado só por admin.
   if (!tCols.includes('official')) db.exec('ALTER TABLE tournaments ADD COLUMN official INTEGER NOT NULL DEFAULT 0');
@@ -1060,6 +1072,13 @@ function migrateStats(db: DB) {
       data       TEXT NOT NULL,                 -- JSON (online/room.ts: RoomData)
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- Mesas de Yonko (todos contra todos) abertas ou em andamento: refeitas ao reiniciar o servidor.
+    CREATE TABLE IF NOT EXISTS yonko_tables (
+      id         TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,                 -- JSON (yonko/table.ts: YonkoTableData)
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
   const seatCols = (db.prepare('PRAGMA table_info(match_seats)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!seatCols.includes('listed')) {
@@ -1091,14 +1110,37 @@ export function listLiveMatches(db: DB): Array<{ id: string; data: string }> {
   return db.prepare('SELECT id, data FROM live_matches').all() as Array<{ id: string; data: string }>;
 }
 
+// ------------------------------------------------------------------ mesas de Yonko
+
+export function saveYonkoTable(db: DB, id: string, data: unknown) {
+  db.prepare(
+    `INSERT INTO yonko_tables (id, data, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+  ).run(id, JSON.stringify(data));
+}
+
+export function deleteYonkoTable(db: DB, id: string) {
+  db.prepare('DELETE FROM yonko_tables WHERE id = ?').run(id);
+}
+
+export function listYonkoTables(db: DB): Array<{ id: string; data: string }> {
+  return db.prepare('SELECT id, data FROM yonko_tables').all() as Array<{ id: string; data: string }>;
+}
+
 // ------------------------------------------------------------------ cartas
 
 /**
  * Junta as artes alternativas já gravadas às da importação: a sincronização dos spoilers
  * importa só algumas coleções, e uma carta reimpressa nelas perderia as artes das outras (e a
  * escolha feita nos decks). As da importação vêm primeiro.
+ *
+ * Artes vindas de um site de spoilers (`CardArt.spoiler`) são provisórias:
+ * - importação oficial que traz arte nova da carta: as do site saem (a mesma arte chega da fonte
+ *   oficial com outro identificador); sem arte nova, continuam até a fonte oficial ter as dela;
+ * - nova rodada do feed de spoilers (`feed`): quem manda nas artes do feed é o feed (as que ele
+ *   não traz mais saem).
  */
-function keepArts(card: CardData, storedData: string): CardData {
+function keepArts(card: CardData, storedData: string, from: { official: boolean; feed: boolean }): CardData {
   let stored: CardArt[] | undefined;
   try {
     stored = (JSON.parse(storedData) as CardData).arts;
@@ -1107,9 +1149,120 @@ function keepArts(card: CardData, storedData: string): CardData {
   }
   if (!stored?.length) return card;
   // Pelo id da arte, não pela URL: a mesma arte já copiada para a CDN própria tem outro endereço.
-  const seen = new Set([card.imageUrl, ...(card.arts ?? []).flatMap((a) => [a.imageUrl, a.id])]);
-  const extra = stored.filter((a) => !seen.has(a.imageUrl) && !seen.has(a.id));
+  const seen = new Set([card.imageUrl, ...(card.arts ?? []).flatMap((a) => [a.imageUrl, a.id, printKey(a.id)])]);
+  let extra = stored.filter((a) => !seen.has(a.imageUrl) && !seen.has(a.id) && !seen.has(printKey(a.id)));
+  const storedIds = new Set(stored.flatMap((a) => [a.id, printKey(a.id)]));
+  const newOfficialArt = from.official && (card.arts ?? []).some((a) => !a.spoiler && !storedIds.has(a.id) && !storedIds.has(printKey(a.id)));
+  if (newOfficialArt || from.feed) extra = extra.filter((a) => !a.spoiler);
   return extra.length ? { ...card, arts: [...(card.arts ?? []), ...extra] } : card;
+}
+
+/**
+ * A impressão de uma arte pelo identificador: a optcgapi às vezes põe um sufixo aleatório no nome do
+ * arquivo ("OP17-119_p1_leUYdJN"), e a mesma impressão na lista oficial é "OP17-119_p1".
+ */
+function printKey(id: string): string {
+  const m = id.match(/^([A-Z]+\d*-\d+(?:_[a-z]+\d+)?)_[A-Za-z0-9]{7}$/);
+  return m ? m[1] : id;
+}
+
+/**
+ * Imagem (e artes) que a importação traz com o endereço de origem e que já estão copiadas na CDN
+ * própria: fica o endereço da CDN que a carta já tinha, sem esperar a próxima cópia.
+ */
+function keepMirrored(db: DB, card: CardData, storedData: string): CardData {
+  let stored: CardData;
+  try {
+    stored = JSON.parse(storedData) as CardData;
+  } catch {
+    return card;
+  }
+  const mirror = db.prepare("SELECT object_key, hash FROM card_images WHERE source_url = ? AND object_key <> ''");
+  const copyOf = (url: string | undefined, candidates: Array<string | undefined>) => {
+    if (!url) return undefined;
+    const m = mirror.get(url) as { object_key: string; hash: string } | undefined;
+    return m && candidates.find((c) => c?.endsWith(`/${m.object_key}?v=${m.hash}`));
+  };
+  const storedUrls = [stored.imageUrl, ...(stored.arts ?? []).map((a) => a.imageUrl)];
+  const imageUrl = copyOf(card.imageUrl, storedUrls);
+  const arts = card.arts?.map((a) => {
+    const url = copyOf(a.imageUrl, storedUrls);
+    return url ? { ...a, imageUrl: url } : a;
+  });
+  const changed = imageUrl || arts?.some((a, i) => a !== card.arts![i]);
+  return changed ? { ...card, ...(imageUrl ? { imageUrl } : {}), ...(arts ? { arts } : {}) } : card;
+}
+
+/**
+ * Carta que já está no banco ganha artes novas, sem mexer nos dados nem na imagem dela: a SP de
+ * uma carta antiga que sai numa coleção nova. Devolve o JSON novo da carta, ou null se não há
+ * arte nova. Arte oficial nova tira as do site de spoilers (ver `keepArts`).
+ */
+function addArts(storedData: string, arts: CardArt[]): string | null {
+  let stored: CardData;
+  try {
+    stored = JSON.parse(storedData) as CardData;
+  } catch {
+    return null;
+  }
+  // A imagem principal também pelo id: a cópia na CDN própria tem outro endereço e o mesmo nome de arquivo.
+  const have = new Set([stored.imageUrl, stored.imageUrl && artId(stored.imageUrl), ...(stored.arts ?? []).flatMap((a) => [a.imageUrl, a.id, printKey(a.id)])]);
+  const fresh = arts.filter((a) => !have.has(a.imageUrl) && !have.has(a.id) && !have.has(printKey(a.id)));
+  if (!fresh.length) return null;
+  const official = fresh.some((a) => !a.spoiler);
+  const kept = (stored.arts ?? []).filter((a) => !official || !a.spoiler);
+  return JSON.stringify({ ...stored, arts: [...kept, ...fresh] });
+}
+
+/**
+ * Artes de cartas de outras coleções reimpressas numa coleção ainda em spoiler (`sp_cards` do
+ * optcgleaks): as de `extra` passam a ser as artes de spoiler da coleção `set` em cada carta.
+ * Carta que não está no banco fica de fora. Com `prune`, as artes de spoiler dessa coleção que
+ * não estão mais em `extra` saem (o site trocou o arquivo ou desmentiu a carta).
+ */
+export function syncSpoilerArts(db: DB, set: string, extra: ReadonlyMap<string, CardArt[]>, opts: { prune?: boolean } = {}): { cards: number; added: number; removed: number } {
+  const result = { cards: 0, added: 0, removed: 0 };
+  const ids = new Set(extra.keys());
+  if (opts.prune) {
+    // O marcador entra no LIKE como texto: a coleção é só letras e números.
+    const marker = `%"spoiler":${JSON.stringify(set).replace(/[%_]/g, '')}%`;
+    // As cartas da própria coleção ficam de fora: as artes delas vêm com a carta (upsertCards).
+    for (const r of db.prepare('SELECT id FROM cards WHERE set_code <> ? AND data LIKE ?').all(set, marker) as unknown as Array<{ id: string }>) ids.add(r.id);
+  }
+  for (const id of ids) if (id.split('-')[0] === set) ids.delete(id);
+  if (!ids.size) return result;
+  const get = db.prepare('SELECT data FROM cards WHERE id = ?');
+  const update = db.prepare('UPDATE cards SET data = ? WHERE id = ?');
+  transaction(db, () => {
+    for (const id of ids) {
+      const row = get.get(id) as { data: string } | undefined;
+      if (!row) continue;
+      let stored: CardData;
+      try {
+        stored = JSON.parse(row.data) as CardData;
+      } catch {
+        continue;
+      }
+      // Sem imagem (imagens desligadas na fonte) não há arte para escolher.
+      if (!stored.imageUrl) continue;
+      const current = stored.arts ?? [];
+      const others = current.filter((a) => a.spoiler !== set);
+      const mine = new Map(current.filter((a) => a.spoiler === set).map((a) => [a.id, a]));
+      const taken = new Set([stored.imageUrl, artId(stored.imageUrl), ...others.flatMap((a) => [a.imageUrl, a.id])]);
+      const incoming = (extra.get(id) ?? []).filter((a) => !taken.has(a.id) && !taken.has(a.imageUrl));
+      // A arte que já estava fica como está (o endereço pode já ser o da CDN própria).
+      const next = [...others, ...(opts.prune ? [] : [...mine.values()].filter((a) => !incoming.some((i) => i.id === a.id))), ...incoming.map((a) => mine.get(a.id) ?? a)];
+      const added = incoming.filter((a) => !mine.has(a.id)).length;
+      const removed = current.length + added - next.length;
+      if (!added && !removed) continue;
+      const { arts: _arts, ...rest } = stored;
+      update.run(JSON.stringify(next.length ? { ...rest, arts: next } : rest), id);
+      result.cards++;
+      result.added += added;
+      result.removed += removed;
+    }
+  });
+  return result;
 }
 
 /**
@@ -1152,9 +1305,30 @@ function keepOfficialImage(db: DB, card: CardData, storedData: string): CardData
 export function upsertCards(
   db: DB,
   cards: CardData[],
-  opts: { provisional: boolean; source: string; raw?: Map<string, unknown> },
+  opts: {
+    provisional: boolean;
+    source: string;
+    raw?: Map<string, unknown>;
+    /**
+     * Cartas de que a fonte só trouxe impressões de outra coleção (a SP de uma carta antiga dentro
+     * da coleção nova): a que já é oficial no banco só ganha as artes; as outras são gravadas inteiras.
+     */
+    artOnly?: ReadonlySet<string>;
+    /**
+     * Rodada completa do feed de spoilers (todas as fontes responderam): as artes de spoiler
+     * (`CardArt.spoiler`) que o feed não traz mais saem da carta. Sem isto, ficam as já gravadas.
+     */
+    feedArts?: boolean;
+    /**
+     * A fonte não traz imagem (a lista oficial sem a CDN própria: as imagens dela não abrem em outro
+     * site): a carta que entra sem imagem fica com a que já tinha, e com as artes dela.
+     */
+    keepImage?: boolean;
+  },
 ): { written: number; skipped: number } {
   const existing = db.prepare('SELECT provisional, data FROM cards WHERE id = ?');
+  const setData = db.prepare("UPDATE cards SET data = ?, updated_at = datetime('now') WHERE id = ?");
+  const from = { official: !opts.provisional, feed: opts.provisional && opts.feedArts === true };
   const write = db.prepare(`
     INSERT INTO cards (id, set_code, name, category, data, provisional, source, raw, updated_at)
     VALUES (@id, @set_code, @name, @category, @data, @provisional, @source, @raw, datetime('now'))
@@ -1174,8 +1348,27 @@ export function upsertCards(
         skipped++;
         continue;
       }
-      if (row) c = keepArts(c, row.data);
+      if (!opts.provisional && opts.artOnly?.has(c.id)) {
+        if (row && !row.provisional) {
+          const data = addArts(row.data, c.arts ?? []);
+          if (data) {
+            setData.run(data, c.id);
+            written++;
+          } else skipped++;
+          continue;
+        }
+        // Carta que o banco não tem (ou só provisória): entra inteira, com a primeira impressão como imagem.
+        const arts = c.arts?.filter((a) => a.imageUrl !== c.imageUrl);
+        const { arts: _arts, ...rest } = c;
+        c = (arts?.length ? { ...rest, arts } : rest) as typeof c;
+      }
+      if (row && opts.keepImage && !c.imageUrl) {
+        const stored = JSON.parse(row.data) as CardData;
+        if (stored.imageUrl) c = { ...c, imageUrl: stored.imageUrl, ...(stored.imageLang ? { imageLang: stored.imageLang } : {}) };
+      }
+      if (row) c = keepArts(c, row.data, from);
       if (row && opts.provisional) c = keepOfficialImage(db, c, row.data);
+      else if (row) c = keepMirrored(db, c, row.data);
       write.run({
         id: c.id,
         set_code: c.set ?? c.id.split('-')[0],
@@ -1190,6 +1383,18 @@ export function upsertCards(
     }
   });
   return { written, skipped };
+}
+
+/** Coleções oficiais pela lista da Bandai que a optcgapi ainda não publicou (coleção -> origem). */
+export function listReleases(db: DB): Map<string, string> {
+  const rows = db.prepare('SELECT set_code, source FROM set_releases ORDER BY set_code').all() as unknown as Array<{ set_code: string; source: string }>;
+  return new Map(rows.map((r) => [r.set_code, r.source]));
+}
+
+/** A coleção virou oficial pela lista (`source`) e fica esperando a API; `null` = a API já a publicou. */
+export function setListRelease(db: DB, set: string, source: string | null): void {
+  if (source === null) db.prepare('DELETE FROM set_releases WHERE set_code = ?').run(set);
+  else db.prepare('INSERT INTO set_releases (set_code, source) VALUES (?, ?) ON CONFLICT(set_code) DO UPDATE SET source = excluded.source').run(set, source);
 }
 
 /** Origem das cartas de spoiler (data/spoilers). Elas são provisórias: a API oficial as substitui. */
@@ -1306,7 +1511,8 @@ export function getTranslations(db: DB, lang: string, ids?: string[]): Map<strin
 /** builtin = vem de data/decks (recriado a cada início); user = montado pelo jogador. */
 export type DeckKind = 'builtin' | 'user';
 /** Grupo de um deck pronto: 'meta' = deck do meta global (data/decks/meta), jogado pelo Bot do Time. */
-export type DeckGroup = 'meta';
+/** `meta`: decks do meta global (data/decks/meta); `allblue`: decks prontos do All Blue (data/decks/allblue). */
+export type DeckGroup = 'meta' | 'allblue';
 export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string; ownerHash: string | null; group: DeckGroup | null };
 
 /** Grava um deck. O dono só é definido na criação (um update nunca troca o dono). */
@@ -1349,7 +1555,7 @@ const toDeck = (r: DeckRow): StoredDeck => ({
   kind: r.kind,
   updatedAt: r.updated_at,
   ownerHash: r.owner_hash,
-  group: r.deck_group === 'meta' ? 'meta' : null,
+  group: r.deck_group === 'meta' || r.deck_group === 'allblue' ? r.deck_group : null,
 });
 
 export function listDecks(db: DB): StoredDeck[] {

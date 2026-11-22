@@ -8,7 +8,7 @@ import type { GlobalStatsOptions } from '../config';
 import { type DB, getCards } from '../db';
 import { fail } from '../errors';
 import type { ApiCard } from '../present';
-import { FORMATS, isFormat, isPlayFormat, isQueue, isTier, type PlayFormat, type QueueId, QUEUES, TIERS, tierFor } from './catalog';
+import { isFormat, OFFICIAL_FORMATS, isPlayFormat, isQueue, isTier, type PlayFormat, type QueueId, QUEUES, TIERS, tierFor } from './catalog';
 import { summarizeDecks } from './decks';
 import { deriveMatch } from './derive';
 import { listGlobalQueues, syncGlobalStats } from './global';
@@ -180,13 +180,14 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
       const { leaders } = statsDimensions(db);
       const decks = me ? myDecks(db, me.id) : [];
       return {
-        /** Estatísticas Pro liberadas (plano Tripulante ou acima). */
+        /** Estatísticas Pro liberadas (plano Capitão ou acima). */
         pro: pro(req),
         /** O servidor separa as estatísticas gerais das Pro (apoio configurado). */
         proGate,
         freeQueues: FREE_QUEUES,
         smallSample: SMALL_SAMPLE,
-        formats: FORMATS,
+        /** Só os formatos oficiais: o All Blue não entra nas estatísticas (`countsInStats`). */
+        formats: OFFICIAL_FORMATS,
         queues: QUEUES,
         tiers: TIERS,
         leaders,

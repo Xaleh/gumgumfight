@@ -18,13 +18,18 @@ export function forEngine<T extends Pick<CardData, 'text' | 'trigger' | 'engineT
   return out;
 }
 
+/** O Líder de 6 cores do Selado: vale por qualquer nome, tipo e atributo. */
+const WILD_TEXT = /treated as a card with all card names, types,? and attributes/i;
+
 export function buildCardDef(card: CardData): CardDef {
   // Nome e tipos oficiais e a errata oficial valem sobre o que a base de cartas trouxer.
   const data = fixCard(card);
   const script = CARD_SCRIPTS[data.id];
+  const wild = WILD_TEXT.test(data.text ?? '') ? { wild: true } : {};
   if (script) {
     return {
       ...data,
+      ...wild,
       keywords: script.keywords ?? detectKeywords(data.text ?? ''),
       abilities: script.abilities,
       scripted: true,
@@ -36,6 +41,7 @@ export function buildCardDef(card: CardData): CardDef {
   const parsed = parseCard(forEngine(data));
   return {
     ...data,
+    ...wild,
     keywords: parsed.keywords,
     abilities: parsed.abilities,
     scripted: parsed.unparsed.length === 0 && parsed.abilities.length > 0,

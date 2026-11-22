@@ -7,6 +7,8 @@ import recap from './recap/de';
 import decks from './decks/de';
 import team from './team/de';
 import chamber from './chamber/de';
+import sealed from './sealed/de';
+import yonko from './yonko/de';
 
 export default {
   // ---- Allgemein ----
@@ -356,6 +358,8 @@ export default {
   'menu.chipNoManual': 'Keine manuellen Effekte',
   'menu.chipReleasedOnly': 'Nur erschienene Karten',
   'menu.rankedNeedsLogin': 'Melde dich mit Google an, um Ranked zu spielen.',
+  'menu.rankedNotInFormat': '{format} hat kein Ranked. Spiele es im Schnellspiel.',
+  'menu.allBlueChip': 'Nur C, UC, R und Promo',
   'menu.rankedSpoilers': '{n|Das Deck hat # Spoiler-Karte, die noch nicht erschienen ist: In Ranked sind nur erschienene Karten erlaubt.|Das Deck hat # Spoiler-Karten, die noch nicht erschienen sind: In Ranked sind nur erschienene Karten erlaubt.}',
   'menu.rankedManualCards':
     '{n|Das Deck hat # Karte mit manuellem Effekt (⚙), was Ranked nicht erlaubt.|Das Deck hat # Karten mit manuellen Effekten (⚙), was Ranked nicht erlaubt.}',
@@ -542,6 +546,35 @@ export default {
   'deck.storageSignIn': 'Melde dich im Menü mit Google an, um sie in deinem Konto zu behalten.',
   // ---- Katalog und Filter ----
   'deck.searchPlaceholder': 'Suche nach Name, Nummer, Typ oder Text…',
+  'deck.searchHelp': 'Such-Kürzel',
+  'deck.searchHelp.hint': 'Tippe auf ein Kürzel, um es in die Suche zu setzen (noch einmal tippen entfernt es). Mehrere lassen sich kombinieren: c3 c2000 blocker.',
+  'deck.searchHelp.numbers': 'Zahlen',
+  'deck.searchHelp.card': 'Karte',
+  'deck.searchHelp.effect': 'Effekt',
+  'deck.searchHelp.deck': 'Deck',
+  'deck.searchHelp.operators': 'Operatoren',
+  'deck.searchHelp.cost': 'Kosten 3',
+  'deck.searchHelp.costRange': 'Kosten 3 oder mehr · höchstens 3 · 2 bis 4',
+  'deck.searchHelp.counter': 'Counter +2000',
+  'deck.searchHelp.noCounter': 'Ohne Counter',
+  'deck.searchHelp.power': 'Stärke 5000 · 6000 oder mehr (p5 geht auch)',
+  'deck.searchHelp.life': 'Leader mit 4 Leben',
+  'deck.searchHelp.color': 'Farbe, auch auf Deutsch (rot, blau…) oder als Buchstabe: r, g, u (blau), p, b (schwarz), y. Zwei Farben zeigen nur die zweifarbigen Karten',
+  'deck.searchHelp.category': 'Kartenart',
+  'deck.searchHelp.attribute': 'Attribut',
+  'deck.searchHelp.rarity': 'Seltenheit',
+  'deck.searchHelp.set': 'Set',
+  'deck.searchHelp.keyword': 'Schlüsselwort, das die Karte hat',
+  'deck.searchHelp.timing': 'Zeitpunkt des Effekts',
+  'deck.searchHelp.don': '[DON!! x2] · DON!! −2',
+  'deck.searchHelp.vanilla': 'Ohne Effekt',
+  'deck.searchHelp.indeck': 'Schon im Deck',
+  'deck.searchHelp.legality': 'In Standard: gebannt · legal · rotiert',
+  'deck.searchHelp.allBlue': 'Legal in All Blue (C, UC, R und Promo)',
+  'deck.searchHelp.new': 'Unveröffentlicht (Spoiler)',
+  'deck.searchHelp.not': 'Blendet Treffer aus',
+  'deck.searchHelp.phrase': 'Genaue Wortfolge',
+  'deck.searchHelp.field': 'Nur im Namen · nur im Typ',
   'deck.filters': 'Filter',
   'deck.color.red': 'Rot',
   'deck.color.green': 'Grün',
@@ -569,7 +602,7 @@ export default {
   'deck.manualTitle': 'Effekt noch nicht automatisiert',
   'deck.showMore': 'Mehr anzeigen ({n})',
   'deck.loadingCards': 'Lade Karten…',
-  'deck.bannedTitle': 'Gebannt: in keinem Format legal',
+  'deck.bannedTitle': 'Gebannt: weder in Standard noch in Extra Grand Battle legal',
   'deck.rotatedTitle': 'Block ①: rotiert, nur in Extra Grand Battle legal',
   // ---- aktuelles Deck ----
   'deck.leader': 'Leader',
@@ -584,6 +617,9 @@ export default {
   'deck.entryManual': '⚙ manuell',
   'deck.entryRotated': '① rotiert (nur EGB)',
   'deck.entryBanned': '🚫 gebannt',
+  'deck.entryNotAllBlue': 'nicht in All Blue',
+  'deck.onlyAllBlue': 'Für All Blue bauen',
+  'deck.onlyAllBlueTitle': 'Zeigt nur Karten, die in All Blue legal sind (C, UC, R und Promo; Leader frei), und markiert in der Liste die, die es nicht sind.',
   'deck.removeOne': 'Eine entfernen',
   'deck.addOne': 'Eine hinzufügen',
   'deck.allowedIn': 'Legal in {format}',
@@ -2423,6 +2459,14 @@ export default {
   'engine.optPeekOwnLife': 'Dein Leben ansehen',
   'engine.optPeekOpponentLife': 'Leben des Gegners ansehen',
   'engine.optDontPeek': 'Nicht ansehen',
+  // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
+  'engine.whoseDonToRest': '{source}: Von welchem Gegner 1 aktive DON!! erschöpfen?',
+  'engine.whoseDonSkipsRefresh': '{source}: Bei welchem Gegner bleibt die erschöpfte DON!! erschöpft?',
+  'engine.optRestDonOf': '1 aktive DON!! von {player} erschöpfen',
+  'engine.optSkipRefreshDonOf': '1 erschöpfte DON!! von {player}',
+  'engine.startCurve': '{player}: Wähle deinen Start.',
+  'engine.optCurveOdd': '1 DON!! im ersten Zug und 1 Karte ziehen (1, 3, 5, 7, 9, 10)',
+  'engine.optCurveEven': '2 DON!! im ersten Zug, ohne zu ziehen (2, 4, 6, 8, 10)',
   'engine.optYesLifeTrash': 'Ja, {n|# Karte|# Karten} von oben aus meinem Leben ablegen',
   'engine.optYesDiscard': 'Ja, {n|# Karte|# Karten} von meiner Hand ablegen',
   'engine.optYesReturnDon': 'Ja, {n|# aktive DON!!|# aktive DON!!} zurücklegen',
@@ -2513,6 +2557,12 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Beide Spieler haben den Zug ohne Karten im Deck beendet.',
   'log.winDeckOutLeaderRule': '{player} hat keine Karten mehr im Deck und gewinnt durch die Regel seines Leaders.',
   'log.winBothDeckOutLeaderRule': 'Beide Spieler haben keine Karten mehr im Deck und gewinnen durch die Regel ihres Leaders.',
+  // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
+  'log.winAllOut': 'Alle verbliebenen Spieler wurden gleichzeitig besiegt.',
+  'log.eliminated': '{player} ist ausgeschieden. {reason}',
+  'log.eliminationReward': '{player} zieht {n|# Karte|# Karten} für das Ausschalten von {target}.',
+  'log.startCurveOdd': '{player} wählt 1 DON!! im ersten Zug und zieht 1 Karte.',
+  'log.startCurveEven': '{player} wählt 2 DON!! im ersten Zug, ohne zu ziehen.',
   // ---- Rückgängig ----
   'log.cancelPlay': '{player} macht das Spielen von {card} rückgängig (die Karte kehrt auf die Hand zurück).',
   'log.cancelActivate': '{player} macht das Aktivieren von {card} rückgängig.',
@@ -2817,6 +2867,7 @@ export default {
   'errors.tooManyRoomsRecently': 'Du hast in kurzer Zeit zu viele Partien eröffnet; warte ein paar Minuten.',
   'errors.alreadyPlaying': 'Du bist bereits in einer Online-Partie.',
   'errors.rankedLoginRequired': 'Ranked ist nur für Spieler, die mit einem Google-Konto angemeldet sind.',
+  'errors.rankedNotInFormat': '{format} hat keine Ranked-Warteschlange.',
   'errors.invalidRoomCode': 'Ungültiger Raumcode.',
   'errors.roomNotFound': 'Raum nicht gefunden oder bereits gestartet.',
   'errors.ownRoom': 'Das ist dein Raum: Schick den Code an jemand anderen.',
@@ -2960,6 +3011,7 @@ export default {
   'labels.deckGroup.mine': 'Meine Decks',
   'labels.deckGroup.community': 'Community-Decks',
   'labels.deckGroup.builtin': 'Starter Decks',
+  'labels.deckGroup.allBlue': 'All-Blue-Decks',
   'labels.phase.final': 'Finale',
   'labels.phase.semifinal': 'Halbfinale',
   'labels.phase.quarterfinal': 'Viertelfinale',
@@ -2984,9 +3036,12 @@ export default {
   'rules.leaderColor': '{name} ({id}) teilt keine Farbe mit dem Leader.',
   'rules.unscripted': '{n|# Karte|# Karten} mit noch nicht automatisiertem Effekt (wird von Hand mit den manuellen Werkzeugen angewendet).',
   // ---- Formate (formatIssues) ----
-  'rules.banned': '{id} ist gebannt (in keinem Format legal).',
+  'rules.banned': '{id} ist gebannt (weder in Standard noch in Extra Grand Battle legal).',
   'rules.rotated': '{id} hat Block ① und ist rotiert: nicht legal in {format}.',
   'rules.bannedPair': '{a} und {b} dürfen nicht zusammen im selben Deck verwendet werden.',
+  'rules.bannedIn': '{id} ist in {format} gebannt.',
+  'rules.rarity': '{id} ist {rarity}: in {format} nicht legal (nur C, UC, R und Promo).',
+  'rules.rarityUnknown': '{id} hat keine bekannte Seltenheit: in {format} nicht legal.',
   'rules.spoiler': '{n|Noch nicht erschienene Karte (Spoiler)|Noch nicht erschienene Karten (Spoiler)}: {ids}. Spoiler sind nur in der Casual-Warteschlange sowie in privaten Räumen, im Bot-Training und in Turnieren mit Spoilern erlaubt.',
   'rules.spoilerNotNext': '{n|Spoiler-Karte aus einem anderen Set|Spoiler-Karten aus anderen Sets}: {ids}. Mit Spoilern ist außerhalb von „Frei“ nur das nächste erscheinende Set erlaubt ({set}); die anderen nur im Modus „Frei“.',
   // ---- Textliste (parseDeckList) ----
@@ -3051,5 +3106,7 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...sealed,
+  ...yonko,
 } satisfies Messages;
 

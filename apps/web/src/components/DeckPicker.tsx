@@ -4,7 +4,7 @@
 // quando a pessoa tem algum. Os decks que não valem nas regras de quem pede ficam no fim,
 // recolhidos, com o motivo escrito.
 
-import { type CardData, DECK_SIZE, FORMATS, withArt } from '@gumgum/engine';
+import { type CardData, DECK_SIZE, FORMATS, isOfficialFormat, withArt } from '@gumgum/engine';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api, type DeckSummary } from '../api';
@@ -332,9 +332,10 @@ export function DeckPicker({
                 </div>
                 <div className="dk-chips">
                   {!current.valid && <span className="dk-chip bad">{t('decks.state.draft', { size: current.size, max: DECK_SIZE })}</span>}
-                  {FORMATS.map((f) => (
-                    <span key={f.id} className={['dk-chip', current.formats[f.id].length ? 'bad' : 'ok'].join(' ')}>
-                      {current.formats[f.id].length ? '🚫' : '✓'} {f.label}
+                  {/* O All Blue (formato da comunidade) só aparece quando o deck vale nele. */}
+                  {FORMATS.filter((f) => isOfficialFormat(f.id) || current.formats[f.id]?.length === 0).map((f) => (
+                    <span key={f.id} className={['dk-chip', current.formats[f.id]?.length ? 'bad' : 'ok'].join(' ')}>
+                      {current.formats[f.id]?.length ? '🚫' : '✓'} {f.label}
                     </span>
                   ))}
                   {Boolean(current.spoilers?.length) && <span className="dk-chip spoiler">{t('decks.state.spoilers')}</span>}

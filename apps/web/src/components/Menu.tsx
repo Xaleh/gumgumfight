@@ -1,4 +1,4 @@
-import { type BotLevel, cardLegality, FORMATS, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
+import { type BotLevel, cardLegality, FORMATS, hasRanked, isFormat, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
@@ -88,7 +88,8 @@ function savedBotLevel(): BotLevel {
 
 function savedFormat(): FormatId {
   try {
-    return localStorage.getItem(LAST_FORMAT) === 'egb' ? 'egb' : 'standard';
+    const saved = localStorage.getItem(LAST_FORMAT);
+    return isFormat(saved) ? saved : 'standard';
   } catch {
     return 'standard';
   }
@@ -289,6 +290,9 @@ export function Menu({
   onTournamentMatch,
   onAdmin,
   onTeamBot,
+  onSealed,
+  onDraft,
+  onYonko,
   dev = false,
 }: {
   onStart: (s: GameSetup) => void;
@@ -312,6 +316,12 @@ export function Menu({
   onAdmin?: () => void;
   /** Tela "Bot do Time" (só para quem é do Time): decks do meta e caixa de correções. */
   onTeamBot?: () => void;
+  /** Abre o Selado (boosters e deck de 40). */
+  onSealed: () => void;
+  /** Abre a entrada do Draft (pods de coleção, Pack Rush ou Cubo). */
+  onDraft: () => void;
+  /** Abre a sala do Yonko (mesa de todos contra todos). */
+  onYonko: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
@@ -336,6 +346,14 @@ export function Menu({
   const team = isTeam(user);
   const botLevel: BotLevel = savedLevel === 'team' && !team ? 'hard' : savedLevel;
   const [format, setFormat] = useState<FormatId>(savedFormat);
+  /** Coleções disponíveis no Selado (null: ainda não se sabe, ou o servidor é antigo). */
+  const [sealedSets, setSealedSets] = useState<number | null>(null);
+  useEffect(() => {
+    api.sealed
+      .sets()
+      .then((r) => setSealedSets(r.sets.length))
+      .catch(() => setSealedSets(null));
+  }, []);
   const [privateRules, setPrivateRules] = useState<Rules>(() => savedRules(LAST_PRIVATE_RULES));
   const [botRules, setBotRules] = useState<Rules>(() => savedRules(LAST_BOT_RULES));
   const [loading, setLoading] = useState(false);
@@ -349,7 +367,7 @@ export function Menu({
   const [pickingLeader, setPickingLeader] = useState(false);
   // Trocar de formato desfaz a escolha de um Líder que não vale no formato novo.
   useEffect(() => {
-    setCasualLeader((l) => (l && cardLegality(l.id, format) !== 'legal' ? null : l));
+    setCasualLeader((l) => (l && cardLegality(l.id, format, undefined, { category: 'leader' }) !== 'legal' ? null : l));
   }, [format]);
   const [code, setCode] = useState(URL_ROOM_CODE ?? '');
   const userId = user?.id;
@@ -442,7 +460,8 @@ export function Menu({
             /* sem armazenamento */
           }
           const valid = d.filter((x) => canPlay(x, format)).map((x) => x.id);
-          const builtin = d.filter((x) => canPlay(x, format) && x.kind === 'builtin').map((x) => x.id);
+          // Os decks prontos do All Blue só são sugeridos nesse formato.
+          const builtin = d.filter((x) => canPlay(x, format) && x.kind === 'builtin' && (format === 'allblue' || !x.allBlue)).map((x) => x.id);
           setDeck0(valid.includes(last[0]) ? last[0] : (builtin[0] ?? valid[0] ?? ''));
           setDeck1(last[1] === RANDOM || valid.includes(last[1]) ? last[1] : (builtin[1] ?? valid[1] ?? valid[0] ?? ''));
         })
@@ -503,7 +522,7 @@ export function Menu({
     try {
       // Sem apelido: um nome que funcione nas frases do log, que são em terceira pessoa ("You kept their hand" não).
       const names: [string, string] = [nickname ?? t('menu.youName'), t('menu.botName')];
-      const builtin = decks.filter((d) => playsIn(d, botMode) && d.kind === 'builtin');
+      const builtin = decks.filter((d) => playsIn(d, botMode) && d.kind === 'builtin' && (botMode.format === 'allblue' || !d.allBlue));
       // O Bot do Time sorteia entre os decks do meta, quando há algum que vale nas regras.
       const meta = botLevel === 'team' ? builtin.filter((d) => d.meta) : [];
       const pool = meta.length ? meta : builtin;
@@ -581,6 +600,7 @@ export function Menu({
   /** Cartas de spoiler (ainda não lançadas) no deck: a ranqueada só aceita cartas lançadas. */
   const spoilerCards = d0?.spoilers?.length ?? 0;
   const rankedNote =
+    (!hasRanked(format) ? t('menu.rankedNotInFormat', { format: fmt }) : null) ??
     onlineNote ??
     (!user
       ? t('menu.rankedNeedsLogin')
@@ -782,6 +802,7 @@ export function Menu({
                     {t('menu.notAllowedIn', { format: fmt })}
                   </li>
                 )}
+                {format === 'allblue' && <li className="home-chip">{t('menu.allBlueChip')}</li>}
                 {d0.unscripted > 0 && (
                   <li className="home-chip" title={t('menu.unscriptedTitle')}>
                     {t('menu.unscriptedChip', { n: d0.unscripted })}
@@ -1001,6 +1022,58 @@ export function Menu({
               live={tournaments ? <Live off={!openTournaments && !runningTournaments}>{t('menu.tourLive', { n: openTournaments, running: runningTournaments })}</Live> : <Live off>{t('menu.counting')}</Live>}
               action={t('menu.seeTournaments')}
               onAction={() => onTournaments()}
+            />
+          </div>
+        </section>
+
+        <section className="home-section" aria-labelledby="home-special">
+          <div className="section-head">
+            <h2 className="home-h2" id="home-special">
+              {t('sealed.special')}
+            </h2>
+            <span className="muted">{t('sealed.specialHint')}</span>
+          </div>
+          <div className="mode-grid special">
+            <ModeCard
+              mode="sealed"
+              color="teal"
+              icon="store"
+              kicker={t('sealed.homeKicker')}
+              title={t('sealed.title')}
+              badge={t('sealed.homeBadge')}
+              desc={t('sealed.homeDesc')}
+              chips={[t('sealed.homeChipPacks'), t('sealed.homeChipDeck'), t('sealed.homeChipPlay')]}
+              live={sealedSets === null ? null : <Live off={!sealedSets}>{t('sealed.homeLive', { n: sealedSets })}</Live>}
+              action={t('sealed.homeAction')}
+              onAction={onSealed}
+              disabled={sealedSets === 0}
+            />
+            <ModeCard
+              mode="draft"
+              color="purple"
+              icon="deck"
+              kicker={t('sealed.homeKicker')}
+              title={t('draft.titlePlain')}
+              badge={t('draft.homeBadge')}
+              desc={t('draft.homeDesc')}
+              chips={[t('draft.homeChipPacks'), t('sealed.homeChipDeck'), t('draft.homeChipSource')]}
+              live={sealedSets === null ? null : <Live off={!sealedSets}>{t('sealed.homeLive', { n: sealedSets })}</Live>}
+              action={t('draft.homeAction')}
+              onAction={onDraft}
+              disabled={sealedSets === 0}
+            />
+            <ModeCard
+              mode="yonko"
+              color="red"
+              icon="crown"
+              kicker={t('yonko.homeKicker')}
+              title={t('yonko.title')}
+              badge={t('yonko.homeBadge')}
+              desc={t('yonko.homeDesc')}
+              chips={[t('yonko.homeChipPlayers'), t('yonko.homeChipDeck'), t('yonko.homeChipBots')]}
+              live={null}
+              action={t('yonko.homeAction')}
+              onAction={onYonko}
             />
           </div>
         </section>

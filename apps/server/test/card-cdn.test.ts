@@ -66,16 +66,21 @@ describe('CDN própria das imagens', () => {
     expect(eb.imageUrl).toMatch(/\/EB05\/en\/eb05-010_v2\.webp\?v=/);
     expect(readFileSync(join(dir, 'OP01/en/OP01-016.png'))).toEqual(PNG);
 
-    // Reimportar volta os endereços de origem: a cópia já existe, só a carta muda (sem download).
+    // Reimportar traz os endereços de origem: a carta fica com os da CDN que já tinha, na hora (sem download).
     upsertCards(db, [card('OP01-016', { arts: [{ id: 'OP01-016_p1', imageUrl: 'https://optcgapi.com/media/static/Card_Images/OP01-016_p1.jpg' }] })], {
       provisional: false,
       source: 'api:test',
     });
+    expect(getCards(db, ['OP01-016'])[0]).toMatchObject({ imageUrl: op.imageUrl, arts: [{ id: 'OP01-016_p1', imageUrl: op.arts![0].imageUrl }] });
     const again = images();
-    expect(await mirrorCardImages(db, store, { fetchImpl: again.fetchImpl })).toMatchObject({ uploaded: 0, reused: 2, cards: 2 });
+    expect(await mirrorCardImages(db, store, { fetchImpl: again.fetchImpl })).toMatchObject({ uploaded: 0, reused: 0, cards: 2 });
     expect(again.calls).toEqual([]);
     const [op2] = getCards(db, ['OP01-016']);
     expect(op2.imageUrl).toBe(op.imageUrl);
+    // Imagem nova da fonte (outro endereço): a carta muda e a cópia é feita na rodada seguinte.
+    upsertCards(db, [card('OP01-016', { imageUrl: 'https://optcgapi.com/media/static/Card_Images/OP01-016_novo.jpg' })], { provisional: false, source: 'api:test' });
+    expect(getCards(db, ['OP01-016'])[0].imageUrl).toBe('https://optcgapi.com/media/static/Card_Images/OP01-016_novo.jpg');
+    upsertCards(db, [card('OP01-016')], { provisional: false, source: 'api:test' });
     // A arte da importação e a já copiada são a mesma (pelo id): nada de arte repetida.
     expect(op2.arts).toHaveLength(1);
   });

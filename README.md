@@ -58,6 +58,7 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | (vazio) | Conta (o Account ID ou o endpoint S3 inteiro), bucket e token do Cloudflare R2 da CDN (segredos: só no `deploy.env`) |
 | `R2_ENDPOINT`   | (vazio)                       | Só para bucket com jurisdição (ex.: `https://<id>.eu.r2.cloudflarestorage.com`) |
 | `CARD_IMAGE_SOURCES` | `bandai-en,bandai-asia,bandai-jp` | Listas oficiais da Bandai onde procurar a imagem das cartas sem imagem, em ordem (com a CDN ligada); `off` desliga |
+| `CARD_RELEASE_SOURCE` | `bandai`                | No dia do lançamento, a coleção que a optcgapi ainda não publicou vira oficial pela lista oficial da Bandai (veja [Spoilers](#spoilers-coleções-ainda-não-lançadas)); `off` desliga |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GLOBAL_STATS_API_KEY` | (vazio) | Chave da OPTCG Logpose API (meta global do TCG Matchmaking; veja [Meta global](#meta-global-tcg-matchmaking)); vazio = escopo Global desligado (segredo: só no `deploy.env`) |
 | `GLOBAL_STATS_CLIENT` | `gumgum` | O `x-client-name` cadastrado junto com a chave |
@@ -75,23 +76,20 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `VAPID_SUBJECT` | `https://gumgumfight.app`     | Contato do servidor para os serviços de push (`mailto:` ou `https:`) |
 | `PM2_MAX_MEMORY` | `1500M` (só no `deploy.env` da VM) | Memória a partir da qual o pm2 reinicia o app |
 | `SUPPORT_PIX_KEY` / `SUPPORT_PIX_NAME` / `SUPPORT_PIX_CITY` | (vazio) | Pix do "Doe um Cafezim": chave (de preferência aleatória), nome e cidade de quem recebe |
-| `SUPPORT_MONTHLY_URL` | (vazio) | Página da campanha mensal na Apoia.se (Grumete, Tripulante, Capitão, Almirante) |
+| `SUPPORT_MONTHLY_URL` | (vazio) | Página da campanha mensal na Apoia.se (Grumete, Capitão, Almirante) |
 | `APOIASE_API_KEY` / `APOIASE_API_SECRET` | (vazio) | Chave e segredo da API da Apoia.se: o plano vem de lá pelo e-mail da conta (segredos: só no `deploy.env`) |
 | `APOIASE_SYNC` | `6` | Horas entre as reconsultas de quem tem plano da Apoia.se; `off` desliga |
 | `SUPPORT_COFFEE_URL` | (vazio) | Opcional: página de doação com cartão (ex.: Ko-fi, para público de fora do Brasil) |
 | `SUPPORT_GOAL_BRL` | (vazio) | Custo mensal do site, mostrado como meta no "Apoiar o projeto" |
 | `SUPPORT_CONTACT_URL` | (vazio) | Contato para lojas que querem patrocinar (`mailto:` ou link) |
 | `KOFI_WEBHOOK_TOKEN` | (vazio) | Opcional: token do webhook do Ko-fi; vazio = desligado (segredo: só no `deploy.env`) |
-| `INTERNAL_TOKEN` | (vazio) | Token da consulta de plano entre homologação e produção (igual nos dois; segredo) |
-| `ACCESS` | `open` | `supporters`: o site só abre para apoiadores Tripulante ou acima e admins (homologação) |
-| `SUPPORT_SOURCE_URL` | (vazio) | Com `ACCESS=supporters`: site onde o plano é consultado (a produção) |
 | `PARTNER_IPS` | (vazio; só no `deploy.env` da VM) | IPs dos servidores de apps parceiros, separados por vírgula: ficam fora do limite por IP do Nginx (o app limita cada token) |
 | `REPLAY_EMBED_ORIGINS` | (vazio) | Sites que podem pôr o replay embutido (`/replay/<id>`) num iframe, separados por vírgula (ex.: `https://sweetapp.com.br`); vazio = só o próprio site |
 | `REPLAY_LINK_SECRET` | (gerado) | Segredo das assinaturas dos links de replay; sem ele, o servidor gera um na primeira vez e guarda no banco (trocar invalida os links abertos) |
 
 Sem nenhuma variável de apoio, o item "Apoiar o projeto" não aparece e as estatísticas ficam todas abertas, como
 antes. Com o apoio configurado, as Estatísticas Pro (ranqueada, torneios e filtro por faixa) passam a exigir o plano
-Tripulante. Detalhes, planos e o passo a passo estão em [`docs/apoio/`](docs/apoio/README.md).
+Capitão. Detalhes, planos e o passo a passo estão em [`docs/apoio/`](docs/apoio/README.md).
 
 O backup é só copiar o arquivo `.db`.
 
@@ -189,6 +187,9 @@ Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construto
 2. Clique nas cartas para adicionar e use o botão direito (ou os botões −/+ na lista) para remover. Por padrão
    aparecem só cartas com a cor do Líder. Dá para filtrar por nome/texto, cor, tipo, custo e coleção (no
    celular, atrás do botão **Filtros**; a busca e os filtros ficam presos no topo enquanto o catálogo rola).
+   A busca também aceita atalhos, que se combinam: `c3` (custo 3), `c2000` (Counter +2000), `p5000` (poder),
+   `c3+`/`c2-4` (faixas), `red`/`azul` (cor), `blocker`, `onplay`, `-blocker` (exclui), `"straw hat"` (frase
+   exata), `n:luffy` (só no nome) e outros; o botão **?** ao lado da busca lista todos.
    Com o mouse sobre uma carta (no catálogo, no Líder ou na lista do deck), ela aparece ampliada ao lado, com
    o texto do efeito; no toque, segure o dedo na carta para abri-la ampliada.
 3. O painel à direita mostra o total, a curva de custo, os Counters e os problemas do deck. **Salvar** grava
@@ -207,9 +208,12 @@ começar uma partida online e antes de gravar uma partida nas estatísticas.
 - **Extra Grand Battle (EGB):** todas as cartas lançadas, menos as banidas.
 - **Standard:** além das banidas, ficam de fora as cartas com o ícone de bloco ① (OP-01 a OP-04 e ST-01 a ST-09),
   que rotacionaram em 1º/04/2026, salvo as exceções oficiais (bloco X e cartas tratadas como bloco ④).
+- **Selado:** não é um formato de deck construído: o deck sai dos boosters. Veja [Selado](#selado-pré-release).
+- **All Blue:** formato da comunidade, no estilo Pauper. Só valem cartas **comuns (C), incomuns (UC), raras (R) e
+  promocionais (P)**; SR e SEC ficam de fora, e o **Líder é livre**. Veja [All Blue](#all-blue).
 
 As cartas banidas (com data de início, quando a proibição ainda não vale), os pares proibidos e as exceções da
-rotação ficam em `packages/engine/src/formats.ts`: atualizar a lista é só mexer lá. A data de início conta a partir da
+rotação valem para os dois formatos oficiais (Standard e EGB) e ficam em `packages/engine/src/formats.ts`: atualizar a lista é só mexer lá. A data de início conta a partir da
 meia-noite no horário de Brasília. Para uma carta voltar ao jogo, basta tirá-la da lista.
 
 Nos torneios, o deck precisa valer **no início do torneio**: com data de início marcada depois de um banimento, a
@@ -220,17 +224,41 @@ canceladas (com aviso por notificação). O construtor mostra em quais
 formatos o deck vale, marca no catálogo as cartas banidas (🚫) e rotacionadas (①), e o menu desabilita os decks que
 não valem no formato escolhido.
 
+#### All Blue
+
+O All Blue não é formato da Bandai: é um formato de fã para decks baratos e meta variado.
+
+- **Cartas:** C, UC, R e promo (P ou PR) de qualquer coleção. SR e SEC não valem. A raridade é a do número da carta:
+  uma arte alternativa (Parallel, SP, Manga) não muda nada. O Líder é livre.
+- **Sem a lista da Bandai:** as banidas, os pares proibidos e a rotação **não se aplicam**. O All Blue tem uma lista
+  de banidas própria (`ALL_BLUE_BANNED`, em `formats.ts`), **vazia no lançamento**: uma carta só entra nela se
+  desbalancear o formato.
+- **Onde se joga:** fila casual própria (quem espera no All Blue só é pareado com quem também escolheu All Blue), sala
+  privada, treino contra o bot e torneios. **Não tem ranqueada** e as partidas **não entram nas estatísticas** nem no
+  meta do construído.
+- **Decks prontos:** seis versões dos primeiros starters sem as cartas SR, em `data/decks/allblue/` ("Luffy Vermelho
+  (All Blue)", Kid, Crocodile, Kaido, Sakazuki e Yamato). São os decks que o bot usa no formato; eles não entram no
+  sorteio do oponente nem na Sala do Tempo dos outros formatos.
+- **No construtor:** o deck ganha o selo "All Blue" quando vale no formato. A opção **Montar para o All Blue** (nos
+  filtros) mostra só as cartas que valem, marca na lista as que não valem e troca os avisos pelos do formato. Na busca,
+  `allblue` filtra as cartas que valem e `-allblue` as que não valem.
+- **Raridade desconhecida:** a regra depende do campo `rarity` das cartas. Carta sem raridade conhecida fica **fora** do
+  All Blue até ser corrigida, para uma SR não passar por falta de dado. `npm run cards:check-rarity -w @gumgum/server`
+  lista quantas cartas há de cada raridade e quais estão sem; vale rodar depois de importar uma coleção nova.
+
 **Spoilers** (cartas anunciadas e ainda não lançadas, veja [Spoilers](#spoilers-coleções-ainda-não-lançadas)) não fazem
 parte de formato nenhum: valem na fila casual, mas **nunca na ranqueada**, que só aceita cartas já lançadas. Nos
-torneios, nas salas privadas e no treino contra o bot, quem cria escolhe entre cinco opções:
+torneios, nas salas privadas e no treino contra o bot, quem cria escolhe o formato e se aceita spoilers:
 
-| Opção | Banidas | Rotacionadas (bloco ①) | Spoilers | Estatísticas e meta |
-|---|---|---|---|---|
-| **Extra Grand Battle** | não | sim | não | sim |
-| **Extra Grand Battle + EB05** (próxima coleção) | não | sim | só a próxima coleção | não |
-| **Standard** | não | não | não | sim |
-| **Standard + EB05** (próxima coleção) | não | não | só a próxima coleção | não |
-| **Livre (vale tudo)** | sim | sim | sim | não |
+| Opção | Banidas (Bandai) | Rotacionadas (bloco ①) | SR e SEC | Spoilers | Estatísticas e meta |
+|---|---|---|---|---|---|
+| **Extra Grand Battle** | não | sim | sim | não | sim |
+| **Extra Grand Battle + EB05** (próxima coleção) | não | sim | sim | só a próxima coleção | não |
+| **Standard** | não | não | sim | não | sim |
+| **Standard + EB05** (próxima coleção) | não | não | sim | só a próxima coleção | não |
+| **All Blue** | sim | sim | não | não | não |
+| **All Blue + EB05** (próxima coleção) | sim | sim | não | só a próxima coleção | não |
+| **Livre (vale tudo)** | sim | sim | sim | sim | não |
 
 Fora do Livre, "+ spoilers" quer dizer **só a próxima coleção a ser lançada**, e as telas mostram o nome dela no lugar
 de "spoilers" ("Standard + EB05"). A próxima coleção sai sozinha dos arquivos `data/spoilers` (campo `release`): entre as
@@ -241,7 +269,7 @@ privada guarda a coleção de quando foi criada, e o torneio grava a dele ao com
 "+ EB05"); antes de começar, vale a próxima de agora. O servidor informa a coleção em `/api/config` (`spoilerSet`).
 
 O **Livre** não é formato oficial: vale toda carta, inclusive as banidas e os pares proibidos. É só por diversão e não
-existe nas filas. No menu, o formato (Standard ou EGB) vale para todos os modos, e as salas privadas e o treino contra
+existe nas filas. No menu, o formato (Standard, EGB ou All Blue) vale para todos os modos, e as salas privadas e o treino contra
 o bot têm a escolha **Cartas**: lançadas, + a próxima coleção (ex.: "+ EB05") ou Livre. Quem entra numa sala privada joga nas regras de quem a
 criou. O servidor confere na fila ranqueada, na sala privada e na inscrição do torneio; o construtor avisa quando o
 deck tem spoilers e o menu desabilita a ranqueada para ele.
@@ -251,6 +279,241 @@ Sem login, cada navegador recebe um código aleatório (guardado no navegador) e
 que criou; limpar os dados do site faz perder a edição deles. Decks de outros jogadores aparecem em "Decks da
 comunidade": dá para jogar com eles e duplicá-los.
 **Exportar/Importar lista** usa o formato de texto da comunidade (`4xOP01-016`, uma carta por linha).
+
+## Selado (Pré-release)
+
+Na tela inicial, em **Modos especiais**, o **Selado** é o modo limitado: o deck não vem dos decks salvos, sai dos
+boosters que o jogador abre na hora.
+
+1. **Escolha a coleção e abra 6 boosters.** Cada booster tem 12 cartas, com as vagas e as taxas do booster daquela
+   linha de produto (veja [Os boosters](#os-boosters)); a tela mostra a composição e as chances da coleção marcada. Dá
+   para abrir um por vez ou todos de uma vez, **em qualquer ordem**: um clique num booster fechado o seleciona e o
+   segundo clique abre (o duplo clique também); o botão "Abrir" abre o selecionado ou, sem seleção, o próximo.
+2. **Monte um deck de 40 cartas** com o que saiu. Vale **qualquer cor com qualquer Líder**, não há limite de cópias
+   (vale o que você abriu) e **não há lista de banidas, pares proibidos nem rotação**. **Montar sozinho** preenche um
+   deck jogável (curva de custo, Counters e alguns Eventos). O deck é salvo sozinho enquanto você monta. Para achar
+   carta entre as que saíram, a montagem tem **a mesma busca e os mesmos filtros do construtor de decks**: o texto com
+   os atalhos (`c3`, `c2000`, `blocker`, `-indeck`…) e o painel "?" que os explica, as cores (mais de uma ao mesmo
+   tempo), o tipo de carta, o custo e, quando há mais de uma coleção (Pack Rush, Cubo), a coleção. A barra fica presa
+   no topo enquanto as cartas rolam e, no celular, os filtros ficam atrás do botão "Filtros". Vale também para os decks
+   de Draft e de Draft Cubo, que usam a mesma tela.
+3. **Jogue:** contra o bot (ele abre os próprios 6 boosters da mesma coleção e monta sozinho; a partida roda no
+   navegador) ou numa **sala privada** de Selado. Quem entra na sala precisa de um deck aberto **da mesma coleção**;
+   quem chega pelo convite com um deck construído recebe o aviso de montar um deck selado antes.
+
+- **Líder:** um dos que saíram nos boosters ou o **Luffy de 6 cores**, que todo jogador tem sempre. É o Líder dos
+  eventos Sealed Battle da Bandai (Vida 5, 5000, "treated as a card with all card names, types, and attributes"): o
+  motor trata o Líder como tendo qualquer nome, tipo e atributo, inclusive nas condições do tipo "o tipo do seu Líder
+  inclui "CP"" (os [Trigger] do Jabra e do Kumadori, por exemplo). A carta não tem número impresso, então o id é nosso
+  (`SEALED-001`, em `data/cards/sealed.json`, com a imagem em `apps/web/public/cards/`). Ela **só vale no Selado** (e
+  no Livre): num deck construído, o aviso é "só pode ser usada no Selado".
+- **Coleções disponíveis:** as de booster (OP e EB) que estão completas no banco (cartas comuns, raras e, onde o
+  booster leva, incomuns suficientes, com raridade conhecida) e com pelo menos 70% dos efeitos automatizados. Os
+  Premium Boosters (PRB) ficam de fora: são reimpressões, e o banco só tem as cartas novas deles. Uma coleção de spoiler entra
+  sozinha quando fica completa, com o selo "Pré-release".
+- **O servidor é a autoridade:** ele sorteia os boosters (seed do `crypto`), grava as cartas na tabela `sealed_pools`
+  e confere o deck contra elas ao salvar e antes de cada partida. Recarregar a página não muda o que saiu. Cada
+  jogador (conta ou navegador) guarda os 12 decks selados mais recentes.
+- **Placar e estatísticas:** as partidas do Selado ficam **fora das estatísticas e do meta**. Cada deck selado tem o
+  próprio placar (vitórias e derrotas), que conta as partidas entre pessoas nas salas privadas; os treinos contra o
+  bot não contam.
+- **Ainda não tem:** fila de Selado, torneio de Selado e Cubo (veja
+  [`docs/plano-modos-de-jogo.md`](docs/plano-modos-de-jogo.md)).
+- Código: `packages/engine/src/sealed.ts` (boosters, validação do deck de 40 e montagem automática),
+  `apps/server/src/sealed/` (tabela e rotas `/api/sealed`) e `apps/web/src/components/Sealed.tsx`.
+
+### Os boosters
+
+A Bandai **não publica as taxas** dos boosters: as páginas oficiais dizem só quantas cartas de cada raridade a coleção
+tem. As taxas daqui vêm de **aberturas de caixas registradas pela comunidade** (caixa em inglês, 24 boosters de 12
+cartas), e cada linha de produto tem o seu booster (`BOOSTER_MODELS`, em `packages/engine/src/sealed.ts`):
+
+| Booster | Vagas (12 cartas) | SR | SEC | Líder |
+|---|---|---|---|---|
+| **Principal de hoje** (OP04 em diante) | 7 comuns, 3 incomuns, 1 rara e 1 vaga de destaque (rara, SR ou SEC) | 32,5% dos boosters (7,8 por caixa) | 3,3% (0,8 por caixa) | 34,7% (8,3 por caixa) |
+| **Primeiras coleções** (OP01 a OP03) | 8 comuns, 3 incomuns e 1 vaga de destaque | 30,4% (7,3 por caixa) | 2,3% (0,55 por caixa) | 33,3% (8 por caixa) |
+| **Extra Booster** (EB) | 10 comuns, 1 rara e 1 vaga de destaque; não tem incomuns | 30% (7,2 por caixa) | 2,9% (0,7 por caixa) | 2 por caixa para cada Líder da coleção (EB01: 25%; as de um Líder só: 8,3%) |
+
+- **O Líder entra no lugar de uma comum.** Nos boosters de hoje, o que traz Líder fica com duas raras: Líder e SR não
+  saem juntos. Nas primeiras coleções, o Líder é sorteado à parte e pode vir com SR.
+- **Artes alternativas contam como a carta que são.** Por caixa, os registros dão 7 SR, 2 SEC a cada 3 caixas e 4
+  artes alternativas a cada 3 caixas (mais um Líder de arte alternativa a cada 3). As artes alternativas foram
+  repartidas em 60% SR, 30% R e 10% SEC, que é uma estimativa.
+- **O DON!! do booster não é carta de deck.** Nas três primeiras coleções todo booster trazia um DON!!: aqui entra
+  uma comum no lugar, para o booster ter 12 cartas de deck. O DON!! de arte alternativa dos boosters de hoje (2 por
+  caixa) vira uma rara.
+- **O que é sólido e o que é estimativa:** 7 SR e 8 Líderes por caixa e as SEC dos boosters de hoje aparecem em
+  registros de vários casos (centenas de caixas). As taxas das três primeiras coleções e dos Extra Boosters têm menos
+  dados; as de Líder dos EB02 a EB05 e todas as do EB05 não foram encontradas e seguem a regra do EB01.
+- **O que não segue o produto:** em inglês, o EB04 saiu dentro dos boosters OP14 e OP15; aqui o OP14 e o OP15 abrem só
+  as próprias cartas, e o EB04 é um booster à parte. A partir do OP17 a quantidade de destaques por caixa varia mais;
+  o modelo usa a média.
+- **Fontes:** as páginas de produto da Bandai ([OP01](https://en.onepiece-cardgame.com/products/boosters/op01.php),
+  [EB01](https://en.onepiece-cardgame.com/products/boosters/eb01.php)) para a composição das coleções; registros de
+  caixas no r/OnePieceTCG ([20+ caixas](https://www.reddit.com/r/OnePieceTCG/comments/1jgnfii/),
+  [14 casos de OP14](https://www.reddit.com/r/OnePieceTCG/comments/1q8k8dd/),
+  [6 casos de OP16](https://www.reddit.com/r/OnePieceTCG/comments/1txjolt/),
+  [Extra Boosters](https://www.reddit.com/r/OnePieceTCG/comments/1kby34v/)) e o
+  [guia do OP17 do TCG Talk](https://tcgtalk.com/guides/op17-pull-rates-case-opening) para as taxas.
+- **A arte dos boosters** é a do produto em inglês (`apps/web/public/boosters/<COLEÇÃO>.webp`, das páginas da Bandai;
+  o EB04 usa a do produto japonês, o único que existe). Coleção sem arquivo aparece com um booster desenhado; para
+  uma coleção nova, basta pôr o arquivo na pasta.
+- **Pack Rush, Cubo e Draft têm arte própria**, do GumGum Fight (`RUSH.webp`, `CUBE.webp` e `DRAFT.webp`, na mesma
+  pasta; os desenhos e o jeito de refazê-los estão em `apps/web/art/boosters`). No Pack Rush, o booster fechado é o
+  "Pack Rush"; na abertura ele chega assim e, quando o brilho passa, **vira o booster da coleção sorteada** antes de
+  estourar.
+- **Abrir um booster** é uma cena: ele vem ao centro com um brilho, treme e gira carregando, **estoura em raios de
+  luz** enquanto a embalagem rasga em duas, a pilha de cartas sobe e as cartas **voam para a mesa viradas para baixo**.
+  As de destaque já chegam brilhando (SR e Líder em dourado, SEC em arco-íris). Aí o jogador **vira as cartas**, uma a
+  uma ou com "Revelar tudo", e segue com "Continuar". Tem som em cada etapa (usa o volume dos efeitos).
+  - "Abrir os que faltam" passa booster por booster numa versão mais rápida, com as cartas virando sozinhas (uns 3 s
+    cada). "Pular" e Esc pulam tudo; Enter e Espaço fazem o botão da vez.
+  - No Draft, o booster de cada rodada estoura numa versão curta, sem a mesa (o relógio da escolha já está correndo).
+  - Segue a opção **Animações** das configurações: "Completas" mostra a cena inteira, "Suaves" só o estouro curto
+    (e as cartas viram na tela dos boosters) e "Desligadas" nada. Como no resto do app, só essa opção decide: o
+    "reduzir movimento" do sistema não desliga a abertura, porque muitos celulares o ligam sozinhos na economia de
+    bateria.
+
+### Pack Rush
+
+Na mesma tela, **Pack Rush** é o Selado com **várias coleções**: quem abre escolhe de 2 a 12 coleções, e **cada um
+dos 6 boosters é sorteado entre elas** na hora. O booster inteiro é de uma coleção só (as coleções não se misturam
+dentro dele), a mesma coleção pode sair mais de uma vez e alguma pode não sair. O resto é o Selado: deck de 40,
+qualquer cor, sem limite de cópias e sem banidas.
+
+- **Líder no Pack Rush selado:** como no Selado de uma coleção, é **um dos que saírem nos boosters ou o Luffy de 6
+  cores**. Os boosters trazem Líder normalmente.
+- **Líder no Draft de Pack Rush (e no Draft Cubo):** vale **qualquer Líder do jogo**, inclusive os banidos nos formatos
+  oficiais e o Luffy de 6 cores, escolhido ao fim do draft, na montagem. Por isso **os boosters desse draft não trazem
+  Líder**: a vaga fica com outra carta da coleção (a comum que ele tiraria do lugar), e SR e SEC saem nas mesmas
+  taxas. "Escolher qualquer Líder" abre todos, com busca e filtro por cor; os primeiros são os que mais combinam com
+  os tipos das cartas escolhidas. Líder de coleção ainda não lançada só vale se a coleção dele estiver entre as do
+  draft.
+- **O Luffy de 6 cores vale em todos os modos especiais** (Selado, Pack Rush, Draft e Draft Cubo).
+- **Sala privada:** os dois precisam ter aberto **as mesmas coleções** (a ordem da escolha não importa). Quem abriu
+  só uma delas, ou outra combinação, recebe o aviso com as coleções da sala.
+- **Bot:** abre os próprios boosters, sorteados entre as mesmas coleções.
+- No banco, o deck de Pack Rush é uma linha de `sealed_pools` com `kind = 'rush'`, a chave das coleções em `set_code`
+  ("OP01+OP05", em ordem) e a coleção de cada booster em `pack_sets`. Nas salas, essa chave vai em `sealedSet`.
+- O Pack Rush também vale no Draft (abaixo): na tela do Draft, com "Pack Rush" marcado, o pod drafta as coleções
+  escolhidas.
+
+### Draft
+
+O **Draft** tem cartão próprio em **Modos especiais**, ao lado do Selado, e uma tela só dele: escolher a fonte (uma
+coleção, Pack Rush ou Cubo), criar um pod ou entrar num pelo código, e a lista dos seus decks de Draft (os decks de
+boosters abertos ficam na tela do Selado). **Criar pod de Draft** abre um **pod de 8 lugares** com a coleção marcada
+(ou, no Pack Rush, com as coleções marcadas). Quem criou recebe um **código de 6 letras**; os outros entram por "Entrar no pod". Quem criou
+começa quando quiser, e **os lugares vazios viram bots**: dá para draftar sozinho contra 7 bots.
+
+- **Como é:** cada um abre um booster de 12 cartas, **fica com 1** e passa o resto para o vizinho, até o booster
+  acabar. São **4 boosters por jogador (48 escolhas)**, e o sentido do rodízio inverte a cada booster. No Pack Rush,
+  a coleção de cada booster é sorteada entre as escolhidas, lugar por lugar: numa mesma rodada, cada um pode abrir
+  uma coleção diferente.
+- **Tempo:** cada escolha tem um prazo que encurta com o booster (10 s + 3 s por carta: 46 s com 12 cartas, 13 s com
+  a última). Sem escolha no prazo, o **servidor escolhe** pela pessoa, com a mesma nota dos bots. Depois de dois
+  prazos perdidos seguidos **com a tela fechada**, o lugar passa a escolher sozinho na hora, para não segurar o pod;
+  voltar à tela devolve o controle. Quem só está devagar, com a tela aberta, não perde o lugar.
+- **Bots:** escolhem na hora, pela nota que a montagem automática usa (custo, poder, Counter, palavras-chave) mais um
+  bônus de raridade e um pouco de acaso. Pegam no máximo um Líder.
+- **Sair e voltar:** sair no meio deixa o lugar escolhendo sozinho, e o deck fica guardado. Recarregar a página ou
+  fechar o app não tira ninguém: as telas do Draft e do Selado mostram "Você está num pod de Draft" com o botão para
+  voltar. Cada
+  jogador fica em **um pod por vez**.
+- **O deck:** no fim, as 48 escolhas viram um deck selado (aparece na lista "Seus decks de Draft" como "Draft OP01") e
+  a montagem é a do Selado: 40 cartas, qualquer cor, "Montar sozinho". O Líder é um dos que você pegou ou o Luffy de 6
+  cores; no Pack Rush draft, qualquer Líder do jogo.
+- **Jogar:** a **sala privada** de um deck de Draft só aceita decks **do mesmo pod**. **Contra o bot**, o oponente é
+  um dos bots que draftaram com você, com o deck que ele montou das próprias escolhas (os decks dos bots ficam
+  guardados por 14 dias; depois disso, ou se o pod só tinha pessoas, o
+  bot abre boosters da coleção, como no Selado).
+- **O servidor é a autoridade:** ele sorteia os 32 boosters, guarda todos e manda a cada um só o booster que está na
+  mão dele. O pod fica gravado (`draft_pods`), então um deploy no meio não perde o draft: ele volta com os prazos
+  zerados. Pod que não começa fecha em 2 horas; o servidor aceita até 300 pods abertos ao mesmo tempo.
+- **Ainda não tem:** chave ou rodadas entre os 8 do pod (cada um chama quem quiser pela sala privada), fila pública
+  para achar pod, link de convite (hoje é o código) e torneio de Draft.
+- Código: `packages/engine/src/draft.ts` (rodízio e escolha dos bots), `apps/server/src/draft/` (pods e rotas
+  `/api/draft`) e `apps/web/src/components/Draft.tsx`. A tela consulta o pod a cada segundo.
+
+### Draft Cubo
+
+Na tela do Draft, a opção **Cubo** troca as coleções pelo **Cubo GumGum**: uma lista fixa de **420 cartas, uma cópia
+de cada, 70 por cor**, com as cartas mais usadas de One Piece em todas as coleções. "Ver a lista" mostra as 420, por
+cor, com o uso de cada uma; "Criar pod de Draft Cubo" abre um pod igual ao do Draft (8 lugares, bots nos vazios,
+código para chamar os amigos, 4 boosters de 12, o mesmo relógio).
+
+- **Boosters:** a lista é embaralhada e repartida, sem vaga de raridade. **Nenhuma carta se repete no pod**: os 8
+  lugares usam 384 das 420.
+- **Líder:** qualquer Líder do jogo (inclusive os banidos nos formatos oficiais e o Luffy de 6 cores), escolhido na
+  montagem. O Cubo não tem Líderes. Líder de coleção ainda não lançada não vale.
+- **Deck e partidas:** como no Draft: 40 cartas, qualquer cor, sala privada só entre decks do mesmo pod, e o treino é
+  contra um dos bots que draftaram com você. Não existe Selado de Cubo: as cartas só saem num pod.
+- **Bots:** no Cubo a raridade não diz nada, então a nota do bot soma o **uso da carta** no lugar dela.
+- **De onde sai a lista:** das **decklists de torneios do mundo todo**, e não das partidas daqui. O meta global que o
+  app já baixa (TCG Matchmaking) só tem Líderes, sem as cartas dos decks; por isso a fonte do Cubo é a plataforma de
+  torneios online do **Limitless TCG**, pela [API pública](https://docs.limitlesstcg.com/developer.html) deles (sem
+  chave). A Temporada 1 saiu de **30.420 decks em 87 torneios**, de junho de 2023 a novembro de 2026: os 6 maiores
+  torneios de cada trimestre, com 32 jogadores ou mais.
+- **A conta do uso:** em cada trimestre, a fração dos decks que jogaram a carta. A nota é a **média dos 4 melhores
+  trimestres** dela (uma carta que existe há menos tempo é medida pelos trimestres que tem). Assim entram tanto as
+  bases de 2023 quanto as de hoje. É essa porcentagem que aparece na lista.
+- **A escolha das 420:** por cor, as de maior nota, com no máximo 14 Eventos e 2 Stages, e faixas de custo para o
+  booster ter carta de toda fase da partida (custo 0 a 2: 18 a 26 cartas; 3 e 4: 20 a 28; 5 e 6: 10 a 18; 7 ou mais:
+  4 a 10). **Líderes e cartas com efeito ainda não automatizado ficam de fora.** Carta de duas cores conta na primeira.
+- **O arquivo:** `data/cubes/t1.json`, com os ids, a nota (`usage`) e os decks de cada carta. É **editável à mão**:
+  troque cartas e o servidor passa a usar a lista nova (ele relê a pasta a cada minuto). O Cubo em uso é o de
+  `publishedAt` mais recente; carta que o banco do servidor não tem some da lista sem quebrar nada, e um Cubo com
+  menos de 384 cartas válidas não aparece.
+- **Gerar uma temporada nova:**
+
+  ```bash
+  npm run cards:import -- --all                         # o banco precisa ter todas as coleções
+  npm run cube:build -- --id T2 --name "Temporada 2"    # grava data/cubes/t2.json
+  npm run cube:build -- --id T2 --dry-run               # só mostra o resumo por cor
+  ```
+
+  Opções: `--per-quarter N` (torneios por trimestre, padrão 6), `--min-players N` (padrão 32) e `--cache PASTA` (as
+  decklists baixadas ficam guardadas, sem nome nem país de jogador). O comando respeita o limite de pedidos da API e
+  leva poucos minutos.
+- **Ainda não tem:** uma tela de Admin para revisar e publicar a lista (hoje é o arquivo), Cubos com mais de uma
+  lista ao mesmo tempo e o histórico das temporadas na tela.
+- Código: `packages/engine/src/cube.ts` (boosters do Cubo e a escolha da lista), `apps/server/src/draft/cubes.ts`
+  (arquivos), `apps/server/src/draft/cube-source.ts` e `apps/server/src/cube-cli.ts` (a coleta e o comando) e
+  `apps/web/src/components/Cube.tsx` (a lista).
+
+## Yonko (mesa de 4, todos contra todos)
+
+Na tela inicial, o cartão **Yonko** abre a **Mesa dos 4 Imperadores**: o formato da comunidade "Four Emperors", em
+que quatro capitães jogam cada um por si e vence o último de pé. As regras seguem o manual do formato, resumido em
+[`docs/regras-yonko.md`](docs/regras-yonko.md). Há duas formas de jogar, e nenhuma entra nas estatísticas:
+
+- **Mesa online (com amigos):** quem cria recebe um **código de 6 letras** e um link de convite (`/?yonko=CÓDIGO`)
+  para até três pessoas. Na sala de espera cada um escolhe o deck e marca **"Estou pronto"**; quem criou a mesa
+  põe **bots** nos lugares vagos, tira alguém (ou um bot) da mesa, muda as regras e começa quando houver 3 ou 4
+  lugares ocupados e todos estiverem prontos. Cada jogador tem **25 minutos** para a partida inteira, e o relógio
+  só corre nas decisões dele. Quem fica sem tempo, ou **2 minutos desconectado** na própria decisão, sai da mesa e
+  ela segue. Recarregar a página (ou fechar e abrir o app) volta para a mesa; a tela do Yonko também mostra
+  "Voltar para a mesa" enquanto ela existir. No fim, quem criou a mesa pode **jogar de novo** com os mesmos
+  lugares. Sair no meio da partida é desistir.
+- **Mesa local (contra três bots):** a partida roda no navegador, sem servidor e sem relógio.
+
+**Deck:** o formato pede **60 cartas da cor do Líder, uma cópia de cada número**. No construtor, a opção **"Montar
+para o Yonko (60, 1 de cada)"** troca o alvo para 60 e o limite para uma cópia, com o selo "Yonko" quando o deck
+fecha as regras (ela liga sozinha ao abrir ou importar uma lista com mais de 50 cartas). Na biblioteca, esses decks
+aparecem com o selo **Yonko**. Um deck comum de 50 também serve: na mesa ele vira um **deck de teste** (o Líder e
+uma cópia de cada carta dele, completado até 60 com cartas sorteadas da mesma cor), e a sala mostra isso a todos.
+Os bots jogam com decks prontos montados do mesmo jeito.
+
+**Na mesa:** os oponentes ficam em painéis no alto, com tudo o que é público (Líder, Vida, mão, DON!!, deck,
+descarte, Personagens, Stage e, no online, o relógio e quem está desconectado); a sua mesa fica embaixo, e ao lado
+vêm a ordem dos turnos, o registro e a carta em destaque. Tudo é por clique: toque numa carta da mão para jogar,
+numa carta sua em campo para atacar, dar DON!! ou ativar; ao atacar, os alvos válidos acendem nas três mesas. Só quem foi
+atacado usa Counter (o manual também deixa os outros usarem Evento [Counter]; por ora isso fica desligado).
+**No celular**, os oponentes viram abas e o registro e a carta abrem em gavetas.
+
+O que ainda **não** tem: espectadores, replay, chat e avisos no celular na mesa online; arrastar cartas, animações e
+som da mesa de dois; ver o descarte carta a carta; dar o valor de Counter a outra carta que não a atacada; e o bot
+com busca (os bots são o bot simples, que completa a mesa mas joga mal).
 
 ## Estatísticas
 
@@ -353,8 +616,8 @@ está na fila e os espectadores também contam.
 - **Relógio:** cada jogador tem **17:30** na partida inteira. O tempo só corre quando a ação ou a decisão (incluindo
   mulligan, Blocker, Counter e escolhas de efeitos) é daquele jogador. Sem tempo, ele perde. Se o jogador da vez ficar
   2 minutos desconectado, perde por abandono.
-- **Ranqueada:** só com login Google e só com decks sem cartas ⚙ (efeito ainda não automatizado). O pareamento junta
-  recompensas parecidas e a faixa abre com o tempo de espera.
+- **Ranqueada:** só com login Google, só nos formatos oficiais (o All Blue não tem ranqueada) e só com decks sem
+  cartas ⚙ (efeito ainda não automatizado). O pareamento junta recompensas parecidas e a faixa abre com o tempo de espera.
 - **Sem desfazer, Auto ou pausa** no online. Chat da partida (mensagens curtas, com palavrões censurados no servidor, e
   emotes de uma lista fixa; em Configurações dá para esconder o que o oponente manda), revanche nas salas privadas e
   o replay completo para baixar no fim.
@@ -514,7 +777,7 @@ O desenho e os limites estão em [`docs/plano-sala-do-tempo.md`](docs/plano-sala
 Em **Torneios** (no menu), contas com perfil **Organizador** ou **Admin** criam torneios; qualquer conta Google se
 inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia qualquer um.
 
-- **Criação:** nome, descrição e regras, formato (Standard, Extra Grand Battle ou Livre) e se aceita spoilers (veja
+- **Criação:** nome, descrição e regras, formato (Standard, Extra Grand Battle, All Blue ou Livre) e se aceita spoilers (veja
   [Formatos](#formatos); o Livre sempre aceita), estrutura, limite de jogadores e
   início previsto. Dá para editar tudo enquanto as inscrições estão abertas.
 - **Check-in, início automático e W.O. por ausência** (torneios com data de início; ligado por padrão ao criar):
@@ -774,8 +1037,7 @@ mexido ou de outra partida: `replay_link_invalid` (a página mostra o erro). Par
 Só `/replay/*` pode ir para um iframe, e só nos sites de `REPLAY_EMBED_ORIGINS`
 (`Content-Security-Policy: frame-ancestors 'self' <origens>`); o resto do site responde `frame-ancestors 'none'`
 e `X-Frame-Options: DENY`. Imagens, CSS e textos vêm do nosso domínio; o replay chega com as definições só das
-cartas usadas (`GET /api/replay/:id?t=`), então não há CORS. Na homologação só para apoiadores, o replay com link
-assinado abre sem login.
+cartas usadas (`GET /api/replay/:id?t=`), então não há CORS.
 
 **postMessage** (os dois lados conferem a origem): a página do app manda para o iframe
 `{ type: 'seek', pos }` (posição = número de ações já aplicadas, de 0 ao total), `{ type: 'play' }` e
@@ -1017,7 +1279,7 @@ frente quando o adaptador existir. Os adaptadores ficam em `apps/server/src/card
 
 A optcgapi só publica uma coleção depois do lançamento. As cartas já anunciadas (hoje EB05 e OP18; com o Cardkaizoku na cadeia,
 também ST37, ST38 e promocionais ainda sem versão em inglês) entram no jogo como **spoilers**, com a etiqueta **SPOILER**, e viram cartas oficiais sozinhas
-quando a API publica a coleção.
+quando a API publica a coleção ou, no dia do lançamento, pela lista oficial da Bandai (o que vier primeiro).
 
 Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
 
@@ -1040,7 +1302,9 @@ promos) nunca é a próxima coleção.
 - **Busca automática** (`"feed": true`; arquivos antigos com `"feed": "optcgleaks"` também valem): o servidor baixa as
   cartas reveladas das fontes de `SPOILER_SOURCES`, juntadas pela [cadeia](#cadeia-de-fontes):
   - [optcgleaks.com](https://optcgleaks.com/) (`https://images.optcgleaks.com/<coleção>/<coleção>.json`), com textos em
-    inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX") e as reimpressões de outras coleções.
+    inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX"). As outras imagens de cada carta ("Alt-Art",
+    "Treasure Rare"…) e as cartas de outras coleções reimpressas com arte nova (`sp_cards`) entram como
+    [artes alternativas](#artes-alternativas).
   - [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) (`https://cdn.cardkaizoku.com/manifest.json` aponta o arquivo
     com todas as cartas do site), sem imagens. Carta com o texto ainda não revelado fica de fora.
 
@@ -1057,6 +1321,25 @@ promos) nunca é a próxima coleção.
   imagem oficiais substituem os do spoiler e a etiqueta some. Os decks
   continuam iguais, porque o número da carta não muda. Coleções já oficiais não são mais buscadas no site de spoilers.
   Para fazer tudo na hora: `npm run cards:import -- --spoilers`.
+- **No dia do lançamento, sem esperar a optcgapi** (`CARD_RELEASE_SOURCE`, ligado por padrão): a optcgapi copia a lista
+  oficial da Bandai e costuma publicar a coleção dias depois. Quando a data de lançamento chega (meia-noite no
+  horário de Brasília) e a API ainda não tem a coleção, a sincronização lê a página dela na
+  [lista oficial em inglês](https://en.onepiece-cardgame.com/cardlist/) e as cartas viram oficiais com os dados e o
+  texto da carta impressa (`cards.source = api:en.onepiece-cardgame.com`). A lista entra no lugar da optcgapi na
+  [cadeia](#cadeia-de-fontes), então as outras fontes continuam valendo na ordem configurada.
+  - **A data de lançamento** é a "Release Date" da [página de produtos da Bandai](https://en.onepiece-cardgame.com/products/)
+    (boosters e starter decks), lida a cada rodada enquanto a coleção está em spoiler: um adiamento ou uma
+    antecipação vale sem mexer em nada. O `release` do arquivo só vale quando a página está fora do ar ou não tem a
+    coleção; se as duas datas divergem, o log avisa. Sem data em nenhum dos dois (promocionais), a coleção continua
+    em spoiler, assim como a carta que a lista ainda não tem.
+  - As imagens da lista só abrem no site dela: com a [CDN própria](#cdn-própria-das-imagens-cloudflare-r2) a carta
+    fica com a imagem oficial e as paralelas da lista viram artes; sem a CDN, fica com a imagem e as artes que já
+    tinha (as do site de spoilers).
+  - Enquanto a API não publica, a cada rodada a lista é relida (as paralelas e as correções entram depois do
+    lançamento) e a API continua sendo consultada. Quando ela publica, a importação dela vale, como sempre, e a lista
+    não é mais consultada para essa coleção.
+  - Além das rodadas de `SPOILER_SYNC`, o servidor marca uma rodada para 00:01 (Brasília) de cada dia de lançamento
+    (as datas dos arquivos e, depois de cada rodada, as da página), então a coleção vira oficial no primeiro minuto do dia.
 - Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
 - No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
 - Deck com spoiler não entra na ranqueada nem em torneio, sala privada ou treino sem spoilers (veja [Formatos](#formatos)),
@@ -1140,6 +1423,15 @@ Líder) abre o seletor para trocar uma por uma. A escolha é salva no deck (`dec
 estatísticas e aparece na mesa para os dois jogadores (o oponente só vê a arte das cartas que estão à vista).
 Com `CARD_IMAGES=off`, as artes somem junto com as imagens.
 
+- **Carta antiga reimpressa numa coleção nova** (a SP do Loki OP17-119 dentro do OP-18): a resposta da coleção nova traz
+  só essa impressão, sem a original. A carta que já está no banco fica como está (dados e imagem) e só ganha a arte;
+  as outras fontes da cadeia não são consultadas para a coleção dela.
+- **Coleção ainda em spoiler:** as artes vêm do optcgleaks (hoje, OP18: 35 artes em 29 cartas da coleção e 7 em 6
+  cartas antigas) e ficam marcadas como provisórias (`CardArt.spoiler`, a coleção do feed). A cada rodada valem as que
+  o site tem. Quando a importação oficial traz arte nova da carta, as do site saem (a mesma arte chega com o
+  identificador oficial, e um deck que tinha a do site volta para a imagem normal); enquanto a fonte oficial não tem
+  as artes da carta, as do site continuam.
+
 ### Textos em português
 
 Cada jogador escolhe "Português" ou "English" em **⚙️ Configurações** (modal no menu) ou no menu da partida (a escolha
@@ -1220,13 +1512,14 @@ pode chamar sem login nem token:
 | GET | `/api/stats/decks?leader=` | Decks de um Líder (mesmos filtros de `/api/stats`): cartas no deck, deck médio e decks populares |
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups de uma fila, tendência e a comparação com as partidas daqui (404 sem a chave) |
 | GET | `/api/online/stats` · `/api/online/live` · `/api/online/rooms/:id` | Contadores do menu, partidas para assistir e o resumo de uma sala |
+| GET · POST | `/api/yonko/active` · `/api/yonko/tables` · `/api/yonko/tables/join` · `/api/yonko/tables/:id/…` | Mesas online do Yonko: as suas (com o token), criar, entrar pelo código, o canal `events` (SSE) e os pedidos da mesa (`deck`, `ready`, `rules`, `bot`, `clear`, `start`, `action`, `reopen`, `leave`), todos com o token do lugar |
 | GET | `/api/tournaments` · `/api/tournaments/:id` | Torneios e o detalhe de um torneio (o que quem pede pode fazer vem na resposta) |
 | GET | `/api/sponsors` · `/api/support` · `/api/support/supporters` | Lojas parceiras, apoio ao projeto e lista pública de apoiadores |
 
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked, tournament), `opponent` (bot,
 human), `by` (human = padrão, bot = simulações bot x bot de versões antigas), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,
 `first` (first, second), `days`, `mine=1` e `deck`. Com o apoio configurado, a ranqueada e os torneios (`queue`) só saem para quem tem o
-plano Tripulante, salvo com `mine=1`.
+plano Capitão, salvo com `mine=1`.
 
 Para apps parceiros (tokens e OAuth), veja [API para parceiros](#api-para-parceiros-apps-que-agem-em-nome-do-usuário).
 

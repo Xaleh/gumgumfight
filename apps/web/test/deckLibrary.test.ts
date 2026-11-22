@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { CardData } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import type { DeckSummary } from '../src/api';
-import { deckNumbers, deckState, deckTime, initialTab, inTab, matchesColors, matchesQuery, quickSwap, sortDecks, topCards } from '../src/deckLibrary';
+import { allBlueLegal, deckNumbers, deckState, deckTime, initialTab, inTab, matchesColors, matchesQuery, quickSwap, sortDecks, topCards, yonkoLegal } from '../src/deckLibrary';
 
 const deck = (over: Partial<DeckSummary>): DeckSummary => ({
   id: 'x',
@@ -135,6 +135,24 @@ describe('estado e números do deck', () => {
     expect(deckState(deck({}))).toBe('standard');
     expect(deckState(deck({ formats: { standard: ['rotacionada'], egb: [] } }))).toBe('egb');
     expect(deckState(deck({ formats: { standard: ['banida'], egb: ['banida'] } }))).toBe('banned');
+    // Deck de 60, uma de cada: não vale no 1 contra 1, mas está pronto para o Yonko.
+    expect(deckState(deck({ valid: false, size: 60, yonko: [] }))).toBe('yonko');
+    expect(deckState(deck({ valid: false, size: 59, yonko: ['faltam 1'] }))).toBe('draft');
+    expect(yonkoLegal(deck({ valid: true }))).toBe(false);
+  });
+
+  it('All Blue: o deck que só vale nele não aparece como proibido', () => {
+    const formats = (allblue: string[]) => ({ standard: ['banida'], egb: ['banida'], allblue });
+    expect(deckState(deck({ formats: formats([]) }))).toBe('allblue');
+    expect(deckState(deck({ formats: formats(['SR']) }))).toBe('banned');
+    // Vale num formato oficial: o selo continua o oficial, e `allBlueLegal` diz se também vale no All Blue.
+    const both = deck({ formats: { standard: [], egb: [], allblue: [] } });
+    expect(deckState(both)).toBe('standard');
+    expect(allBlueLegal(both)).toBe(true);
+    expect(allBlueLegal(deck({ formats: { standard: [], egb: [], allblue: ['SR'] } }))).toBe(false);
+    expect(allBlueLegal(deck({ valid: false, formats: formats([]) }))).toBe(false);
+    // Servidor antigo: sem o formato no resumo, não vale.
+    expect(allBlueLegal(deck({ formats: { standard: [], egb: [] } as never }))).toBe(false);
   });
 
   it('curva, counters, tipos e as cartas principais', () => {

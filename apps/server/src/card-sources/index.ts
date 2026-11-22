@@ -59,13 +59,14 @@ export function buildChain(names: string[], ctx: ChainContext, cache = new Map<s
 }
 
 /** Grava as cartas resolvidas como oficiais, cada uma com a sua fonte vencedora. */
-export function writeOfficial(db: DB, resolved: ResolvedCard[]): number {
+export function writeOfficial(db: DB, resolved: ResolvedCard[], opts: { keepImage?: boolean } = {}): number {
   const bySource = new Map<CardSource, ResolvedCard[]>();
   for (const r of resolved) bySource.set(r.source, [...(bySource.get(r.source) ?? []), r]);
   let written = 0;
   for (const [source, list] of bySource) {
     const raw = new Map(list.filter((r) => r.raw !== undefined).map((r) => [r.card.id, r.raw]));
-    written += upsertCards(db, list.map((r) => r.card), { provisional: false, source: `api:${source.host}`, raw }).written;
+    const artOnly = new Set(list.filter((r) => r.artOnly).map((r) => r.card.id));
+    written += upsertCards(db, list.map((r) => r.card), { provisional: false, source: `api:${source.host}`, raw, artOnly, keepImage: opts.keepImage }).written;
   }
   return written;
 }

@@ -40,6 +40,7 @@ import type {
   RemovalStep,
   Replacement,
   StateSnapshot,
+  TableRules,
   TargetRef,
   TargetSpec,
   TriggeredEffect,
@@ -90,6 +91,8 @@ const DECK_TOP_BOTTOM = ['engine.optDeckTop', 'engine.optDeckBottom'];
 export const MAX_CHARACTERS = 5;
 export const DON_DECK_SIZE = 10;
 export const DECK_SIZE = 50;
+/** Deck do Selado (regra oficial dos eventos Sealed Battle). */
+export const LIMITED_DECK_SIZE = 40;
 export const HAND_SIZE = 5;
 
 export class IllegalActionError extends Error {}
@@ -104,7 +107,11 @@ type PlayFrame = Extract<Frame, { kind: 'play' }>;
 // ---------------------------------------------------------------------------
 
 export function createGame(config: GameConfig): GameState {
-  // Só as cartas dos dois decks entram no estado (que é copiado a cada ação).
+  if (config.players.length < 2 || config.players.length > MAX_PLAYERS) {
+    throw new Error(`Uma partida tem de 2 a ${MAX_PLAYERS} jogadores (vieram ${config.players.length}).`);
+  }
+  const multi = config.players.length > 2;
+  // Só as cartas dos decks da partida entram no estado (que é copiado a cada ação).
   const used = new Set(config.players.flatMap((p) => [p.deck.leader, ...p.deck.cards.map((c) => c.id)]));
   const defs: Record<string, CardDef> = {};
   /** Artes de cada carta: a instância leva só a imagem escolhida, e a lista sai das definições (o estado é copiado a cada ação). */
@@ -141,8 +148,13 @@ export function createGame(config: GameConfig): GameState {
     for (const entry of setup.deck.cards) {
       for (let i = 0; i < entry.count; i++) deck.push(makeInstance(entry.id, id, setup.deck.arts?.[entry.id]));
     }
-    if (deck.length !== DECK_SIZE) {
-      throw new Error(`O deck ${setup.deck.name} tem ${deck.length} cartas (precisa de ${DECK_SIZE})`);
+    // 50 no deck construído, 40 no Selado. Qual dos dois vale em cada partida é conferido antes
+    // (`validateDeck`, `validateLimitedDeck`); aqui só se recusa o que não é nenhum deles.
+    // Na mesa de Yonko, 60 (`validateYonkoDeck`); o motor também aceita ali os decks de 50.
+    if (deck.length !== DECK_SIZE && deck.length !== LIMITED_DECK_SIZE && !(multi && deck.length === YONKO_DECK_SIZE)) {
+      throw new Error(
+        `O deck ${setup.deck.name} tem ${deck.length} cartas (precisa de ${multi ? `${YONKO_DECK_SIZE} no Yonko, ou de ${DECK_SIZE}` : `${DECK_SIZE}, ou de ${LIMITED_DECK_SIZE} no Selado`})`,
+      );
     }
     shuffleInPlace(holder, deck);
     const p: PlayerState = {
@@ -162,11 +174,15 @@ export function createGame(config: GameConfig): GameState {
       mulliganDone: false,
     };
     return p;
-  }) as [PlayerState, PlayerState];
+  });
 
-  const firstPlayer: PlayerId = config.firstPlayer ?? (holder.rng128 ? (nextRandom(holder) < 0.5 ? 0 : 1) : holder.rng & 1 ? 0 : 1);
-  // O vencedor do sorteio escolhe se joga primeiro ou segundo.
-  const choose = Boolean(config.chooseFirst) && config.firstPlayer === undefined;
+  // Mesa com mais de dois: o sorteio (o dado) decide quem começa, e a ordem segue os lugares.
+  const firstPlayer: PlayerId =
+    config.firstPlayer ??
+    (multi ? Math.floor(nextRandom(holder) * players.length) : holder.rng128 ? (nextRandom(holder) < 0.5 ? 0 : 1) : holder.rng & 1 ? 0 : 1);
+  if (!Number.isInteger(firstPlayer) || firstPlayer < 0 || firstPlayer >= players.length) throw new Error(`Primeiro jogador inválido: ${firstPlayer}`);
+  // O vencedor do sorteio escolhe se joga primeiro ou segundo (só com dois jogadores).
+  const choose = Boolean(config.chooseFirst) && config.firstPlayer === undefined && !multi;
 
   const state: GameState = {
     version: 1,
@@ -186,6 +202,7 @@ export function createGame(config: GameConfig): GameState {
     pending: { kind: choose ? 'chooseFirst' : 'mulligan', player: firstPlayer },
     modifiers: [],
     usedThisTurn: [],
+    ...(multi ? { table: { ...(config.table ?? {}) }, eliminated: [], turnsTaken: players.map(() => 0) } : {}),
     winner: null,
     winReason: null,
     log: [],
@@ -206,6 +223,14 @@ export function createGame(config: GameConfig): GameState {
       }
     }
   }
+  if (multi) {
+    // Mesa com mais de dois: quem começa já está decidido; a largada de cada um, as mãos e os mulligans
+    // seguem em `continueSetup`.
+    log(state, null, lg('goesFirst', `${players[firstPlayer].name} joga primeiro.`, { player: players[firstPlayer].name }));
+    continueSetup(state);
+    run(state);
+    return state;
+  }
   // Quem tem "at the start of the game" no Líder compra a mão só depois de resolvê-lo (5-2-1-5/6).
   for (const p of players) if (state.legacySetup || !leaderRule(state, p.id, 'startStage')) drawCards(state, p.id, HAND_SIZE);
   if (choose) log(state, null, lg('wonRoll', `${players[firstPlayer].name} venceu o sorteio e escolhe quem começa.`, { player: players[firstPlayer].name }));
@@ -224,7 +249,7 @@ export function createGame(config: GameConfig): GameState {
  */
 function startOfGame(state: GameState) {
   if (state.legacySetup) return;
-  const order = [state.firstPlayer, opponent(state.firstPlayer)];
+  const order = turnOrder(state, state.firstPlayer);
   const effects = order.flatMap((p) => {
     const rule = leaderRule(state, p, 'startStage');
     if (!rule) return [];
@@ -244,15 +269,150 @@ function startOfGame(state: GameState) {
 
 /** Fim dos efeitos "at the start of the game": quem ainda não tem mão compra 5 e começa o mulligan. */
 function finishStartOfGame(state: GameState) {
-  for (const p of state.players) if (!p.hand.length && !p.mulliganDone) drawCards(state, p.id, HAND_SIZE);
+  for (const p of alivePlayers(state)) if (!p.hand.length && !p.mulliganDone) drawCards(state, p.id, HAND_SIZE);
   state.pending = { kind: 'mulligan', player: state.firstPlayer };
+  // Mesa com mais de dois: quem começaria pode ter saído durante os efeitos de início.
+  if (isMultiplayer(state)) continueSetup(state);
 }
 
 // ---------------------------------------------------------------------------
 // Consultas
 // ---------------------------------------------------------------------------
 
+/** O outro jogador de uma partida de dois. Com o estado em mãos, prefira `opponentOf` (vale para qualquer mesa). */
 export const opponent = (p: PlayerId): PlayerId => (p === 0 ? 1 : 0);
+
+// ---------------------------------------------------------------------------
+// Mesa com mais de dois jogadores (todos contra todos: o formato Yonko, "Four Emperors")
+//
+// As cartas foram escritas para dois jogadores. O manual do formato (docs/regras-yonko.md) diz como
+// ler "your opponent" com mais gente na mesa, e o motor aplica isso a qualquer carta:
+//  1. Alvo ("up to 1 of your opponent's Characters"): qualquer alvo legal de qualquer oponente.
+//  2. O que mexe na mão, na Vida, nos DON!! ou no deck "do oponente" vale para cada oponente
+//     (`eachOpponent`): o passo roda uma vez contra cada um, com a condição dele conferida a cada vez.
+//  3. Efeitos contínuos ("give all of your opponent's Characters…") e [Opponent's Turn] valem para
+//     todos os oponentes e para o turno de qualquer um deles.
+//  4. Condição sobre "your opponent" num efeito que não o atinge: basta um oponente cumprir.
+// Com dois jogadores as quatro dão o resultado de sempre: nada aqui muda o jogo normal.
+// ---------------------------------------------------------------------------
+
+/** Máximo de jogadores numa mesa. */
+export const MAX_PLAYERS = 4;
+
+/** Regras da mesa de Yonko pelo manual do formato (docs/regras-yonko.md); cada sala pode mudar as suas. */
+export const YONKO_TABLE: TableRules = { extraLife: 2, curveChoice: true };
+
+/** Deck do Yonko: 60 cartas, uma cópia de cada (ver `validateYonkoDeck`). */
+export const YONKO_DECK_SIZE = 60;
+
+/** `untilTurn` de um efeito cujo fim depende do turno de um jogador (ver `Expiry` em types.ts). */
+export const FAR_TURN = 1_000_000_000;
+
+/** Mesa com mais de dois jogadores? */
+export const isMultiplayer = (state: Pick<GameState, 'players'>): boolean => state.players.length > 2;
+
+/** Os jogadores que continuam na partida, na ordem dos lugares. */
+export function alivePlayers(state: GameState): PlayerState[] {
+  return isMultiplayer(state) ? state.players.filter((ps) => !ps.out) : state.players;
+}
+
+/** Os jogadores vivos na ordem dos turnos, a partir de `from` (ele primeiro, se estiver vivo). */
+export function turnOrder(state: GameState, from: PlayerId): PlayerId[] {
+  const n = state.players.length;
+  const out: PlayerId[] = [];
+  for (let i = 0; i < n; i++) {
+    const id = (from + i) % n;
+    if (!state.players[id].out) out.push(id);
+  }
+  return out;
+}
+
+/** Os oponentes vivos de `p`, na ordem dos turnos depois dele. */
+export function opponentsOf(state: GameState, p: PlayerId): PlayerId[] {
+  if (!isMultiplayer(state)) return [opponent(p)];
+  return turnOrder(state, p).filter((id) => id !== p);
+}
+
+/** Quem joga depois de `p` (pula os eliminados). */
+export function nextPlayer(state: GameState, p: PlayerId): PlayerId {
+  if (!isMultiplayer(state)) return opponent(p);
+  return opponentsOf(state, p)[0] ?? p;
+}
+
+/** Oponente fixado para um trecho de código (condições avaliadas contra cada oponente). */
+const opponentOverride: Array<{ player: PlayerId; opp: PlayerId }> = [];
+
+function withOpponent<T>(player: PlayerId, opp: PlayerId, fn: () => T): T {
+  opponentOverride.push({ player, opp });
+  try {
+    return fn();
+  } finally {
+    opponentOverride.pop();
+  }
+}
+
+/**
+ * Mesa com mais de dois: o oponente de `p` que o contexto fixa, ou undefined se não há um (aí vale
+ * "todos os oponentes"). Pela ordem: o oponente contra o qual um passo `eachOpponent` está rodando; o
+ * `focus` do efeito de `p` em resolução (os passos escolhidos por um oponente em "Your opponent chooses
+ * one"; continua valendo se ele foi eliminado no meio: o resto não acha nada do lado dele); e o único
+ * oponente vivo.
+ */
+function fixedOpponent(state: GameState, p: PlayerId): PlayerId | undefined {
+  for (let i = opponentOverride.length - 1; i >= 0; i--) if (opponentOverride[i].player === p) return opponentOverride[i].opp;
+  for (let i = state.stack.length - 1; i >= 0; i--) {
+    const f = state.stack[i];
+    if (f.kind === 'effect' && f.controller === p && f.focus !== undefined) return f.focus;
+  }
+  const others = opponentsOf(state, p);
+  return others.length === 1 ? others[0] : undefined;
+}
+
+/**
+ * "Your opponent" do ponto de vista de `p`, quando o código precisa de um só. Com dois jogadores, o
+ * outro. Com mais, o que o contexto fixa (`fixedOpponent`); sem contexto, o próximo oponente vivo na
+ * ordem dos turnos (os passos de efeito não chegam aqui sem contexto: ver `eachOpponent`).
+ */
+export function opponentOf(state: GameState, p: PlayerId): PlayerId {
+  if (!isMultiplayer(state)) return opponent(p);
+  const fixed = fixedOpponent(state, p);
+  if (fixed !== undefined) return fixed;
+  if (opponentProbe && probeStep) opponentProbe(probeStep.source, probeStep.step);
+  return opponentsOf(state, p)[0] ?? (p + 1) % state.players.length;
+}
+
+/** O passo de efeito em execução (só para `setOpponentProbe`). */
+let probeStep: { source: string; step: EffectStep } | null = null;
+let opponentProbe: ((cardId: string, step: EffectStep) => void) | null = null;
+
+/**
+ * Diagnóstico da simulação de mesas (scripts/simulate-yonko.ts): avisa quando um passo de efeito
+ * pergunta por "o oponente" sem que o contexto fixe um, isto é, um passo que `eachOpponent` deveria
+ * rodar contra cada oponente e não conhece. O passo cai então só no próximo oponente da ordem. Cada
+ * aviso é um tipo de passo a ensinar a `eachOpponent`.
+ */
+export function setOpponentProbe(probe: ((cardId: string, step: EffectStep) => void) | null) {
+  opponentProbe = probe;
+}
+
+/** Os lados "do oponente" para alvos e contagens: o oponente que o contexto fixa, ou todos os oponentes vivos. */
+function opponentSides(state: GameState, p: PlayerId): PlayerId[] {
+  if (!isMultiplayer(state)) return [opponent(p)];
+  const fixed = fixedOpponent(state, p);
+  return fixed !== undefined ? [fixed] : opponentsOf(state, p);
+}
+
+/**
+ * Roda `test` do ponto de vista de `p` contra o oponente que o contexto fixa; sem um, contra cada
+ * oponente vivo, e vale se algum passa ("if your opponent has a Character with 5000 or more power":
+ * basta um oponente).
+ */
+function anyOpponent(state: GameState, p: PlayerId, test: () => boolean): boolean {
+  if (!isMultiplayer(state) || fixedOpponent(state, p) !== undefined) return test();
+  const others = opponentsOf(state, p);
+  if (!others.length) return test();
+  return others.some((o) => withOpponent(p, o, test));
+}
 
 /** Regra especial do Líder do jogador, se houver. */
 export function leaderRule<K extends LeaderRule['kind']>(state: GameState, player: PlayerId, kind: K): Extract<LeaderRule, { kind: K }> | undefined {
@@ -341,6 +501,7 @@ export function ownerOf(state: GameState, uid: string): PlayerId {
 
 export function locate(state: GameState, uid: string): Located | null {
   for (const ps of state.players) {
+    if (ps.out) continue;
     if (ps.leader.uid === uid) return { player: ps.id, zone: 'leader', fc: ps.leader };
     const ch = ps.characters.find((c) => c.uid === uid);
     if (ch) return { player: ps.id, zone: 'character', fc: ch };
@@ -374,7 +535,7 @@ export function conditionHolds(state: GameState, controller: PlayerId, source: s
   if (condDepth > 6) return false;
   condDepth++;
   try {
-    return evalCondition(state, controller, source, cond);
+    return anyOpponent(state, controller, () => evalCondition(state, controller, source, cond));
   } finally {
     condDepth--;
   }
@@ -383,7 +544,10 @@ export function conditionHolds(state: GameState, controller: PlayerId, source: s
 function evalCondition(state: GameState, controller: PlayerId, source: string, cond: Condition): boolean {
   if (cond.anyOf && !cond.anyOf.some((c) => conditionHolds(state, controller, source, c))) return false;
   const ps = state.players[controller];
-  const opp = state.players[opponent(controller)];
+  const opp = state.players[opponentOf(state, controller)];
+  // "Characters on the field", "a Character": de qualquer jogador da mesa.
+  const everyone = isMultiplayer(state) ? alivePlayers(state) : [ps, opp];
+  const allCharacters = () => everyone.flatMap((pl) => pl.characters);
   if (cond.ownCharacterMinBasePower !== undefined && !ps.characters.some((c) => (cardDef(state, c.uid).power ?? 0) >= cond.ownCharacterMinBasePower!)) {
     return false;
   }
@@ -416,13 +580,13 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   }
   const wc = cond.charactersWithCost;
   if (wc && ps.characters.filter((c) => getCost(state, c.uid) >= wc.cost).length < wc.count) return false;
-  if (cond.opponentLeaderAttribute && !(cardDef(state, opp.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.opponentLeaderAttribute!.toLowerCase())) {
+  if (cond.opponentLeaderAttribute && !hasAttribute(cardDef(state, opp.leader.uid), cond.opponentLeaderAttribute)) {
     return false;
   }
   if (cond.selfRested && !locate(state, source)?.fc.rested) return false;
   if (cond.selfActive && locate(state, source)?.fc.rested !== false) return false;
   if (cond.leaderActive && ps.leader.rested) return false;
-  if (cond.anyCharacterNamed && ![...ps.characters, ...opp.characters].some((c) => hasName(cardDef(state, c.uid), cond.anyCharacterNamed!))) return false;
+  if (cond.anyCharacterNamed && !allCharacters().some((c) => hasName(cardDef(state, c.uid), cond.anyCharacterNamed!))) return false;
   if (cond.onlyTypeIncludes && (!ps.characters.length || ps.characters.some((c) => !typeIncludes(cardDef(state, c.uid), cond.onlyTypeIncludes!)))) return false;
   if (cond.allDonRested && (ps.donActive > 0 || totalDonOnField(ps) === 0)) return false;
   if (cond.deficit) {
@@ -432,7 +596,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.trashHasNames && !cond.trashHasNames.every((nm) => ps.trash.some((u) => hasName(cardDef(state, u), nm)))) return false;
   if (
     cond.anyCharacterMinBasePower !== undefined &&
-    ![...ps.characters, ...opp.characters].some((c) => (cardDef(state, c.uid).power ?? 0) >= cond.anyCharacterMinBasePower!)
+    !allCharacters().some((c) => (cardDef(state, c.uid).power ?? 0) >= cond.anyCharacterMinBasePower!)
   ) {
     return false;
   }
@@ -462,8 +626,8 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.leaderMinPower !== undefined && getPower(state, ps.leader.uid) < cond.leaderMinPower) return false;
   if (cond.fewerCharacters && ps.characters.length >= opp.characters.length) return false;
   const acw = cond.anyCharactersWithCost;
-  if (acw && [...ps.characters, ...opp.characters].filter((c) => getCost(state, c.uid) >= acw.cost).length < acw.count) return false;
-  if (cond.leaderNameIncludes && !cardDef(state, ps.leader.uid).name.toLowerCase().includes(cond.leaderNameIncludes.toLowerCase())) return false;
+  if (acw && allCharacters().filter((c) => getCost(state, c.uid) >= acw.cost).length < acw.count) return false;
+  if (cond.leaderNameIncludes && !nameIncludes(cardDef(state, ps.leader.uid), cond.leaderNameIncludes)) return false;
   if (cond.leaderColor && !cardDef(state, ps.leader.uid).colors.includes(cond.leaderColor)) return false;
   if (cond.leaderMaxPower !== undefined && getPower(state, ps.leader.uid) > cond.leaderMaxPower) return false;
   if (cond.opponentLeaderMinPower !== undefined && getPower(state, opp.leader.uid) < cond.opponentLeaderMinPower) return false;
@@ -481,7 +645,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   const range = cond.anyCharacterCost;
   if (
     range &&
-    ![...ps.characters, ...opp.characters].some((c) => {
+    !allCharacters().some((c) => {
       const cost = getCost(state, c.uid);
       return (range.min === undefined || cost >= range.min) && (range.max === undefined || cost <= range.max);
     })
@@ -495,11 +659,11 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.selfBattledCharacter && !(state.battledCharacter ?? []).includes(source)) return false;
   if (cond.maxActiveDon !== undefined && ps.donActive > cond.maxActiveDon) return false;
   if (cond.minRestedDon !== undefined && ps.donRested < cond.minRestedDon) return false;
-  if (cond.anyCharacterMinPower !== undefined && ![...ps.characters, ...opp.characters].some((c) => getPower(state, c.uid) >= cond.anyCharacterMinPower!)) {
+  if (cond.anyCharacterMinPower !== undefined && !allCharacters().some((c) => getPower(state, c.uid) >= cond.anyCharacterMinPower!)) {
     return false;
   }
   if (cond.faceUpLifeMin !== undefined && ps.life.filter((u) => ps.lifeFaceUp?.includes(u)).length < cond.faceUpLifeMin) return false;
-  if (cond.leaderAttribute && !(cardDef(state, ps.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.leaderAttribute!.toLowerCase())) {
+  if (cond.leaderAttribute && !hasAttribute(cardDef(state, ps.leader.uid), cond.leaderAttribute)) {
     return false;
   }
   // "If you have [Jewelry Bonney]" / "… [Merry Go] on your field": qualquer carta sua com o nome (Líder, Personagem
@@ -636,7 +800,7 @@ function ownCost(state: GameState, uid: string): number {
 
 /** Nome da carta (ou nome alternativo, "Also treat this card's name as …"). */
 export function hasName(def: CardDef, name: string): boolean {
-  if (def.name === name || def.aliases?.includes(name)) return true;
+  if (def.name === name || def.aliases?.includes(name) || def.wild) return true;
   // O texto às vezes grafa o nome com outra pontuação ("other than [Mr.2.Bon.Kurei.(Bentham)]" na
   // carta "Mr.2.Bon.Kurei(Bentham)"): pontos e espaços não distinguem nomes.
   const key = nameKey(name);
@@ -670,7 +834,7 @@ function currentChosen(state: GameState): string[] {
   return top?.kind === 'effect' ? (top.last ?? []) : [];
 }
 
-const hasAttribute = (def: CardDef, a: string) => (def.attributes ?? []).some((x) => x.toLowerCase() === a.toLowerCase());
+const hasAttribute = (def: CardDef, a: string) => def.wild === true || (def.attributes ?? []).some((x) => x.toLowerCase() === a.toLowerCase());
 
 /**
  * "with no base effect": carta sem texto. [Blocker] é efeito, e uma carta só com [Trigger] também tem
@@ -701,10 +865,21 @@ export function matchesFilter(def: CardDef, f: import('./types').CardFilter): bo
   return true;
 }
 
-/** "with a type including "X"": algum tipo contém o texto (sem diferenciar maiúsculas). */
-export function typeIncludes(def: CardDef, part: string): boolean {
+/**
+ * "with a type including "X"": algum tipo contém o texto (sem diferenciar maiúsculas). O Líder de
+ * 6 cores (`wild`) tem todos os tipos, então também tem um que inclui o texto.
+ */
+export function typeIncludes(def: Pick<CardDef, 'types' | 'wild'>, part: string): boolean {
+  if (def.wild) return true;
   const p = part.toLowerCase();
   return def.types.some((t) => t.toLowerCase().includes(p));
+}
+
+/** "name includes "X"": o nome (ou um nome alternativo) contém o texto; o Líder de 6 cores tem todos os nomes. */
+export function nameIncludes(def: Pick<CardDef, 'name' | 'aliases' | 'wild'>, part: string): boolean {
+  if (def.wild) return true;
+  const p = part.toLowerCase();
+  return def.name.toLowerCase().includes(p) || Boolean(def.aliases?.some((a) => a.toLowerCase().includes(p)));
 }
 
 /** Soma das auras ativas que afetam a carta (bônus de outras cartas do mesmo jogador). */
@@ -727,7 +902,7 @@ function collectAuras(state: GameState, uid: string, zone: 'leader' | 'character
   const owner = ownerOf(state, uid);
   const target = cardDef(state, uid);
   const out: Aura[] = [];
-  for (const ps of state.players) {
+  for (const ps of alivePlayers(state)) {
     for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
       for (const a of cardDef(state, fc.uid).abilities) {
         if (a.timing !== 'static' || !a.aura || !a.aura.kinds.includes(zone)) continue;
@@ -849,8 +1024,8 @@ export function hasKeyword(state: GameState, uid: string, kw: Keyword): boolean 
  * Verifica o tipo ({Straw Hat Crew}). Tolera listas mal separadas vindas de APIs
  * (ex.: "Supernovas Straw Hat Crew" como um único item).
  */
-export function hasType(def: Pick<CardDef, 'types'>, type: string): boolean {
-  if (def.types.includes(type)) return true;
+export function hasType(def: Pick<CardDef, 'types' | 'wild'>, type: string): boolean {
+  if (def.types.includes(type) || def.wild) return true;
   // Sem diferenciar maiúsculas: a API traz "Film" nos tipos e "{FILM}" nos textos.
   return ` ${def.types.join(' ')} `.toLowerCase().includes(` ${type.toLowerCase()} `);
 }
@@ -915,7 +1090,7 @@ export function isIdle(state: GameState): boolean {
 /** Motivo pelo qual o ataque é ilegal, ou null se for legal. */
 export function attackError(state: GameState, player: PlayerId, attacker: string, target: string): string | null {
   if (!isIdle(state) || state.activePlayer !== player) return 'Não é possível atacar agora.';
-  if (state.turn <= 2) return 'Nenhum jogador pode atacar no seu primeiro turno.';
+  if (isMultiplayer(state) ? (state.turnsTaken?.[player] ?? 0) <= 1 : state.turn <= 2) return 'Nenhum jogador pode atacar no seu primeiro turno.';
   const a = locate(state, attacker);
   if (!a || a.player !== player || a.zone === 'stage') return 'Atacante inválido.';
   if (a.fc.rested) return 'O atacante está virado.';
@@ -926,7 +1101,7 @@ export function attackError(state: GameState, player: PlayerId, attacker: string
   ) {
     return 'Esta carta não pode atacar.';
   }
-  if (restricted(state, player, 'noAttackLeader') && state.players[opponent(player)].leader.uid === target) return 'Você não pode atacar o Líder neste turno.';
+  if (restricted(state, player, 'noAttackLeader') && opponentsOf(state, player).some((o) => state.players[o].leader.uid === target)) return 'Você não pode atacar o Líder neste turno.';
   const maxCostBlock = state.modifiers.find((m) => m.uid === attacker && m.kind === 'cannotAttackCharMaxCost');
   if (maxCostBlock && locate(state, target)?.zone === 'character' && (cardDef(state, target).cost ?? 0) <= maxCostBlock.amount) {
     return 'Este Líder não pode atacar esse Personagem neste turno.';
@@ -1102,6 +1277,14 @@ export function counterOptions(state: GameState, defender: PlayerId): string[] {
 }
 
 /**
+ * Mesa com mais de dois: os Eventos [Counter] que um jogador de fora da batalha pode usar na etapa de
+ * Counter (o manual do formato deixa: "you MAY play counter effects"). Só Eventos que ele pode pagar.
+ */
+export function bystanderCounterOptions(state: GameState, player: PlayerId): string[] {
+  return counterOptions(state, player).filter((uid) => cardDef(state, uid).category === 'event');
+}
+
+/**
  * Quem pode receber o valor de Counter de uma carta da mão (7-1-3-1-1): o Líder ou 1 Personagem do
  * defensor, inclusive um que não é o alvo do ataque (o bônus acaba no fim da batalha, Q&A de regras).
  */
@@ -1111,21 +1294,34 @@ export function counterTargets(state: GameState, defender: PlayerId): string[] {
 }
 
 export function targetCandidates(state: GameState, controller: PlayerId, source: string, spec: TargetSpec): string[] {
-  if (spec.maxCostDynamic) {
-    const own = state.players[controller].life.length;
-    const opp = state.players[opponent(controller)].life.length;
-    const bound = spec.maxCostDynamic === 'opponentLife' ? opp : spec.maxCostDynamic === 'ownLife' ? own : own + opp;
-    spec = { ...spec, maxCost: Math.min(spec.maxCost ?? bound, bound) };
-  }
+  // 'any' ("up to 1 Leader or Character card", sem "your opponent's"): as cartas de qualquer jogador da mesa.
   const sides: PlayerId[] =
-    spec.side === 'own' ? [controller] : spec.side === 'opponent' ? [opponent(controller)] : [opponent(controller), controller];
-  const pool: FieldCard[] = [];
-  for (const ps of sides.map((id) => state.players[id])) {
-    if (spec.kinds.includes('leader')) pool.push(ps.leader);
-    if (spec.kinds.includes('character')) pool.push(...ps.characters);
-    if (spec.kinds.includes('stage') && ps.stage) pool.push(ps.stage);
+    spec.side === 'own'
+      ? [controller]
+      : spec.side === 'opponent'
+        ? opponentSides(state, controller)
+        : isMultiplayer(state)
+          ? [...opponentsOf(state, controller), controller]
+          : [opponent(controller), controller];
+  const out: string[] = [];
+  for (const id of sides) {
+    const ps = state.players[id];
+    let sided = spec;
+    if (spec.maxCostDynamic) {
+      // "with a cost equal to or less than the number of your opponent's Life cards": numa mesa com mais de
+      // dois, a Vida que conta para as cartas de um oponente é a dele.
+      const own = state.players[controller].life.length;
+      const opp = (id === controller ? state.players[opponentOf(state, controller)] : ps).life.length;
+      const bound = spec.maxCostDynamic === 'opponentLife' ? opp : spec.maxCostDynamic === 'ownLife' ? own : own + opp;
+      sided = { ...spec, maxCost: Math.min(spec.maxCost ?? bound, bound) };
+    }
+    const pool: FieldCard[] = [];
+    if (sided.kinds.includes('leader')) pool.push(ps.leader);
+    if (sided.kinds.includes('character')) pool.push(...ps.characters);
+    if (sided.kinds.includes('stage') && ps.stage) pool.push(ps.stage);
+    for (const fc of pool) if (fieldCardMatches(state, source, fc, sided)) out.push(fc.uid);
   }
-  return pool.filter((fc) => fieldCardMatches(state, source, fc, spec)).map((fc) => fc.uid);
+  return out;
 }
 
 /** Uma carta em campo atende aos filtros do alvo (sem olhar lado/zona)? */
@@ -1204,19 +1400,23 @@ export function applyAction(prev: GameState, action: Action): GameState {
   const p = action.player;
   const pending = state.pending;
 
-  if (action.type === 'concede') {
-    gameOver(state, opponent(p), lg('winConcede', `${state.players[p].name} desistiu.`, { player: state.players[p].name }));
-    state.actionCount++;
-    return state;
-  }
-
-  if (action.type === 'timeout') {
-    const name = state.players[p].name;
-    gameOver(
-      state,
-      opponent(p),
-      action.abandoned ? lg('winAbandoned', `${name} abandonou a partida.`, { player: name }) : lg('winTimeout', `${name} ficou sem tempo.`, { player: name }),
-    );
+  if (action.type === 'concede' || action.type === 'timeout') {
+    const name = state.players[p]?.name;
+    if (name === undefined || state.players[p].out) throw new IllegalActionError('Jogador fora da partida.');
+    const reason =
+      action.type === 'concede'
+        ? lg('winConcede', `${name} desistiu.`, { player: name })
+        : action.abandoned
+          ? lg('winAbandoned', `${name} abandonou a partida.`, { player: name })
+          : lg('winTimeout', `${name} ficou sem tempo.`, { player: name });
+    // Com dois jogadores a partida acaba; numa mesa maior ele é eliminado e a mesa segue.
+    eliminate(state, [p], () => reason, reason);
+    if (state.phase !== 'gameover') {
+      // A ação em andamento de outro jogador não volta para antes da saída dele.
+      delete state.cancel;
+      delete state.checkpoint;
+      run(state);
+    }
     state.actionCount++;
     return state;
   }
@@ -1284,8 +1484,8 @@ export function applyAction(prev: GameState, action: Action): GameState {
 // Cancelar a ação em andamento
 // ---------------------------------------------------------------------------
 
-/** Quem pode ver cartas: os dois jogadores e os espectadores. */
-const VIEWERS: Array<PlayerId | null> = [0, 1, null];
+/** Quem pode ver cartas: cada jogador (pelo lugar) e, por último, os espectadores. */
+const viewersOf = (state: GameState): Array<PlayerId | null> => [...state.players.map((ps) => ps.id), null];
 
 /**
  * `state` é o estado de antes da ação de `player`, que o motor nunca muda: o checkpoint só
@@ -1293,7 +1493,7 @@ const VIEWERS: Array<PlayerId | null> = [0, 1, null];
  */
 function makeCheckpoint(state: GameState): Checkpoint {
   const { defs: _defs, cards: _cards, log: _log, actionCount: _n, cancel: _cancel, checkpoint: _cp, ...snap } = state;
-  return { seen: VIEWERS.map((v) => [...visibleCards(state, v)]) as Checkpoint['seen'], snap: snap as StateSnapshot };
+  return { seen: viewersOf(state).map((v) => [...visibleCards(state, v)]), snap: snap as StateSnapshot };
 }
 
 /**
@@ -1320,7 +1520,7 @@ function settleCancel(state: GameState, actor: PlayerId) {
   const cp = state.checkpoint;
   if (!cp) return;
   const actorSaw = new Set(cp.seen[info.player]);
-  const revealed = VIEWERS.some((v, i) => {
+  const revealed = viewersOf(state).some((v, i) => {
     const before = new Set(cp.seen[i]);
     for (const uid of visibleCards(state, v)) if (!before.has(uid) && !actorSaw.has(uid)) return true;
     return false;
@@ -1435,23 +1635,7 @@ function handlePendingResponse(state: GameState, action: Action) {
       }
       ps.mulliganDone = true;
       state.pending = null;
-      const other = state.players[opponent(p)];
-      if (!other.mulliganDone) {
-        state.pending = { kind: 'mulligan', player: other.id };
-      } else {
-        for (const pl of state.players) {
-          const life = cardDef(state, pl.leader.uid).life ?? 5;
-          // A carta do topo do deck fica por baixo da pilha de Vida (5-2-1-7): o topo da Vida é o
-          // fim do array. (Replays até a versão 8 punham a Vida na ordem inversa.)
-          for (let i = 0; i < life; i++) {
-            if (state.legacySetup) pl.life.unshift(pl.deck.shift()!);
-            else pl.life.push(pl.deck.shift()!);
-          }
-        }
-        state.turn = 1;
-        state.activePlayer = state.firstPlayer;
-        startTurn(state);
-      }
+      continueSetup(state);
       return;
     }
 
@@ -1498,7 +1682,9 @@ function handlePendingResponse(state: GameState, action: Action) {
       const ps = state.players[p];
       if (action.type === 'pass') {
         state.pending = null;
-        state.battle!.step = 'damage';
+        // Um terceiro passou: a etapa segue com o próximo (e o defensor por último).
+        if (pending.bystander) state.battle!.bystanders = (state.battle!.bystanders ?? []).filter((id) => id !== p);
+        else state.battle!.step = 'damage';
         return;
       }
       if (action.type !== 'counter') throw new IllegalActionError('Use um Counter ou passe.');
@@ -1544,6 +1730,11 @@ function handlePendingResponse(state: GameState, action: Action) {
       if (pending.order) {
         const chosen = state.triggered?.find((e) => e.id === pending.order![action.index]);
         if (chosen) activateTriggered(state, chosen);
+        return;
+      }
+      if (pending.curve) {
+        chooseCurve(state, p, action.index === 0 ? 'odd' : 'even');
+        continueSetup(state);
         return;
       }
       const top = state.stack[state.stack.length - 1];
@@ -1742,9 +1933,14 @@ function handleMainAction(state: GameState, action: Action) {
       // os "When your Leader attacks": mesmo lote, o jogador escolhe a ordem (8-6-1). Os do jogador
       // do turno resolvem antes (10-2-16).
       pushAbilities(state, action.attacker, 'whenAttacking');
-      const def = state.players[opponent(p)];
-      for (const fc of [def.leader, ...def.characters, ...(def.stage ? [def.stage] : [])]) {
-        pushAbilities(state, fc.uid, 'onOpponentAttack');
+      // Com mais de dois na mesa, "your opponent's attack" é o ataque de qualquer oponente, mesmo a outra
+      // mesa: reagem todos os oponentes do atacante, o defensor primeiro.
+      const defender = ownerOf(state, action.target);
+      for (const id of [defender, ...opponentsOf(state, p).filter((o) => o !== defender)]) {
+        const def = state.players[id];
+        for (const fc of [def.leader, ...def.characters, ...(def.stage ? [def.stage] : [])]) {
+          pushAbilities(state, fc.uid, 'onOpponentAttack');
+        }
       }
       return;
     }
@@ -1753,10 +1949,11 @@ function handleMainAction(state: GameState, action: Action) {
       // End Phase (6-6-1-1): os [End of Your Turn] do jogador do turno e os [End of Your Opponent's
       // Turn] do outro ativam juntos (mesmo lote: os do jogador do turno resolvem primeiro, 8-6-1).
       // Os "at the end of this turn" entram depois deles, no frame `endTurn` (6-6-1-2).
-      const other = state.players[opponent(p)];
       state.stack.push({ kind: 'endTurn' });
       for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) pushAbilities(state, fc.uid, 'endOfTurn');
-      for (const fc of [other.leader, ...other.characters, ...(other.stage ? [other.stage] : [])]) pushAbilities(state, fc.uid, 'endOfOpponentTurn');
+      for (const other of opponentsOf(state, p).map((o) => state.players[o])) {
+        for (const fc of [other.leader, ...other.characters, ...(other.stage ? [other.stage] : [])]) pushAbilities(state, fc.uid, 'endOfOpponentTurn');
+      }
       return;
     }
 
@@ -1771,8 +1968,13 @@ function handleMainAction(state: GameState, action: Action) {
 
 function startTurn(state: GameState) {
   const ps = state.players[state.activePlayer];
-  const other = state.players[opponent(state.activePlayer)];
+  const others = opponentsOf(state, state.activePlayer).map((o) => state.players[o]);
   state.phase = 'main';
+  if (isMultiplayer(state)) {
+    state.turnsTaken ??= state.players.map(() => 0);
+    state.turnsTaken[ps.id] = (state.turnsTaken[ps.id] ?? 0) + 1;
+    turnExpiries(state, ps.id);
+  }
   state.modifiers = state.modifiers.filter((m) => !(m.duration === 'untilYourNextTurn' && (m.untilTurn ?? 0) <= state.turn));
   log(state, ps.id, lg('turnStart', `— Turno ${state.turn}: ${ps.name} —`, { n: state.turn, player: ps.name }));
 
@@ -1782,7 +1984,9 @@ function startTurn(state: GameState) {
   // vem o Draw e o DON!! Phase (frame `refresh`).
   const queued = [
     ...[ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])].flatMap((fc) => pushAbilities(state, fc.uid, 'startOfTurn')),
-    ...[other.leader, ...other.characters, ...(other.stage ? [other.stage] : [])].flatMap((fc) => pushAbilities(state, fc.uid, 'startOfOpponentTurn')),
+    ...others.flatMap((other) =>
+      [other.leader, ...other.characters, ...(other.stage ? [other.stage] : [])].flatMap((fc) => pushAbilities(state, fc.uid, 'startOfOpponentTurn')),
+    ),
   ];
   if (queued.length) state.stack.push({ kind: 'refresh' });
   else refreshDrawDon(state);
@@ -1808,11 +2012,14 @@ function refreshDrawDon(state: GameState) {
   ps.donActive += ps.donRested - keep;
   ps.donRested = keep;
 
-  // Draw: o primeiro jogador não compra no primeiro turno.
-  if (state.turn !== 1) drawCards(state, ps.id, 1);
+  // Draw: o primeiro jogador não compra no primeiro turno. DON!!: 2 por turno (1 no primeiro turno do
+  // primeiro jogador). Na mesa de Yonko, cada um escolheu a própria largada (`curve`): 1 DON!! e a
+  // compra, ou 2 DON!! sem comprar.
+  const curve = isMultiplayer(state) && (state.turnsTaken?.[ps.id] ?? 0) <= 1 ? state.curve?.[ps.id] : undefined;
+  const skipDraw = curve ? curve === 'even' : state.turn === 1;
+  if (!skipDraw) drawCards(state, ps.id, 1);
 
-  // DON!!: 2 por turno (1 no primeiro turno do primeiro jogador).
-  const n = Math.min(state.turn === 1 ? 1 : 2, ps.donDeck);
+  const n = Math.min(curve ? (curve === 'odd' ? 1 : 2) : state.turn === 1 ? 1 : 2, ps.donDeck);
   const hadDon = totalDonOnField(ps) > 0;
   ps.donDeck -= n;
   ps.donActive += n;
@@ -1821,7 +2028,8 @@ function refreshDrawDon(state: GameState) {
     ps.leader.don++;
   }
   checkDefeat(state);
-  if (state.phase === 'gameover') return;
+  // (Mesa com mais de dois: o jogador da vez pode ter sido eliminado pelo deck vazio.)
+  if (state.phase === 'gameover' || ps.out) return;
 
   // "your opponent rests 1 of their active DON!! cards at the start of their next Main Phase" (PRB02-005).
   const toRest = (state.donRestAtMain ?? []).filter((d) => d.player === ps.id).reduce((k, d) => k + d.count, 0);
@@ -1839,7 +2047,7 @@ function refreshDrawDon(state: GameState) {
 /** "all Characters with a cost of 5 or less do not become active in your and your opponent's Refresh Phases" */
 export function noRefreshByAura(state: GameState, uid: string): boolean {
   if (locate(state, uid)?.zone !== 'character') return false;
-  return state.players.some((pl) =>
+  return alivePlayers(state).some((pl) =>
     [pl.leader, ...pl.characters, ...(pl.stage ? [pl.stage] : [])].some((fc) =>
       cardDef(state, fc.uid).abilities.some(
         (a) => a.timing === 'static' && a.noRefreshMaxCost !== undefined && getCost(state, uid) <= a.noRefreshMaxCost && conditionsMet(state, fc.uid, a),
@@ -1850,7 +2058,8 @@ export function noRefreshByAura(state: GameState, uid: string): boolean {
 
 function endTurn(state: GameState) {
   const ps = state.players[state.activePlayer];
-  log(state, ps.id, lg('endTurn', `${ps.name} encerra o turno.`, { player: ps.name }));
+  // Mesa com mais de dois: o turno também fecha quando o jogador da vez é eliminado no meio dele.
+  if (!ps.out) log(state, ps.id, lg('endTurn', `${ps.name} encerra o turno.`, { player: ps.name }));
   state.modifiers = state.modifiers.filter(
     (m) =>
       m.duration !== 'turn' &&
@@ -1868,21 +2077,271 @@ function endTurn(state: GameState) {
   state.lifeRemovedThisTurn = [];
   state.onPlayNegated = (state.onPlayNegated ?? []).filter((n) => n.untilTurn > state.turn);
   // "You lose at the end of the turn in which your deck becomes 0 cards."
-  const out = state.players.filter((pl) => pl.deck.length === 0 && leaderRule(state, pl.id, 'deckOutEndOfTurn')).map((pl) => pl.id);
+  const out = alivePlayers(state).filter((pl) => pl.deck.length === 0 && leaderRule(state, pl.id, 'deckOutEndOfTurn')).map((pl) => pl.id);
   if (out.length) {
-    defeat(
+    eliminate(
       state,
       out,
       (pl) => lg('winDeckOutEndOfTurn', `${pl.name} terminou o turno sem cartas no deck.`, { player: pl.name }),
       lg('winBothDeckOutEndOfTurn', 'Os dois terminaram o turno sem cartas no deck.'),
     );
-    return;
+    if (state.phase === 'gameover' || !isMultiplayer(state)) return;
+    // O turno já está fechando: a eliminação do jogador da vez não precisa fechá-lo de novo.
+    state.stack = state.stack.filter((f) => f.kind !== 'endTurn');
   }
   // "take an extra turn after this one"
-  if (state.extraTurn === state.activePlayer) state.extraTurn = undefined;
-  else state.activePlayer = opponent(state.activePlayer);
+  if (state.extraTurn === state.activePlayer && !ps.out) state.extraTurn = undefined;
+  else state.activePlayer = nextPlayer(state, state.activePlayer);
   state.turn++;
   startTurn(state);
+}
+
+/**
+ * Mesa com mais de dois, no começo do turno de `p`: os efeitos "until the start of your next turn" dele
+ * acabam, e os "until the end of … next turn" que esperavam este turno passam a acabar no fim dele
+ * (ver `Expiry` em types.ts).
+ */
+function turnExpiries(state: GameState, p: PlayerId) {
+  state.modifiers = state.modifiers.filter((m) => m.untilStartOf !== p);
+  if (state.restrictions?.length) state.restrictions = state.restrictions.filter((r) => r.untilStartOf !== p);
+  if (state.onPlayNegated?.length) state.onPlayNegated = state.onPlayNegated.filter((n) => n.untilStartOf !== p);
+  for (const x of [...state.modifiers, ...(state.restrictions ?? []), ...(state.onPlayNegated ?? [])]) {
+    if (x.untilEndOf !== p) continue;
+    x.untilTurn = state.turn;
+    delete x.untilEndOf;
+  }
+}
+
+/**
+ * Até quando vale um efeito "until the end of your opponent's next turn" / "until … your next turn" de
+ * `controller`. Com dois jogadores, o número do turno. Com mais, o turno de quem o encerra: "until the
+ * end of your opponent's turn" vale até o seu turno recomeçar (cobre o turno de todos os oponentes).
+ */
+function setExpiry(state: GameState, controller: PlayerId, x: import('./types').Expiry, duration: import('./types').Duration | undefined) {
+  const mine = state.activePlayer === controller;
+  if (duration === 'nextOpponentTurn') {
+    if (!isMultiplayer(state)) {
+      // No seu turno: acaba no fim do próximo turno (do oponente). No turno do oponente: no fim do turno seguinte a ele.
+      x.untilTurn = state.turn + (mine ? 1 : 2);
+    } else {
+      // Manual do formato: "until the end of your opponent's turn" vale até o começo do seu turno.
+      x.untilTurn = FAR_TURN;
+      x.untilStartOf = controller;
+    }
+  } else if (duration === 'untilYourNextTurn' || duration === 'endOfYourNextTurn') {
+    if (!isMultiplayer(state)) {
+      // Turno em que começa o seu próximo turno.
+      x.untilTurn = state.turn + (mine ? 2 : 1);
+    } else {
+      x.untilTurn = FAR_TURN;
+      if (duration === 'untilYourNextTurn') x.untilStartOf = controller;
+      else x.untilEndOf = controller;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Preparação (mulligans, bônus de início, Vida) e eliminação
+// ---------------------------------------------------------------------------
+
+/**
+ * Próximo passo da preparação. Com dois jogadores: os mulligans, a Vida e o primeiro turno. Na mesa com
+ * mais de dois, pelo manual do formato: antes das mãos, cada um na ordem dos turnos escolhe a própria
+ * largada (`curve`); depois as mãos iniciais (e os "at the start of the game"), os mulligans na ordem, a
+ * Vida de cada um e o primeiro turno.
+ */
+function continueSetup(state: GameState) {
+  state.pending = null;
+  const order = turnOrder(state, state.firstPlayer);
+  if (!order.length) return;
+  if (isMultiplayer(state)) {
+    if (state.table?.curveChoice) {
+      const curve = (state.curve ??= state.players.map(() => null));
+      const next = order.find((id) => curve[id] === null);
+      if (next !== undefined) {
+        const name = state.players[next].name;
+        state.pending = {
+          kind: 'option',
+          player: next,
+          source: state.players[next].leader.uid,
+          ...promptOf(pr('startCurve', `${name}: escolha a sua largada.`, { player: name })),
+          options: ['1 DON!! no primeiro turno e comprar 1 carta (1, 3, 5, 7, 9, 10)', '2 DON!! no primeiro turno, sem comprar (2, 4, 6, 8, 10)'],
+          optionKeys: ['engine.optCurveOdd', 'engine.optCurveEven'],
+          curve: true,
+        };
+        return;
+      }
+    }
+    if (!state.dealt) {
+      state.dealt = true;
+      // Quem tem "at the start of the game" no Líder compra a mão só depois de resolvê-lo (5-2-1-5/6).
+      for (const p of alivePlayers(state)) if (!leaderRule(state, p.id, 'startStage')) drawCards(state, p.id, HAND_SIZE);
+      startOfGame(state);
+      // Os efeitos de início resolvem primeiro; `finishStartOfGame` volta aqui.
+      if (state.stack.length) return;
+    }
+  }
+  const mulligan = order.find((id) => !state.players[id].mulliganDone);
+  if (mulligan !== undefined) {
+    state.pending = { kind: 'mulligan', player: mulligan };
+    return;
+  }
+  const extraLife = isMultiplayer(state) ? Math.max(0, state.table?.extraLife ?? 0) : 0;
+  for (const pl of alivePlayers(state)) {
+    const life = (cardDef(state, pl.leader.uid).life ?? 5) + extraLife;
+    // A carta do topo do deck fica por baixo da pilha de Vida (5-2-1-7): o topo da Vida é o
+    // fim do array. (Replays até a versão 8 punham a Vida na ordem inversa.)
+    for (let i = 0; i < life; i++) {
+      if (state.legacySetup) pl.life.unshift(pl.deck.shift()!);
+      else pl.life.push(pl.deck.shift()!);
+    }
+  }
+  state.turn = 1;
+  state.activePlayer = order[0];
+  startTurn(state);
+}
+
+/** A largada escolhida: ímpar = 1 DON!! no primeiro turno e a compra; par = 2 DON!! sem comprar. */
+function chooseCurve(state: GameState, p: PlayerId, curve: 'odd' | 'even') {
+  const ps = state.players[p];
+  (state.curve ??= state.players.map(() => null))[p] = curve;
+  log(
+    state,
+    p,
+    curve === 'odd'
+      ? lg('startCurveOdd', `${ps.name} escolhe 1 DON!! no primeiro turno e comprar 1 carta.`, { player: ps.name })
+      : lg('startCurveEven', `${ps.name} escolhe 2 DON!! no primeiro turno, sem comprar.`, { player: ps.name }),
+  );
+}
+
+/**
+ * Derrota de `losers` (ao mesmo tempo). Com dois jogadores: um perde e o outro vence; os dois juntos,
+ * empate (9-2-1). Numa mesa maior, quem perde é eliminado (`removePlayer`) e a mesa segue; a partida
+ * acaba quando sobra um (ele vence) ou quando todos os que restavam caem juntos (empate). `by`: quem
+ * deu o golpe final (leva a recompensa da mesa).
+ */
+function eliminate(state: GameState, losers: PlayerId[], reason: (ps: PlayerState) => Prompt, both: Prompt, by?: PlayerId) {
+  if (!isMultiplayer(state)) {
+    if (losers.length === 2) gameOver(state, null, both);
+    else if (losers.length === 1) gameOver(state, opponent(losers[0]), reason(state.players[losers[0]]));
+    return;
+  }
+  const alive = alivePlayers(state).map((ps) => ps.id);
+  const falling = turnOrder(state, state.activePlayer).filter((id) => losers.includes(id));
+  if (!falling.length) return;
+  const left = alive.filter((id) => !falling.includes(id));
+  // Os que restavam caem juntos: ninguém vence.
+  if (!left.length) {
+    state.eliminated = [...(state.eliminated ?? []), ...falling];
+    gameOver(state, null, falling.length === 1 ? reason(state.players[falling[0]]) : lg('winAllOut', 'Todos os jogadores que restavam foram derrotados ao mesmo tempo.'));
+    return;
+  }
+  // O último a cair fica com a mesa como estava (é o fim da partida); os outros saem dela.
+  const last = left.length === 1 ? falling[falling.length - 1] : undefined;
+  for (const id of falling) {
+    if (id === last) (state.eliminated ??= []).push(id);
+    else removePlayer(state, id, reason(state.players[id]), by);
+  }
+  if (last !== undefined) gameOver(state, left[0], reason(state.players[last]));
+}
+
+/**
+ * Tira um jogador da mesa (com mais de dois): as cartas dele saem do jogo e os efeitos dele acabam.
+ * A batalha em que ele estava termina; os efeitos de outros jogadores que o tinham como oponente seguem
+ * sem achar nada do lado dele. Se era a vez dele, o turno fecha e passa para o próximo.
+ */
+function removePlayer(state: GameState, id: PlayerId, reason: Prompt, by?: PlayerId) {
+  const ps = state.players[id];
+  const pending = state.pending;
+  const top = state.stack[state.stack.length - 1];
+  ps.out = true;
+  (state.eliminated ??= []).push(id);
+  log(state, id, lg('eliminated', `${ps.name} foi eliminado. ${reason.text}`, { player: ps.name, reason: reason.text }, { reason: { items: [msgOf(reason)] } }));
+
+  const theirs = (uid: string) => state.cards[uid]?.owner === id;
+  // A batalha dele termina.
+  const b = state.battle;
+  if (b && (theirs(b.attacker) || theirs(b.target))) {
+    state.battle = null;
+    state.modifiers = state.modifiers.filter((m) => m.duration !== 'battle');
+    state.stack = state.stack.filter((f) => f.kind !== 'battle');
+  } else if (b) {
+    if (b.after?.length) b.after = b.after.filter((d) => d.controller !== id);
+    if (b.bystanders?.length) b.bystanders = b.bystanders.filter((x) => x !== id);
+  }
+  // Uma escolha dele estava aberta num efeito de outro jogador: esse efeito não segue.
+  if (pending?.player === id && top?.kind === 'effect' && top.controller !== id && !(pending.kind === 'option' && pending.order)) {
+    state.stack = state.stack.filter((f) => f !== top);
+    if (top.trigger) limboToTrash(state, top.source);
+  }
+  state.stack = state.stack.filter(
+    (f) => !((f.kind === 'effect' && f.controller === id) || (f.kind === 'damage' && f.defender === id) || (f.kind === 'play' && theirs(f.uid))),
+  );
+  if (state.triggered?.length) {
+    state.triggered = state.triggered.filter((e) => e.controller !== id);
+    if (!state.triggered.length) delete state.triggered;
+  }
+  if (state.delayed?.length) state.delayed = state.delayed.filter((d) => d.controller !== id);
+
+  // As cartas saem do jogo.
+  ps.characters = [];
+  ps.stage = null;
+  ps.hand = [];
+  ps.deck = [];
+  ps.trash = [];
+  ps.life = [];
+  delete ps.lifeFaceUp;
+  ps.leader.don = 0;
+  delete ps.leader.donLoose;
+  ps.donDeck = 0;
+  ps.donActive = 0;
+  ps.donRested = 0;
+  if (state.limbo?.length) state.limbo = state.limbo.filter((u) => !theirs(u));
+  if (state.knownHand?.length) state.knownHand = state.knownHand.filter((u) => !theirs(u));
+
+  // Os efeitos sobre as cartas dele, e os que esperavam um turno dele para acabar, acabam agora.
+  const expired = (x: { untilStartOf?: PlayerId; untilEndOf?: PlayerId }) => x.untilStartOf === id || x.untilEndOf === id;
+  state.modifiers = state.modifiers.filter((m) => !theirs(m.uid) && !expired(m));
+  if (state.restrictions?.length) state.restrictions = state.restrictions.filter((r) => r.player !== id && !expired(r));
+  if (state.onPlayNegated?.length) state.onPlayNegated = state.onPlayNegated.filter((n) => n.player !== id && !expired(n));
+  if (state.costReductions?.length) state.costReductions = state.costReductions.filter((r) => r.player !== id);
+  if (state.tempReplacements?.length) state.tempReplacements = state.tempReplacements.filter((r) => r.player !== id);
+  if (state.donSkipRefresh?.length) state.donSkipRefresh = state.donSkipRefresh.filter((d) => d.player !== id);
+  if (state.donRestAtMain?.length) state.donRestAtMain = state.donRestAtMain.filter((d) => d.player !== id);
+  if (state.extraTurn === id) state.extraTurn = undefined;
+
+  // Escolhas em aberto: a dele some; a de outro jogador perde as cartas que saíram do jogo.
+  if (pending?.player === id) state.pending = null;
+  else if (pending && (pending.kind === 'selectTargets' || pending.kind === 'block' || pending.kind === 'counter')) {
+    pending.options = pending.options.filter((u) => !theirs(u));
+    if (pending.kind === 'selectTargets') {
+      if (pending.shown) pending.shown = pending.shown.filter((u) => !theirs(u));
+      pending.max = Math.min(pending.max, pending.options.length);
+      pending.min = Math.min(pending.min, pending.max);
+    }
+  }
+
+  // Recompensa de quem deu o golpe final.
+  const reward = state.table?.eliminationDraw ?? 0;
+  if (reward > 0 && by !== undefined && by !== id && !state.players[by].out) {
+    const killer = state.players[by];
+    log(state, by, lg('eliminationReward', `${killer.name} compra ${reward} carta(s) por eliminar ${ps.name}.`, { player: killer.name, n: reward, target: ps.name }));
+    drawCards(state, by, reward);
+  }
+
+  if (state.phase === 'mulligan') {
+    // Saiu durante a preparação: ela segue com os outros.
+    if (pending?.player === id && !state.stack.length) continueSetup(state);
+    return;
+  }
+  if (state.activePlayer === id && state.phase === 'main') {
+    // Era a vez dele: o que estava em resolução no turno se perde, e o turno fecha (frame `endTurn`).
+    state.stack = [{ kind: 'endTurn' }];
+    delete state.triggered;
+    state.delayed = [];
+    state.pending = null;
+    state.battle = null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1938,6 +2397,17 @@ function run(state: GameState) {
         break;
     }
     checkDefeat(state);
+    // Mesa com mais de dois: um efeito que pede uma decisão a quem já saiu da mesa (eliminado no
+    // meio do efeito) não segue.
+    const waiting = state.pending as GameState['pending'];
+    if (waiting && state.players[waiting.player]?.out) {
+      state.pending = null;
+      const top = state.stack[state.stack.length - 1];
+      if (top?.kind === 'effect') {
+        state.stack.pop();
+        if (top.trigger) limboToTrash(state, top.source);
+      }
+    }
   }
 }
 
@@ -2017,7 +2487,12 @@ function nextTriggered(state: GameState): boolean {
   if (state.stack.some((f) => f.kind === 'effect' || f.kind === 'damage')) return false;
   const batch = Math.min(...queue.map((e) => e.batch));
   const together = queue.filter((e) => e.batch === batch);
-  const player = together.some((e) => e.controller === state.activePlayer) ? state.activePlayer : opponent(state.activePlayer);
+  // Primeiro os do jogador do turno; depois os dos outros, na ordem dos turnos.
+  const player = together.some((e) => e.controller === state.activePlayer)
+    ? state.activePlayer
+    : isMultiplayer(state)
+      ? (turnOrder(state, state.activePlayer).find((id) => together.some((e) => e.controller === id)) ?? together[0].controller)
+      : opponent(state.activePlayer);
   const mine = together.filter((e) => e.controller === player);
   // Na vez dele, a carta saiu do campo ou a condição deixou de valer: o efeito não ativa.
   const lapsed = mine.find(
@@ -2096,7 +2571,7 @@ type EmittedEvent = {
 
 /** Dispara as habilidades "When …" de todas as cartas em campo que reagem ao acontecimento. */
 function emit(state: GameState, ev: EmittedEvent) {
-  for (const ps of state.players) {
+  for (const ps of alivePlayers(state)) {
     for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
       const def = cardDef(state, fc.uid);
       def.abilities.forEach((a, i) => {
@@ -2308,7 +2783,7 @@ function stepPlay(state: GameState, frame: PlayFrame) {
 function stepBattle(state: GameState) {
   const b = state.battle!;
   const attackerOwner = ownerOf(state, b.attacker);
-  const defender = opponent(attackerOwner);
+  const defender = isMultiplayer(state) ? ownerOf(state, b.target) : opponent(attackerOwner);
 
   if (b.step !== 'end' && (!locate(state, b.attacker) || !locate(state, b.target))) {
     log(state, null, lg('battleEndsCardLeft', 'A batalha termina (uma das cartas saiu do campo).'));
@@ -2340,6 +2815,21 @@ function stepBattle(state: GameState) {
     }
 
     case 'counter': {
+      // Mesa com mais de dois e `bystanderCounter` ligado: antes do defensor, os outros oponentes do
+      // atacante podem usar Eventos [Counter] (não o valor de Counter das cartas, nem [Blocker]: isso é só
+      // de quem foi atacado). A vez de cada um só abre se ele tem um Evento que pode pagar; o defensor
+      // decide por último. Desligado (o padrão), só quem foi atacado usa Counter.
+      if (isMultiplayer(state) && state.table?.bystanderCounter) {
+        b.bystanders ??= opponentsOf(state, attackerOwner).filter((id) => id !== defender);
+        while (b.bystanders.length) {
+          const options = bystanderCounterOptions(state, b.bystanders[0]);
+          if (options.length) {
+            state.pending = { kind: 'counter', player: b.bystanders[0], options, bystander: true };
+            return;
+          }
+          b.bystanders.shift();
+        }
+      }
       // A etapa abre mesmo sem Counter na mão (e mesmo quando o ataque já falha): se fosse
       // pulada, o atacante saberia que o defensor não tem Counter (ou veria a diferença de tempo).
       state.pending = { kind: 'counter', player: defender, options: counterOptions(state, defender) };
@@ -2428,6 +2918,11 @@ function stepBattle(state: GameState) {
 }
 
 function stepDamage(state: GameState, frame: DamageFrame) {
+  // Dano num jogador que já saiu da mesa (o oponente de um efeito ainda em resolução): nada acontece.
+  if (state.players[frame.defender].out) {
+    state.stack.pop();
+    return;
+  }
   if (frame.remaining <= 0) {
     state.stack.pop();
     // Reações ao dano só depois que ele (e os [Trigger]) termina.
@@ -2456,7 +2951,10 @@ function stepDamage(state: GameState, frame: DamageFrame) {
       log(state, frame.defender, lg('noLifeLeft', `${ps.name} não tem mais Vida: o dano restante do ataque não tem efeito.`, { player: ps.name }));
       return;
     }
-    gameOver(state, opponent(frame.defender), lg('winLeaderDamage', `O líder de ${ps.name} recebeu dano sem cartas de Vida.`, { player: ps.name }));
+    const reason = lg('winLeaderDamage', `O líder de ${ps.name} recebeu dano sem cartas de Vida.`, { player: ps.name });
+    // O golpe final é de quem atacou, ou de quem usou o efeito que causou o dano.
+    const by = frame.attack && state.battle ? ownerOf(state, state.battle.attacker) : frame.by;
+    eliminate(state, [frame.defender], () => reason, reason, by);
     return;
   }
   const card = ps.life.pop()!;
@@ -2486,12 +2984,108 @@ function stepEffect(state: GameState, frame: EffectFrame) {
     if (frame.trigger) limboToTrash(state, frame.source);
     return;
   }
-  const step = frame.steps[frame.i];
-  const done = execStep(state, frame, step);
+  let step = frame.steps[frame.i];
+  if (isMultiplayer(state)) {
+    // O passo mexe na mão, na Vida, nos DON!! ou no deck "do oponente": roda uma vez contra cada oponente,
+    // na ordem dos turnos (cada cópia leva o oponente em `vs`).
+    if (step.vs === undefined && eachOpponent(step) && fixedOpponent(state, frame.controller) === undefined) {
+      const original = step;
+      frame.steps.splice(frame.i, 1, ...opponentsOf(state, frame.controller).map((o) => ({ ...original, vs: o })));
+      step = frame.steps[frame.i];
+    }
+    // O oponente da vez saiu da mesa antes de o passo chegar nele.
+    if (step.vs !== undefined && state.players[step.vs].out) {
+      frame.i++;
+      frame.choice = undefined;
+      frame.memo = undefined;
+      return;
+    }
+  }
+  const vs = step.vs;
+  const at = frame.i;
+  const length = frame.steps.length;
+  const depth = state.stack.length;
+  if (opponentProbe) probeStep = { source: state.cards[frame.source].cardId, step };
+  let done: boolean;
+  try {
+    done = vs !== undefined ? withOpponent(frame.controller, vs, () => execStep(state, frame, step)) : execStep(state, frame, step);
+  } finally {
+    probeStep = null;
+  }
+  if (vs !== undefined) {
+    // O que o passo deixou para depois continua contra o mesmo oponente: os passos que ele inseriu
+    // ("If they do not, …") e os efeitos que empilhou ("Your opponent chooses one").
+    for (let k = at + 1; k < at + 1 + (frame.steps.length - length); k++) if (frame.steps[k].vs === undefined) frame.steps[k] = { ...frame.steps[k], vs };
+    for (let k = depth; k < state.stack.length; k++) {
+      const f = state.stack[k];
+      if (f.kind === 'effect' && f.controller === frame.controller && f.focus === undefined) f.focus = vs;
+    }
+  }
   if (done) {
     frame.i++;
     frame.choice = undefined;
     frame.memo = undefined;
+  }
+}
+
+/** Passos que agem sobre "o oponente" (a mão, a Vida, os DON!!, o deck dele) sem escolher um alvo em campo. */
+const EACH_OPPONENT_STEPS = new Set<EffectStep['do']>([
+  'opponentDiscards',
+  'trashRandomFromOpponentHand',
+  'opponentTrashToBottom',
+  'revealOpponentTop',
+  'revealOpponentHand',
+  'lookOpponentTop',
+  'opponentLifeToBottom',
+  'opponentLifeToHand',
+  'opponentHandToBottom',
+  'opponentMay',
+  'opponentPlays',
+  'opponentAddDon',
+  'opponentDraws',
+  'opponentChoosesOwn',
+  'opponentReturnsDon',
+]);
+
+/**
+ * Mesa com mais de dois: o passo vale para cada oponente? Segue o texto da carta, como o manual. "Your
+ * opponent returns/adds/may return … DON!!" é o oponente fazendo algo, como "your opponent returns all cards
+ * in their hand" (Pudding): vale para cada um. Já "rest up to N of your opponent's DON!! cards" é escrito como
+ * um alvo: um DON!! de um oponente, escolhido por quem usa o efeito (`donTargetOpponent`). E o que é "effects
+ * that interact with an opponent's hand/life": "trash up to 1 card from the top of your opponent's Life
+ * cards" tira 1 Vida de cada oponente; "Your opponent chooses one" pergunta a cada um; "If your
+ * opponent has 7 or more cards in their hand, trash 2…" só atinge quem tem 7 ou mais (a condição do
+ * passo é conferida contra cada um). Não entram aqui os passos com alvo em campo ("up to 1 of your
+ * opponent's Characters": um alvo, de qualquer oponente) nem os que só olham o oponente numa condição.
+ */
+export function eachOpponent(step: EffectStep): boolean {
+  if (EACH_OPPONENT_STEPS.has(step.do)) return true;
+  switch (step.do) {
+    case 'returnDon':
+    case 'takeDamage':
+    case 'restrict':
+      return Boolean(step.opponent);
+    case 'trashLife':
+      return step.side === 'opponent';
+    case 'arrangeLife':
+      return step.whose === 'opponent';
+    case 'peekLife':
+      return step.whose !== 'own';
+    case 'handAllToDeck':
+    case 'negateOnPlay':
+      return step.who === 'opponent';
+    case 'trashHandUntil':
+      return Boolean(step.both);
+    case 'basePower':
+      return step.copy === 'opponentLeader';
+    // "your opponent rests 1 of their active DON!! cards at the start of their next Main Phase": o oponente faz.
+    // Já "up to 1 of your opponent's rested DON!! cards will not become active" é um alvo (`donTargetOpponent`).
+    case 'skipRefreshDon':
+      return Boolean(step.atMainPhase);
+    case 'chooseOne':
+      return step.chooser === 'opponent';
+    default:
+      return false;
   }
 }
 
@@ -2712,14 +3306,7 @@ function useOwnEffect(state: GameState, frame: EffectFrame, timing: 'main' | 'co
 
 /** Registra um modificador; "until the end of your opponent's next turn" calcula o turno em que acaba. */
 function addModifier(state: GameState, controller: PlayerId, m: Modifier) {
-  const mine = state.activePlayer === controller;
-  if (m.duration === 'nextOpponentTurn') {
-    // No seu turno: acaba no fim do próximo turno (do oponente). No turno do oponente: no fim do turno seguinte a ele.
-    m.untilTurn = state.turn + (mine ? 1 : 2);
-  } else if (m.duration === 'untilYourNextTurn' || m.duration === 'endOfYourNextTurn') {
-    // Turno em que começa o seu próximo turno.
-    m.untilTurn = state.turn + (mine ? 2 : 1);
-  }
+  setExpiry(state, controller, m, m.duration);
   state.modifiers.push(m);
 }
 
@@ -2748,6 +3335,34 @@ function askOption(
     ...(optionParts ? { optionParts } : {}),
     ...(shown?.length ? { shown } : {}),
   };
+}
+
+/**
+ * Mesa com mais de dois: de qual oponente sai o DON!! de um efeito escrito como alvo ("rest up to 1 of your
+ * opponent's DON!! cards"). Cada DON!! é um alvo, de qualquer oponente, como um Personagem (regra 1 do manual).
+ * `candidates`: os oponentes que têm um DON!! que serve. Devolve o oponente, null (nenhum serve) ou undefined
+ * (abriu a pergunta). Com dois jogadores, ou com o oponente já fixado (um passo "para cada oponente"), não pergunta.
+ * Usa `frame.memo[0] = 'donOf'` enquanto espera a resposta.
+ */
+function donTargetOpponent(state: GameState, frame: EffectFrame, candidates: PlayerId[], prompt: Prompt): PlayerId | null | undefined {
+  if (frame.memo?.[0] === 'donOf' && frame.choice) {
+    const id = Number(frame.memo[1 + Number(frame.choice[0])]);
+    frame.memo = undefined;
+    frame.choice = undefined;
+    return Number.isInteger(id) && candidates.includes(id) ? id : null;
+  }
+  if (!candidates.length) return null;
+  if (candidates.length === 1) return candidates[0];
+  askOption(
+    state,
+    frame,
+    frame.controller,
+    prompt,
+    candidates.map((id) => state.players[id].name),
+    candidates.map(() => null),
+  );
+  frame.memo = ['donOf', ...candidates.map(String)];
+  return undefined;
 }
 
 /** Interrompe o efeito: os passos restantes não acontecem. */
@@ -2920,13 +3535,16 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if (cost.selfMinCost !== undefined && (!locate(state, source) || getCost(state, source) < cost.selfMinCost)) return false;
   if (
     cost.restOpponentChars &&
-    state.players[opponent(player)].characters.filter((c) => !c.rested && !cannotBeRested(state, c.uid)).length < cost.restOpponentChars
+    // (Mesa com mais de dois, sem oponente definido: basta um oponente em que o custo caiba.)
+    !opponentSides(state, player).some(
+      (o) => state.players[o].characters.filter((c) => !c.rested && !cannotBeRested(state, c.uid)).length >= cost.restOpponentChars!,
+    )
   ) {
     return false;
   }
   if ((cost.trashToDeck ?? 0) > ps.trash.length) return false;
   if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(handDef(state, u, cost.playFromHand), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
-  if (cost.giveOppDon && (state.players[opponent(player)].donRested < cost.giveOppDon || !state.players[opponent(player)].characters.length)) return false;
+  if (cost.giveOppDon && !opponentSides(state, player).some((o) => state.players[o].donRested >= cost.giveOppDon! && state.players[o].characters.length > 0)) return false;
   if ((cost.handToTop ?? 0) > ps.hand.length) return false;
   if (cost.koSelf && (locate(state, source)?.zone !== 'character' || koProtected(state, source, false, source, player))) return false;
   if (cost.koOwn && others(koCostOptions(state, player, source, cost.koOwn.spec)).length < cost.koOwn.count) return false;
@@ -3043,7 +3661,8 @@ function costPieces(cost: AbilityCost): Prompt[] {
  */
 function conditionFailure(state: GameState, controller: PlayerId, source: string, cond: Condition): Prompt {
   const ps = state.players[controller];
-  const opp = state.players[opponent(controller)];
+  // Só para o texto do histórico: sem oponente definido (mesa com mais de dois), descreve o próximo da ordem.
+  const opp = state.players[isMultiplayer(state) ? (fixedOpponent(state, controller) ?? opponentsOf(state, controller)[0] ?? controller) : opponent(controller)];
   const chars = ps.characters.length;
   const self = ps.characters.some((c) => c.uid === source) ? ', contando esta carta' : '';
   const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
@@ -3181,10 +3800,20 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'giveRestedDon': {
-      const opp = state.players[opponent(frame.controller)];
-      // "from its owner's cost area" (OP15-023): o DON!! sai da área de custo do dono da carta escolhida.
-      const giverOf = (uid: string): PlayerState => (step.fromOwner ? state.players[ownerOf(state, uid)] : step.fromOpponent ? opp : ps);
+      // O oponente só entra quando o DON!! sai da área de custo dele (ou do dono da carta escolhida).
+      const multi = isMultiplayer(state) && (step.fromOpponent || step.fromOwner) && fixedOpponent(state, frame.controller) === undefined;
       const poolOf = (g: PlayerState) => g.donRested + (step.anyState ? g.donActive : 0);
+      // Mesa com mais de dois: o alvo pode ser de qualquer oponente e o DON!! sai de quem o controla; "o
+      // oponente", nas contas de antes da escolha, é quem tem mais DON!! para dar.
+      const opp =
+        step.fromOpponent || step.fromOwner
+          ? multi
+            ? opponentsOf(state, frame.controller).map((o) => state.players[o]).reduce((a, x) => (poolOf(x) > poolOf(a) ? x : a))
+            : state.players[opponentOf(state, frame.controller)]
+          : ps;
+      // "from its owner's cost area" (OP15-023): o DON!! sai da área de custo do dono da carta escolhida.
+      const giverOf = (uid: string): PlayerState =>
+        step.fromOwner || (multi && ownerOf(state, uid) !== frame.controller) ? state.players[ownerOf(state, uid)] : step.fromOpponent ? opp : ps;
       const prompt = step.anyState ? 'DON!!' : 'DON!! virado(s)';
       const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
       let t: string[];
@@ -3326,7 +3955,34 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'restOpponentDon': {
-      const o = state.players[opponent(frame.controller)];
+      if (isMultiplayer(state) && fixedOpponent(state, frame.controller) === undefined) {
+        // "Rest up to N of your opponent's DON!! cards": cada DON!! é um alvo, de qualquer oponente.
+        const done = Number(frame.choice ? (frame.memo?.[frame.memo.length - 1] ?? 0) : (frame.memo?.[0] === 'restN' ? frame.memo[1] : 0));
+        let left = step.count - done;
+        let n = done;
+        while (left > 0) {
+          const id = donTargetOpponent(
+            state,
+            frame,
+            opponentSides(state, frame.controller).filter((o) => state.players[o].donActive > 0),
+            pr('whoseDonToRest', `${srcName}: virar 1 DON!! ativo de qual oponente?`, { source: srcName }),
+          );
+          if (id === undefined) {
+            // Guarda quantos já foram virados no fim da memória da pergunta.
+            frame.memo!.push(String(n));
+            return false;
+          }
+          if (id === null) break;
+          const o = state.players[id];
+          o.donActive--;
+          o.donRested++;
+          log(state, frame.controller, lg('donRested', `1 DON!! de ${o.name} é virado.`, { n: 1, player: o.name }));
+          n++;
+          left--;
+        }
+        return true;
+      }
+      const o = state.players[opponentOf(state, frame.controller)];
       const n = Math.min(step.count, o.donActive);
       o.donActive -= n;
       o.donRested += n;
@@ -3569,7 +4225,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'returnDon': {
-      const owner = step.opponent ? state.players[opponent(frame.controller)] : ps;
+      const owner = step.opponent ? state.players[opponentOf(state, frame.controller)] : ps;
       const picked = (frame.memo ?? []) as DonSource[];
       if (frame.choice) {
         const src = donSources(owner)[Number(frame.choice[0])];
@@ -3623,7 +4279,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'trashLife': {
-      const target = state.players[step.side === 'own' ? frame.controller : opponent(frame.controller)];
+      const target = state.players[step.side === 'own' ? frame.controller : opponentOf(state, frame.controller)];
       const n = upToCount(state, frame, step, target.life.length, pr('howManyLifeToTrash', `${srcName}: quantas cartas da Vida de ${target.name} descartar?`, { source: srcName, player: target.name }));
       if (n === null) return false;
       for (let i = 0; i < n; i++) target.trash.push(takeLife(target));
@@ -3679,7 +4335,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentDiscards': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const n = Math.min(step.count, opp.hand.length);
       if (n === 0) return true;
       if (!frame.choice) {
@@ -3816,7 +4472,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'trashRandomFromOpponentHand': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       for (let i = 0; i < step.count && opp.hand.length; i++) {
         const uid = opp.hand[Math.floor(nextRandom(state) * opp.hand.length)];
         removeFrom(opp.hand, uid);
@@ -3980,7 +4636,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentTrashToBottom': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const pile = opp.trash.filter((u) => !step.filter || matchesFilter(cardDef(state, u), step.filter));
       const n = Math.min(step.count, pile.length);
       if (!n) return true;
@@ -4012,7 +4668,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'arrangeLife': {
-      const owner = step.whose === 'own' ? ps : state.players[opponent(frame.controller)];
+      const owner = step.whose === 'own' ? ps : state.players[opponentOf(state, frame.controller)];
       if (owner.life.length < 2) return true;
       if (!frame.choice) {
         // Do topo para o fundo, na ordem dos cliques.
@@ -4028,17 +4684,48 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'restDonOrCharacter': {
-      const opp = state.players[opponent(frame.controller)];
       const skip = Boolean(step.skipRefresh);
       // skipRefresh: só cartas viradas que ainda não vão ficar viradas; DON!! virados que ainda não vão ficar.
-      const skippedDon = (state.donSkipRefresh ?? []).filter((d) => d.player === opp.id).reduce((n, d) => n + d.count, 0);
-      const donAvailable = skip ? opp.donRested > skippedDon : opp.donActive > 0;
+      const skippedDon = (id: PlayerId) => (state.donSkipRefresh ?? []).filter((d) => d.player === id).reduce((n, d) => n + d.count, 0);
+      const hasDon = (id: PlayerId) => (skip ? state.players[id].donRested > skippedDon(id) : state.players[id].donActive > 0);
+      // Mesa com mais de dois: "1 of your opponent's DON!! cards or Characters" é um alvo de qualquer oponente;
+      // cada oponente com DON!! que sirva vira uma opção.
+      const many = isMultiplayer(state) && fixedOpponent(state, frame.controller) === undefined;
+      const donOwners = (many ? opponentSides(state, frame.controller) : [opponentOf(state, frame.controller)]).filter(hasDon);
+      const opp = state.players[donOwners[0] ?? opponentOf(state, frame.controller)];
+      const donAvailable = donOwners.length > 0;
       const spec: TargetSpec = { ...step.spec, side: 'opponent', upTo: 1 };
       const chars = targetCandidates(state, frame.controller, frame.source, spec).filter((u) =>
         skip ? !state.modifiers.some((m) => m.uid === u && m.kind === 'skipRefresh') : !locate(state, u)?.fc.rested,
       );
       const onlyChars = spec.kinds.every((k) => k === 'character');
       const cardLabel = onlyChars ? 'um Personagem do oponente' : 'uma carta do oponente (Líder, Personagem ou Stage)';
+      if (!frame.memo && many && donOwners.length > 1) {
+        if (!chars.length && !donAvailable) return true;
+        // Uma opção de DON!! por oponente ("Virar 1 DON!! ativo de Fulano").
+        const name = (id: PlayerId) => state.players[id].name;
+        const donText = (id: PlayerId) => (skip ? `1 DON!! virado de ${name(id)}` : `Virar 1 DON!! ativo de ${name(id)}`);
+        const donPart = (id: PlayerId): MsgList => ({ items: [{ key: skip ? 'engine.optSkipRefreshDonOf' : 'engine.optRestDonOf', params: { player: name(id) } }] });
+        const charText = skip
+          ? onlyChars
+            ? 'Um Personagem virado do oponente'
+            : 'Uma carta virada do oponente (Líder, Personagem ou Stage)'
+          : `Virar ${cardLabel}`;
+        const charKey = skip ? (onlyChars ? 'engine.optSkipRefreshCharacter' : 'engine.optSkipRefreshCard') : onlyChars ? 'engine.optRestOpponentCharacter' : 'engine.optRestOpponentCard';
+        askOption(
+          state,
+          frame,
+          frame.controller,
+          skip
+            ? pr('whatSkipsRefresh', `${srcName}: o que não desvira na próxima Renovação do oponente?`, { source: srcName })
+            : pr('whatToRest', `${srcName}: o que virar?`, { source: srcName }),
+          [...donOwners.map(donText), ...(chars.length ? [charText] : []), 'Nenhum'],
+          [...donOwners.map(() => null), ...(chars.length ? [charKey] : []), 'engine.optNone'],
+          [...donOwners.map(donPart), ...(chars.length ? [null] : []), null],
+        );
+        frame.memo = ['pick', ...donOwners.map((id) => `don:${id}`), ...(chars.length ? ['char'] : [])];
+        return false;
+      }
       if (!frame.memo) {
         if (!donAvailable && !chars.length) return true;
         if (!frame.choice) {
@@ -4066,13 +4753,16 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
             opts,
             optKeys,
           );
-          frame.memo = ['pick', ...(donAvailable ? ['don'] : []), ...(chars.length ? ['char'] : [])];
+          frame.memo = ['pick', ...(donAvailable ? [many ? `don:${opp.id}` : 'don'] : []), ...(chars.length ? ['char'] : [])];
           return false;
         }
       }
       if (frame.memo?.[0] === 'pick') {
-        const pick = frame.memo[1 + Number(frame.choice?.[0])];
+        const raw = frame.memo[1 + Number(frame.choice?.[0])];
         frame.choice = undefined;
+        // 'don' (o único oponente) ou 'don:<lugar>' (mesa com mais de dois).
+        const pick = raw?.startsWith('don:') ? 'don' : raw;
+        const opp = raw?.startsWith('don:') ? state.players[Number(raw.slice(4))] : state.players[opponentOf(state, frame.controller)];
         if (pick === 'don') {
           if (skip) {
             (state.donSkipRefresh ??= []).push({ player: opp.id, count: 1 });
@@ -4108,7 +4798,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       log(state, frame.controller, lg('choosesCost', `${ps.name} escolhe o custo ${frame.chosenCost}.`, { player: ps.name, n: frame.chosenCost }));
       return true;
     case 'revealOpponentTop': {
-      const card = state.players[opponent(frame.controller)].deck[0];
+      const card = state.players[opponentOf(state, frame.controller)].deck[0];
       frame.last = card ? [card] : [];
       if (card) log(state, frame.controller, lg('revealsOppDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck do oponente.`, { player: ps.name, card: cardDef(state, card).name }), { uids: [card] });
       return true;
@@ -4270,7 +4960,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'revealOpponentHand': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const picked: string[] = [];
       const pool = [...opp.hand];
       for (let k = 0; k < step.count && pool.length; k++) picked.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
@@ -4280,7 +4970,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentLifeToBottom': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const n = Math.min(step.count, opp.life.length);
       for (let k = 0; k < n; k++) opp.deck.push(takeLife(opp));
       if (n) {
@@ -4327,14 +5017,28 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'skipRefreshDon': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       if (step.atMainPhase) {
         (state.donRestAtMain ??= []).push({ player: opp.id, count: step.count });
         log(state, frame.controller, lg('oppWillRestDon', `${opp.name} vai virar ${step.count} DON!! ativo(s) no início da próxima Fase Principal.`, { player: opp.name, n: step.count }));
         return true;
       }
-      (state.donSkipRefresh ??= []).push({ player: opp.id, count: step.count });
-      log(state, frame.controller, lg('donSkipsRefresh', `${step.count} DON!! de ${opp.name} não fica(m) ativo(s) na próxima Renovação.`, { n: step.count, player: opp.name }));
+      let target = opp;
+      if (isMultiplayer(state) && fixedOpponent(state, frame.controller) === undefined) {
+        // "Up to 1 of your opponent's rested DON!! cards will not become active": um alvo, de qualquer oponente.
+        const skipped = (id: PlayerId) => (state.donSkipRefresh ?? []).filter((d) => d.player === id).reduce((k, d) => k + d.count, 0);
+        const id = donTargetOpponent(
+          state,
+          frame,
+          opponentSides(state, frame.controller).filter((o) => state.players[o].donRested > skipped(o)),
+          pr('whoseDonSkipsRefresh', `${srcName}: o DON!! virado de qual oponente não desvira?`, { source: srcName }),
+        );
+        if (id === undefined) return false;
+        if (id === null) return true;
+        target = state.players[id];
+      }
+      (state.donSkipRefresh ??= []).push({ player: target.id, count: step.count });
+      log(state, frame.controller, lg('donSkipsRefresh', `${step.count} DON!! de ${target.name} não fica(m) ativo(s) na próxima Renovação.`, { n: step.count, player: target.name }));
       return true;
     }
     case 'replaceRest': {
@@ -4368,7 +5072,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       log(state, frame.controller, lg('extraTurn', `${ps.name} jogará um turno extra.`, { player: ps.name }));
       return true;
     case 'opponentMay': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const canPay =
         step.pay === 'lifeTrash' ? opp.life.length >= step.count : step.pay === 'discard' ? opp.hand.length >= step.count : opp.donActive >= step.count;
       const what =
@@ -4393,7 +5097,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentPlays': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const options = opp.hand.filter((u) => {
         const def = cardDef(state, u);
         return def.category === 'character' && matchesFilter(def, step.filter) && !def.abilities.some((a) => a.noPlayByEffect);
@@ -4416,7 +5120,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentAddDon': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const n = Math.min(step.count, opp.donDeck);
       // "your opponent may add …": quem decide é o oponente.
       if (step.may && n > 0) {
@@ -4440,7 +5144,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'donMatchOpponent': {
-      const extra = totalDonOnField(ps) - totalDonOnField(state.players[opponent(frame.controller)]);
+      // "until you have the same number of DON!! cards on your field as your opponent": com mais de dois, basta
+      // um oponente (regra 10 do manual): vale o que tem mais DON!! (o que obriga a devolver menos).
+      const extra = totalDonOnField(ps) - Math.max(...opponentSides(state, frame.controller).map((o) => totalDonOnField(state.players[o])));
       if (extra > 0) frame.steps.splice(frame.i + 1, 0, { do: 'returnDon', count: extra });
       return true;
     }
@@ -4484,7 +5190,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'handAllToDeck': {
-      const who = step.who === 'self' ? ps : state.players[opponent(frame.controller)];
+      const who = step.who === 'self' ? ps : state.players[opponentOf(state, frame.controller)];
       const n = who.hand.length;
       who.deck.push(...who.hand.splice(0));
       frame.eventCount = n;
@@ -4499,7 +5205,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentDraws': {
-      const o = state.players[opponent(frame.controller)];
+      const o = state.players[opponentOf(state, frame.controller)];
       drawCards(state, o.id, step.count);
       log(state, frame.controller, lg('draws', `${o.name} compra ${step.count} carta(s).`, { player: o.name, n: step.count }));
       return true;
@@ -4515,7 +5221,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentChoosesOwn': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const options = targetCandidates(state, opp.id, frame.source, { ...step.spec, side: 'own' }).filter(
         (u) => locate(state, u)?.zone === 'character' && !removalBlocked(state, u, frame.controller),
       );
@@ -4546,7 +5252,13 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'takeDamage':
-      state.stack.push({ kind: 'damage', defender: step.opponent ? opponent(frame.controller) : frame.controller, remaining: step.count, banish: false });
+      state.stack.push({
+        kind: 'damage',
+        defender: step.opponent ? opponentOf(state, frame.controller) : frame.controller,
+        remaining: step.count,
+        banish: false,
+        ...(isMultiplayer(state) ? { by: frame.controller } : {}),
+      });
       return true;
     case 'lifeTrashUntil': {
       const n = Math.max(0, ps.life.length - step.count);
@@ -4558,7 +5270,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'trashHandUntil': {
-      const who = step.both ? [frame.controller, opponent(frame.controller)] : [frame.controller];
+      const who = step.both ? [frame.controller, opponentOf(state, frame.controller)] : [frame.controller];
       const memo = frame.memo ?? [];
       // Um jogador por vez: memo guarda quem já descartou.
       const next = who.find((p) => !memo.includes(String(p)) && state.players[p].hand.length > step.count);
@@ -4591,10 +5303,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return !who.some((p) => !frame.memo!.includes(String(p)) && state.players[p].hand.length > step.count);
     }
     case 'negateOnPlay': {
-      const who = step.who === 'self' ? frame.controller : opponent(frame.controller);
-      const mine = state.activePlayer === frame.controller;
-      const untilTurn = step.duration === 'nextOpponentTurn' ? state.turn + (mine ? 1 : 2) : state.turn;
-      (state.onPlayNegated ??= []).push({ player: who, untilTurn, source: frame.source });
+      const who = step.who === 'self' ? frame.controller : opponentOf(state, frame.controller);
+      const until: import('./types').Expiry = { untilTurn: state.turn };
+      if (step.duration === 'nextOpponentTurn') setExpiry(state, frame.controller, until, step.duration);
+      (state.onPlayNegated ??= []).push({ player: who, untilTurn: until.untilTurn!, source: frame.source, ...(until.untilStartOf !== undefined ? { untilStartOf: until.untilStartOf } : {}), ...(until.untilEndOf !== undefined ? { untilEndOf: until.untilEndOf } : {}) });
       log(state, frame.controller, lg('playerOnPlayNegated', `Os efeitos [Ao Jogar] de ${state.players[who].name} estão anulados.`, { player: state.players[who].name }));
       return true;
     }
@@ -4769,10 +5481,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'restrict': {
       // Quem fica restrito e até quando: "your opponent cannot …", "until the end of your opponent's next turn".
-      const player = step.opponent ? opponent(frame.controller) : frame.controller;
+      const player = step.opponent ? opponentOf(state, frame.controller) : frame.controller;
       const r: Restriction = { player, kind: step.kind, ...(step.minCost !== undefined ? { minCost: step.minCost } : {}) };
       // Como em addModifier: no seu turno, acaba no fim do turno seguinte (do oponente); no do oponente, no fim do próximo dele.
-      if (step.duration === 'nextOpponentTurn') r.untilTurn = state.turn + (state.activePlayer === frame.controller ? 1 : 2);
+      if (step.duration === 'nextOpponentTurn') setExpiry(state, frame.controller, r, step.duration);
       (state.restrictions ??= []).push(r);
       return true;
     }
@@ -4786,7 +5498,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!t) return false;
       const copied =
         step.copy === 'opponentLeader'
-          ? state.players[opponent(frame.controller)].leader.uid
+          ? state.players[opponentOf(state, frame.controller)].leader.uid
           : step.copy === 'attacker'
             ? state.battle?.attacker
             : step.copy === 'chosen'
@@ -4977,7 +5689,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'lookOpponentTop': {
       // A carta aparece inteira só para quem olha (`shown`); o oponente e os espectadores veem
       // apenas que uma carta do topo foi olhada. O histórico guarda o nome só para quem olhou.
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const card = opp.deck[0];
       if (!card) return true;
       if (!frame.choice) {
@@ -5008,7 +5720,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentLifeToHand': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const n = upToCount(state, frame, step, opp.life.length, pr('howManyOpponentLifeToHand', `${srcName}: quantas cartas da Vida de ${opp.name} vão para a mão dele?`, { source: srcName, player: opp.name }));
       if (n === null) return false;
       for (let i = 0; i < n; i++) lifeToHandCard(state, opp.id, opp.life.pop()!);
@@ -5017,7 +5729,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentHandToBottom': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       const n = Math.min(step.count, opp.hand.length);
       if (n === 0) return true;
       if (!frame.choice) {
@@ -5239,7 +5951,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'peekLife': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = step.whose === 'own' ? ps : state.players[opponentOf(state, frame.controller)];
       // Etapa 1: de quem é a Vida (memo[0] = 'own' | 'opp').
       if (!frame.memo) {
         const sides = (step.whose === 'either' ? ['own', 'opp'] : [step.whose === 'own' ? 'own' : 'opp']).filter(
@@ -5291,7 +6003,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'chooseOne': {
-      const chooser = step.chooser === 'self' ? frame.controller : opponent(frame.controller);
+      const chooser = step.chooser === 'self' ? frame.controller : opponentOf(state, frame.controller);
       if (!frame.choice) {
         askOption(state, frame, chooser, pr('chooseAnEffect', `${srcName}: escolha um efeito.`, { source: srcName }), step.labels);
         return false;
@@ -5354,7 +6066,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'opponentReturnsDon': {
-      const opp = state.players[opponent(frame.controller)];
+      const opp = state.players[opponentOf(state, frame.controller)];
       if (step.activeOnly) {
         const k = Math.min(step.count, opp.donActive);
         opp.donActive -= k;
@@ -5430,7 +6142,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
               : step.from === 'deckOrTrash'
                 ? [...ps.deck, ...ps.trash]
                 : [...ps.hand, ...ps.trash];
-      const donCap = step.filter.maxCostDon ? totalDonOnField(ps) : step.filter.maxCostOppDon ? totalDonOnField(state.players[opponent(frame.controller)]) : undefined;
+      const donCap = step.filter.maxCostDon ? totalDonOnField(ps) : step.filter.maxCostOppDon ? Math.max(...opponentSides(state, frame.controller).map((o) => totalDonOnField(state.players[o]))) : undefined;
       const filter = donCap !== undefined ? { ...step.filter, maxCost: Math.min(step.filter.maxCost ?? 99, donCap) } : step.filter;
       const lastColors = step.notColorOfLast && frame.last?.[0] ? cardDef(state, frame.last[0]).colors : [];
       const sameName = step.filter.sameNameAsChosen ? (frame.trashed ?? []).map((u) => cardDef(state, u).name) : null;
@@ -5826,7 +6538,7 @@ function replacementMatches(r: Replacement, action: RemovalAction, owner: Player
   // "would be K.O.'d": só K.O.
   if (r.event !== 'removal' && action === 'ko' && cause(r.by)) return true;
   // "would be removed from the field" / "would leave the field": qualquer saída do campo (o K.O. também),
-  // inclusive por efeito próprio quando o texto não diz "by your opponent('s effect)".
+  // inclusive por efeito próprio quando o texto não diz "by your opponentOf(state, 's effect)".
   return r.event !== 'ko' && cause(r.event === 'koOrRemoval' ? (r.removalBy ?? r.by) : r.by);
 }
 
@@ -5847,7 +6559,7 @@ interface ReplacementOffer {
  * cobre todas as vítimas a que se aplica (um pagamento salva todas, Q&A OP15-009, OP11-001, OP05-001).
  */
 function nextReplacement(state: GameState, victims: string[], action: RemovalAction, ctx: RemovalCtx, skip: string[]): ReplacementOffer | null {
-  for (const pid of [state.activePlayer, opponent(state.activePlayer)]) {
+  for (const pid of isMultiplayer(state) ? turnOrder(state, state.activePlayer) : [state.activePlayer, opponent(state.activePlayer)]) {
     const owner = state.players[pid];
     const mine = victims.filter((u) => owner.characters.some((c) => c.uid === u));
     if (!mine.length) continue;
@@ -6015,7 +6727,6 @@ export function koProtected(state: GameState, uid: string, inBattle: boolean, by
   const effectKO = (v: true | 'opponent' | undefined) => !inBattle && (v === true || (v === 'opponent' && byOpponent));
   const kinds = inBattle ? ['cannotBeKO', 'cannotBeKOInBattle'] : ['cannotBeKO', 'cannotBeKOByEffect', ...(byOpponent ? ['cannotBeKOByOpponentEffect'] : [])];
   if (state.modifiers.some((m) => m.uid === uid && kinds.includes(m.kind))) return true;
-  const byAttrs = by ? (cardDef(state, by).attributes ?? []) : [];
   const zone = locate(state, uid)?.zone;
   if (!inBattle && zone && zone !== 'stage' && aurasOn(state, uid, zone, (au) => effectKO(au.noEffectKO)).length) return true;
   if (inBattle && zone && zone !== 'stage' && aurasOn(state, uid, zone, (au) => Boolean(au.noBattleKO)).length) return true;
@@ -6037,7 +6748,7 @@ export function koProtected(state: GameState, uid: string, inBattle: boolean, by
     (a) =>
       a.timing === 'static' &&
       ((inBattle ? a.staticNoBattleKO : effectKO(a.staticNoEffectKO)) ||
-        (inBattle && a.noBattleKOVsAttribute !== undefined && byAttrs.includes(a.noBattleKOVsAttribute) && (!a.noBattleKOVsAttributeCharacters || byChar)) ||
+        (inBattle && a.noBattleKOVsAttribute !== undefined && by !== undefined && hasAttribute(cardDef(state, by), a.noBattleKOVsAttribute) && (!a.noBattleKOVsAttributeCharacters || byChar)) ||
         (inBattle && a.noBattleKOByLeader && by !== undefined && locate(state, by)?.zone === 'leader') ||
         // "by Characters without the "Special" attribute": o Líder (qualquer atributo) ainda nocauteia.
         (inBattle && a.noBattleKOUnlessAttribute !== undefined && byChar && !hasAttributeOn(state, by!, a.noBattleKOUnlessAttribute))) &&
@@ -6253,7 +6964,7 @@ function checkDefeat(state: GameState) {
   if (state.phase === 'gameover' || state.phase === 'mulligan') return;
   const losers: PlayerId[] = [];
   const winners: PlayerId[] = [];
-  for (const ps of state.players) {
+  for (const ps of alivePlayers(state)) {
     if (ps.deck.length !== 0 || leaderRule(state, ps.id, 'deckOutEndOfTurn')) continue;
     // "… you win the game instead of losing": vitória pela regra do Líder.
     (leaderRule(state, ps.id, 'deckOutWin') ? winners : losers).push(ps.id);
@@ -6261,20 +6972,14 @@ function checkDefeat(state: GameState) {
   if (winners.length === 1) {
     const w = state.players[winners[0]];
     gameOver(state, w.id, lg('winDeckOutLeaderRule', `${w.name} ficou sem cartas no deck e vence pela regra do Líder.`, { player: w.name }));
-  } else if (winners.length === 2) {
+  } else if (winners.length >= 2) {
     gameOver(state, null, lg('winBothDeckOutLeaderRule', 'Os dois ficaram sem cartas no deck e vencem pela regra do Líder.'));
-  } else defeat(
+  } else eliminate(
       state,
       losers,
       (ps) => lg('winDeckOut', `${ps.name} ficou sem cartas no deck.`, { player: ps.name }),
       lg('winBothDeckOut', 'Os dois ficaram sem cartas no deck.'),
     );
-}
-
-/** Aplica a derrota de `losers`: um perde e o outro vence; os dois juntos, empate (9-2-1). */
-function defeat(state: GameState, losers: PlayerId[], reason: (ps: PlayerState) => Prompt, both: Prompt) {
-  if (losers.length === 2) gameOver(state, null, both);
-  else if (losers.length === 1) gameOver(state, opponent(losers[0]), reason(state.players[losers[0]]));
 }
 
 /** Fim da partida. `winner` null: empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */

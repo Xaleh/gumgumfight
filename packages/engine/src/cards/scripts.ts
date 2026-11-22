@@ -29,6 +29,11 @@ const anyChar = (extra: Partial<TargetSpec> = {}): TargetSpec => ({
 });
 
 export const CARD_SCRIPTS: Record<string, CardScript> = {
+  // ------------------------------------------------------------ Selado
+  // Luffy de 6 cores dos eventos Sealed Battle. "This Leader can only be used in designated events" é
+  // regra de deck (`formats.ts`); "treated as a card with all card names, types, and attributes" é a
+  // marca `wild` da carta (`buildCardDef`). Não tem efeito de jogo.
+  'SEALED-001': { abilities: [] },
   // ------------------------------------------------------------ ST01 Straw Hat Crew (vermelho)
   // Sem efeito: ST01-003 Karoo, ST01-008 Nico Robin, ST01-009 Nefeltari Vivi, ST01-010 Franky.
   'ST01-001': {

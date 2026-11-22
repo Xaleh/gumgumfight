@@ -11,6 +11,7 @@ import {
   type FormatId,
   formatLabel,
   type GameState,
+  isCube,
   type LogEntry,
   type ManualOp,
   type Pending,
@@ -18,6 +19,7 @@ import {
   type PlayFormat,
   type PlayMode,
   type SpoilerRule,
+  type TableRules,
 } from '@gumgum/engine';
 
 export type { FormatId, PlayFormat, PlayMode };
@@ -28,6 +30,8 @@ export interface DeckSummary {
   kind: 'builtin' | 'user';
   /** Deck pronto do meta global (data/decks/meta): grupo "Decks do meta", jogado pelo Bot do Time (servidores antigos não mandam). */
   meta?: boolean;
+  /** Deck pronto do All Blue (data/decks/allblue): só entra no sorteio do oponente nesse formato. */
+  allBlue?: boolean;
   leader: string;
   leaderName: string | null;
   /** Imagem do Líder (null quando o servidor desliga as imagens). */
@@ -40,6 +44,10 @@ export interface DeckSummary {
   formats: Record<FormatId, string[]>;
   /** Os mesmos motivos, na mesma ordem, com a chave `rules.…` para traduzir (servidores antigos não mandam). */
   formatCodes?: Record<FormatId, Array<{ code: string; params: Params }>>;
+  /** O que impede o deck de ser usado no Yonko (vazio = deck de 60, uma cópia de cada); servidores antigos não mandam. */
+  yonko?: string[];
+  /** Os mesmos motivos com a chave `rules.…` para traduzir. */
+  yonkoCodes?: Array<{ code: string; params: Params }>;
   unscripted: number;
   /** Cartas de spoiler, ainda não lançadas (servidores antigos não mandam): o deck não vale na ranqueada. */
   spoilers?: string[];
@@ -56,6 +64,47 @@ export interface DeckSummary {
   games?: number;
   /** Sua última partida com o deck (null = nunca jogou). */
   lastPlayedAt?: string | null;
+}
+
+/** Um lugar numa mesa do Yonko: a mesa, o código dela e o token do lugar (fica no navegador de quem senta). */
+export interface YonkoSeatRef {
+  id: string;
+  code: string;
+  token: string;
+  status?: 'waiting' | 'playing' | 'finished';
+}
+
+/** Um lugar da sala de espera do Yonko como o servidor descreve (null = vazio). */
+export interface YonkoSeatInfo {
+  name: string;
+  bot: boolean;
+  ready: boolean;
+  connected: boolean;
+  leader: string;
+  leaderName: string;
+  colors: string[];
+  deckName: string;
+  /** Deck de teste (montado a partir de um deck de 50). */
+  test: boolean;
+  you: boolean;
+}
+
+/** O resumo de uma mesa do Yonko que chega pelo canal (`state.room`). */
+export interface YonkoRoomInfo {
+  id: string;
+  code: string;
+  status: 'waiting' | 'playing' | 'finished';
+  host: number;
+  /** O lugar da sala de quem recebe. */
+  you: number | null;
+  rules: TableRules;
+  seats: Array<YonkoSeatInfo | null>;
+  /** Por que ainda não dá para começar (só na espera). */
+  problem: { code: string; text: string; params?: Params } | null;
+  /** Na partida: o jogador do motor de quem recebe. */
+  player: number | null;
+  players: Array<{ seat: number; name: string; bot: boolean; connected: boolean; leader: string; test: boolean }> | null;
+  clock: { remaining: number[]; running: number | null; total: number; awaySince: number | null; abandonMs: number } | null;
 }
 
 /** Deck com a mesma lista que o construtor tentou salvar (resposta 409 `deckDuplicate`). */
@@ -107,6 +156,8 @@ export const setCurrentSpoilerSet = (set: string | null | undefined) => {
  * lançadas também impedem.
  */
 export function canPlay(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all', spoilerSet = currentSpoilerSet()): boolean {
+  // O Selado não usa os decks salvos: o deck sai dos boosters (tela do Selado).
+  if (format === 'sealed') return false;
   return (
     deck.valid && !(format !== 'free' && deck.formats?.[format]?.length) && !barredSpoilers(deck.spoilers ?? [], spoilers, spoilerSet).length
   );
@@ -115,6 +166,7 @@ export function canPlay(deck: DeckSummary, format: PlayFormat, spoilers: Spoiler
 /** Por que o deck não pode ser usado no formato (null = pode). */
 export function whyNotPlayable(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all', spoilerSet = currentSpoilerSet()): string | null {
   if (!deck.valid) return t('labels.deckIncomplete', { size: deck.size });
+  if (format === 'sealed') return t('sealed.onlySealedDecks');
   const issues = (format !== 'free' && deck.formats?.[format]) || [];
   const codes = format !== 'free' ? deck.formatCodes?.[format] : undefined;
   if (issues.length) return issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n');
@@ -133,8 +185,17 @@ export function spoilerText(ids: string[], rule: SpoilerRule = 'none', spoilerSe
  * Nome das regras de cartas de um torneio ou sala: "Standard", "Standard + EB05" (a coleção de
  * spoiler aceita), "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"… (traduzido).
  */
-export function modeLabel(m: { format: PlayFormat | string; spoilers?: boolean; spoilerSet?: string | null }, tr: Translate = t): string {
+export function modeLabel(
+  m: { format: PlayFormat | string; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null; sealedPod?: string | null },
+  tr: Translate = t,
+): string {
   if (m.format === 'free') return tr('mode.free');
+  if (m.format === 'sealed') {
+    if (isCube(m.sealedSet)) return tr('mode.draftCube');
+    if (m.sealedPod) return tr('mode.draft', { sets: (m.sealedSet ?? '').split('+').join(' + ') });
+    if (m.sealedSet?.includes('+')) return tr('mode.packRush', { sets: m.sealedSet.split('+').join(' + ') });
+    return m.sealedSet ? tr('mode.sealedSet', { set: m.sealedSet }) : tr('mode.sealed');
+  }
   const format = formatLabel(m.format as FormatId);
   if (!m.spoilers) return format;
   return m.spoilerSet ? tr('mode.withSpoilerSet', { format, set: m.spoilerSet }) : tr('mode.withSpoilers', { format });
@@ -146,7 +207,8 @@ export function deckGroups(decks: DeckSummary[]): Array<[MessageKey, DeckSummary
     ['labels.deckGroup.mine', decks.filter((d) => d.kind === 'user' && d.mine)],
     ['labels.deckGroup.community', decks.filter((d) => d.kind === 'user' && !d.mine)],
     ['labels.deckGroup.meta', decks.filter((d) => d.kind === 'builtin' && d.meta)],
-    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin' && !d.meta)],
+    ['labels.deckGroup.allBlue', decks.filter((d) => d.kind === 'builtin' && d.allBlue)],
+    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin' && !d.meta && !d.allBlue)],
   ];
 }
 
@@ -273,6 +335,82 @@ export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards' | 'arts'>;
 
 export type ApiCard = CardData & { provisional?: boolean };
 
+/** Coleção em que dá para abrir boosters no Selado. */
+export interface SealedSetInfo {
+  set: string;
+  cards: number;
+  leaders: number;
+  /** Parte das cartas com efeito automatizado (0 a 1). */
+  automated: number;
+  /** Coleção ainda não lançada (pré-release de verdade). */
+  spoiler: boolean;
+  /** O booster da coleção: as vagas e a chance (0 a 1) de vir uma SR, uma SEC e um Líder (servidores antigos não mandam). */
+  pack?: { commons: number; uncommons: number; rares: number; sr: number; sec: number; leader: number };
+}
+export type SealedDeck = { leader: string; cards: Array<{ id: string; count: number }> };
+/** Resumo de uma coleção aberta (lista "seus decks selados"). */
+export interface SealedPoolSummary {
+  id: string;
+  /** A coleção; no Pack Rush, a chave das coleções escolhidas ("OP01+OP05"). */
+  set: string;
+  createdAt: string;
+  updatedAt: string;
+  wins: number;
+  losses: number;
+  leader: string | null;
+  size: number;
+  /** Deck completo e conferido no servidor: dá para jogar. */
+  ready: boolean;
+  /** Deck de Draft: as cartas foram escolhidas num pod (`packs` são as escolhas de cada rodada). */
+  draft?: boolean;
+}
+
+/** O Cubo em uso no Draft Cubo: a lista da temporada, com o uso que pôs cada carta nela. */
+export interface CubeInfo {
+  /** A chave do modo ("CUBE:T1"): é a "coleção" dos pods e dos decks de Draft Cubo. */
+  key: string;
+  id: string;
+  name: string;
+  publishedAt: string;
+  source: { name: string; url: string; tournaments: number; decks: number; from: string; to: string };
+  perColor: number;
+  /** `usage`: parte dos decks que jogava a carta no melhor ano dela (0 a 1). */
+  cards: Array<{ id: string; usage: number; decks: number }>;
+}
+
+/** O que o jogador vê de um pod de Draft. */
+export interface DraftPod {
+  id: string;
+  code: string;
+  /** A coleção, a chave das coleções no Pack Rush draft ("OP01+OP05") ou a do Cubo ("CUBE:T1"). */
+  sets: string;
+  status: 'waiting' | 'drafting' | 'done';
+  host: boolean;
+  you: number;
+  seats: Array<{ name: string; bot: boolean; you: boolean; away: boolean; picked: number; choosing: boolean }>;
+  capacity: number;
+  rounds: number;
+  round: number;
+  packSize: number;
+  /** O booster na mão (null: esperando o vizinho passar). */
+  pack: string[] | null;
+  packSet: string | null;
+  /** Milissegundos até o servidor escolher por você. */
+  timeLeft: number | null;
+  passTo: string | null;
+  picks: string[][];
+  /** No fim: o deck selado com as escolhas. */
+  poolId: string | null;
+}
+export interface SealedPool extends SealedPoolSummary {
+  /** Os boosters, na ordem em que foram sorteados no servidor. */
+  packs: string[][];
+  /** A coleção de cada booster (no Pack Rush elas variam; servidores antigos não mandam). */
+  packSets?: string[];
+  deck: SealedDeck | null;
+  issues: Array<{ level: 'error' | 'warning'; message: string; code: string; params: Params; cardId?: string }>;
+}
+
 /** Corpo de uma resposta de erro do servidor: `error` em português e `errorCode` (+ `errorParams`) para traduzir. */
 type ErrorBody = { error?: string; errorCode?: string; errorParams?: Record<string, unknown> } & Record<string, unknown>;
 
@@ -383,9 +521,9 @@ export const isTeam = (u: User | null | undefined) => Boolean(u && (u.team || is
 // ------------------------------------------------------------------ apoio ao projeto
 
 /** Planos de apoio mensal, do menor para o maior. */
-export type SupporterTier = 'grumete' | 'tripulante' | 'capitao' | 'almirante';
-export const SUPPORTER_TIERS: SupporterTier[] = ['grumete', 'tripulante', 'capitao', 'almirante'];
-export const TIER_LABEL: Record<SupporterTier, string> = { grumete: 'Grumete', tripulante: 'Tripulante', capitao: 'Capitão', almirante: 'Almirante' };
+export type SupporterTier = 'grumete' | 'capitao' | 'almirante';
+export const SUPPORTER_TIERS: SupporterTier[] = ['grumete', 'capitao', 'almirante'];
+export const TIER_LABEL: Record<SupporterTier, string> = { grumete: 'Grumete', capitao: 'Capitão', almirante: 'Almirante' };
 export const tierRank = (t: SupporterTier | null | undefined) => (t ? SUPPORTER_TIERS.indexOf(t) + 1 : 0);
 /** A conta tem o benefício do plano `min` (admins têm todos, para testar e moderar). */
 export const hasPerk = (u: User | null | undefined, min: SupporterTier) => Boolean(u && (isAdmin(u.role) || tierRank(u.supporter?.tier) >= tierRank(min)));
@@ -527,8 +665,6 @@ export interface AppConfig {
   googleClientId: string | null;
   /** O apoio está configurado: o item "Apoiar o projeto" aparece. */
   support: boolean;
-  /** supporters: o site só abre para apoiadores (homologação). */
-  access: 'open' | 'supporters';
   /** Chave pública para as notificações (null = desligadas no servidor). */
   pushKey?: string | null;
   /** Próxima coleção a ser lançada, a dos modos "+ spoilers" fora do Livre (servidores antigos não mandam). */
@@ -608,6 +744,30 @@ export const api = {
   /** O mesmo Líder nas partidas daqui (no formato da fila) e na fila deles. */
   globalCompare: (queue: string, format?: string) =>
     get<GlobalCompare>(`/api/stats/global/compare?queue=${encodeURIComponent(queue)}${format ? `&format=${encodeURIComponent(format)}` : ''}`),
+  /** Selado (Pré-release): os boosters abertos de quem pede e o deck montado com eles. */
+  sealed: {
+    sets: () => get<{ packs: number; deckSize: number; rush?: { min: number; max: number }; sets: SealedSetInfo[] }>('/api/sealed/sets'),
+    pools: () => get<SealedPoolSummary[]>('/api/sealed/pools'),
+    /** Uma coleção: Selado. Várias: Pack Rush (cada booster sorteado entre elas). */
+    open: (sets: string[]) => send<SealedPool>('POST', '/api/sealed/pools', sets.length > 1 ? { sets } : { set: sets[0] }),
+    pool: (id: string) => get<SealedPool>(`/api/sealed/pools/${encodeURIComponent(id)}`),
+    saveDeck: (id: string, deck: SealedDeck) => send<SealedPool>('PUT', `/api/sealed/pools/${encodeURIComponent(id)}/deck`, deck),
+    remove: (id: string) => send<void>('DELETE', `/api/sealed/pools/${encodeURIComponent(id)}`),
+    /** Deck do bot para o treino no navegador: ele abre os próprios boosters da mesma coleção. */
+    botDeck: (id: string) => send<SealedDeck & { name: string }>('POST', `/api/sealed/pools/${encodeURIComponent(id)}/bot`),
+  },
+  /** Draft: pod de 8 (bots nos lugares vazios); cada um fica com uma carta do booster e passa o resto. */
+  draft: {
+    active: () => get<{ pod: Pick<DraftPod, 'id' | 'code' | 'sets' | 'status'> | null }>('/api/draft/active'),
+    cube: () => get<{ cube: CubeInfo | null }>('/api/draft/cube'),
+    /** `cube`: Draft Cubo (os boosters saem do Cubo em uso, e `sets` não conta). */
+    create: (sets: string[], cube = false) => send<DraftPod>('POST', '/api/draft/pods', cube ? { cube: true } : { sets }),
+    join: (code: string) => send<DraftPod>('POST', '/api/draft/pods/join', { code }),
+    pod: (id: string) => get<DraftPod>(`/api/draft/pods/${encodeURIComponent(id)}`),
+    start: (id: string) => send<DraftPod>('POST', `/api/draft/pods/${encodeURIComponent(id)}/start`),
+    pick: (id: string, card: string) => send<DraftPod>('POST', `/api/draft/pods/${encodeURIComponent(id)}/pick`, { card }),
+    leave: (id: string) => send<void>('POST', `/api/draft/pods/${encodeURIComponent(id)}/leave`),
+  },
   tutorial: {
     progress: () => get<TutorialProgressDto>('/api/tutorial/progress'),
     saveProgress: (p: { done: string[]; dismissed: boolean; completed: boolean; reset?: boolean }) => send<TutorialProgressDto>('PUT', '/api/tutorial/progress', p),
@@ -636,11 +796,6 @@ export const api = {
   },
   sponsors: (placement?: 'tournaments' | 'home') =>
     get<{ sponsors: PublicSponsor[]; contactUrl: string | null }>(`/api/sponsors${placement ? `?placement=${placement}` : ''}`),
-  /** Acesso ao site (homologação só para apoiadores). */
-  access: () =>
-    get<{ mode: 'open' | 'supporters'; allowed: boolean; reason: 'open' | 'login' | 'admin' | 'supporter' | 'remote' | 'denied' | 'unverified'; homeUrl: string | null }>(
-      '/api/access',
-    ),
   support: {
     info: () => get<SupportInfo>('/api/support'),
     supporters: () => get<Array<{ name: string; tier: SupporterTier }>>('/api/support/supporters'),
@@ -791,6 +946,25 @@ export const api = {
       ),
     resolve: (id: number, resolved: boolean, note?: string) => send<MatchReport>('PUT', `/api/reports/${id}`, { resolved, note }),
   },
+  /** Mesas online do Yonko (todos contra todos): ver apps/server/src/yonko/. */
+  yonko: {
+    config: () => get<{ timeBankMs: number; abandonMs: number; seats: number; minPlayers: number }>('/api/yonko/config'),
+    /** As mesas em que este navegador (ou conta) tem lugar, com o token: voltar depois de recarregar. */
+    active: () => get<YonkoSeatRef[]>('/api/yonko/active'),
+    create: (deckId: string, rules: TableRules) => send<YonkoSeatRef>('POST', '/api/yonko/tables', { deckId, rules }),
+    join: (code: string, deckId: string) => send<YonkoSeatRef>('POST', '/api/yonko/tables/join', { code, deckId }),
+    deck: (id: string, t: string, deckId: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/deck`, { t, deckId }),
+    ready: (id: string, t: string, ready: boolean) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/ready`, { t, ready }),
+    rules: (id: string, t: string, rules: TableRules) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/rules`, { t, rules }),
+    bot: (id: string, t: string, seat?: number) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/bot`, { t, ...(seat !== undefined ? { seat } : {}) }),
+    clear: (id: string, t: string, seat: number) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/clear`, { t, seat }),
+    start: (id: string, t: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/start`, { t }),
+    action: (id: string, t: string, seq: number, action: Action) =>
+      send<{ ok: true; actionCount: number }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/action`, { t, seq, action }),
+    reopen: (id: string, t: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/reopen`, { t }),
+    leave: (id: string, t: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/leave`, { t }),
+    eventsUrl: (id: string, t: string) => `/api/yonko/tables/${encodeURIComponent(id)}/events?t=${encodeURIComponent(t)}`,
+  },
   online: {
     config: () => get<{ timeBankMs: number; botRooms: boolean }>('/api/online/config'),
     active: () => get<ActiveRoom[]>('/api/online/active'),
@@ -924,6 +1098,10 @@ export interface LiveRoom {
   spoilers?: boolean;
   /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
   spoilerSet?: string | null;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string | null;
+  /** Sala de decks de Draft: o pod. */
+  sealedPod?: string | null;
   status: 'playing' | 'finished';
   players: Array<{
     name: string;
@@ -992,6 +1170,10 @@ export interface OnlineRoomInfo {
   spoilers?: boolean;
   /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
   spoilerSet?: string | null;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string | null;
+  /** Sala de decks de Draft: o pod. */
+  sealedPod?: string | null;
   /** Jogo de uma partida de torneio; `score`: placar da série antes deste jogo, na ordem dos assentos. */
   tournament: {
     id: string;
@@ -1097,6 +1279,10 @@ export interface TournamentSummary {
   spoilers?: boolean;
   /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
   spoilerSet?: string | null;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string | null;
+  /** Sala de decks de Draft: o pod. */
+  sealedPod?: string | null;
   structure: TournamentStructure;
   topCut: number | null;
   status: TournamentStatus;
@@ -1705,6 +1891,10 @@ export interface TournamentDetail {
   spoilers?: boolean;
   /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
   spoilerSet?: string | null;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string | null;
+  /** Sala de decks de Draft: o pod. */
+  sealedPod?: string | null;
   structure: TournamentStructure;
   swissBestOf: number;
   topCut: number | null;
@@ -1921,7 +2111,7 @@ export interface WinCount {
 }
 
 export interface StatsMeta {
-  /** Estatísticas Pro liberadas para quem pede (plano Tripulante ou acima, ou servidor sem apoio configurado). */
+  /** Estatísticas Pro liberadas para quem pede (plano Capitão ou acima, ou servidor sem apoio configurado). */
   pro: boolean;
   /** O servidor separa as estatísticas gerais (casual) das Pro (ranqueada e torneios). */
   proGate: boolean;

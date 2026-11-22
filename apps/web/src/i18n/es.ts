@@ -7,6 +7,8 @@ import recap from './recap/es';
 import decks from './decks/es';
 import team from './team/es';
 import chamber from './chamber/es';
+import sealed from './sealed/es';
+import yonko from './yonko/es';
 
 export default {
   // ---- general ----
@@ -356,6 +358,8 @@ export default {
   'menu.chipNoManual': 'Sin efectos manuales',
   'menu.chipReleasedOnly': 'Solo cartas lanzadas',
   'menu.rankedNeedsLogin': 'Inicia sesión con Google para jugar clasificatoria.',
+  'menu.rankedNotInFormat': '{format} no tiene clasificatoria. Juégalo en partida rápida.',
+  'menu.allBlueChip': 'Solo C, UC, R y promo',
   'menu.rankedSpoilers': '{n|El mazo tiene # carta de spoiler aún no lanzada: la clasificatoria solo admite cartas lanzadas.|El mazo tiene # cartas de spoiler aún no lanzadas: la clasificatoria solo admite cartas lanzadas.}',
   'menu.rankedManualCards':
     '{n|El mazo tiene # carta con efecto manual (⚙), algo que la clasificatoria no permite.|El mazo tiene # cartas con efectos manuales (⚙), algo que la clasificatoria no permite.}',
@@ -542,6 +546,35 @@ export default {
   'deck.storageSignIn': 'Inicia sesión con Google desde el menú para guardarlos en tu cuenta.',
   // ---- catálogo y filtros ----
   'deck.searchPlaceholder': 'Busca por nombre, número, tipo o texto…',
+  'deck.searchHelp': 'Atajos de búsqueda',
+  'deck.searchHelp.hint': 'Toca un atajo para añadirlo a la búsqueda (toca otra vez para quitarlo). Puedes combinar varios: c3 c2000 blocker.',
+  'deck.searchHelp.numbers': 'Números',
+  'deck.searchHelp.card': 'Carta',
+  'deck.searchHelp.effect': 'Efecto',
+  'deck.searchHelp.deck': 'Mazo',
+  'deck.searchHelp.operators': 'Operadores',
+  'deck.searchHelp.cost': 'Coste 3',
+  'deck.searchHelp.costRange': 'Coste 3 o más · hasta 3 · de 2 a 4',
+  'deck.searchHelp.counter': 'Counter +2000',
+  'deck.searchHelp.noCounter': 'Sin Counter',
+  'deck.searchHelp.power': 'Poder 5000 · 6000 o más (p5 también vale)',
+  'deck.searchHelp.life': 'Líder con 4 de vida',
+  'deck.searchHelp.color': 'Color, también en español (rojo, azul…) o por la letra: r, g, u (azul), p, b (negro), y. Dos colores muestran solo las bicolores',
+  'deck.searchHelp.category': 'Tipo de carta',
+  'deck.searchHelp.attribute': 'Atributo',
+  'deck.searchHelp.rarity': 'Rareza',
+  'deck.searchHelp.set': 'Colección',
+  'deck.searchHelp.keyword': 'Palabra clave que tiene la carta',
+  'deck.searchHelp.timing': 'Momento del efecto',
+  'deck.searchHelp.don': '[DON!! x2] · DON!! −2',
+  'deck.searchHelp.vanilla': 'Sin efecto',
+  'deck.searchHelp.indeck': 'Ya está en el mazo',
+  'deck.searchHelp.legality': 'En Standard: prohibida · válida · rotada',
+  'deck.searchHelp.allBlue': 'Válida en All Blue (C, UC, R y promo)',
+  'deck.searchHelp.new': 'Sin lanzar (spoiler)',
+  'deck.searchHelp.not': 'Quita lo que coincida',
+  'deck.searchHelp.phrase': 'Frase exacta',
+  'deck.searchHelp.field': 'Solo en el nombre · solo en el tipo',
   'deck.filters': 'Filtros',
   'deck.color.red': 'Rojo',
   'deck.color.green': 'Verde',
@@ -569,7 +602,7 @@ export default {
   'deck.manualTitle': 'Efecto aún no automatizado',
   'deck.showMore': 'Mostrar más ({n})',
   'deck.loadingCards': 'Cargando cartas…',
-  'deck.bannedTitle': 'Prohibida: no es válida en ningún formato',
+  'deck.bannedTitle': 'Prohibida: no es válida en Standard ni en Extra Grand Battle',
   'deck.rotatedTitle': 'Bloque ①: rotada, solo válida en Extra Grand Battle',
   // ---- mazo actual ----
   'deck.leader': 'Líder',
@@ -584,6 +617,9 @@ export default {
   'deck.entryManual': '⚙ manual',
   'deck.entryRotated': '① rotada (solo EGB)',
   'deck.entryBanned': '🚫 prohibida',
+  'deck.entryNotAllBlue': 'fuera de All Blue',
+  'deck.onlyAllBlue': 'Construir para All Blue',
+  'deck.onlyAllBlueTitle': 'Muestra solo las cartas válidas en All Blue (C, UC, R y promo; Líder libre) y marca en la lista las que no lo son.',
   'deck.removeOne': 'Quitar una',
   'deck.addOne': 'Añadir una',
   'deck.allowedIn': 'Válido en {format}',
@@ -2423,6 +2459,14 @@ export default {
   'engine.optPeekOwnLife': 'Mirar tu Vida',
   'engine.optPeekOpponentLife': 'Mirar la Vida de tu rival',
   'engine.optDontPeek': 'No mirar',
+  // ---- mesa con más de dos jugadores (Yonko) ----
+  'engine.whoseDonToRest': '{source}: ¿girar 1 DON!! activo de qué rival?',
+  'engine.whoseDonSkipsRefresh': '{source}: ¿el DON!! girado de qué rival no se endereza?',
+  'engine.optRestDonOf': 'Girar 1 DON!! activo de {player}',
+  'engine.optSkipRefreshDonOf': '1 DON!! girado de {player}',
+  'engine.startCurve': '{player}: elige tu salida.',
+  'engine.optCurveOdd': '1 DON!! en el primer turno y robar 1 carta (1, 3, 5, 7, 9, 10)',
+  'engine.optCurveEven': '2 DON!! en el primer turno, sin robar (2, 4, 6, 8, 10)',
   'engine.optYesLifeTrash': 'Sí, descartar {n|# carta|# cartas} de la parte superior de mi Vida',
   'engine.optYesDiscard': 'Sí, descartar {n|# carta|# cartas} de mi mano',
   'engine.optYesReturnDon': 'Sí, devolver {n|# DON!! activo|# DON!! activos}',
@@ -2513,6 +2557,12 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Ambos jugadores terminaron el turno sin cartas en el mazo.',
   'log.winDeckOutLeaderRule': '{player} se quedó sin cartas en el mazo y gana por la regla de su Líder.',
   'log.winBothDeckOutLeaderRule': 'Ambos jugadores se quedaron sin cartas en el mazo y ganan por la regla de su Líder.',
+  // ---- mesa con más de dos jugadores (Yonko) ----
+  'log.winAllOut': 'Todos los jugadores que quedaban fueron derrotados al mismo tiempo.',
+  'log.eliminated': '{player} fue eliminado. {reason}',
+  'log.eliminationReward': '{player} roba {n|# carta|# cartas} por eliminar a {target}.',
+  'log.startCurveOdd': '{player} elige 1 DON!! en su primer turno y robar 1 carta.',
+  'log.startCurveEven': '{player} elige 2 DON!! en su primer turno, sin robar.',
   // ---- deshacer ----
   'log.cancelPlay': '{player} deshace la jugada de {card} (la carta vuelve a su mano).',
   'log.cancelActivate': '{player} deshace la activación de {card}.',
@@ -2817,6 +2867,7 @@ export default {
   'errors.tooManyRoomsRecently': 'Abriste demasiadas partidas en poco tiempo; espera unos minutos.',
   'errors.alreadyPlaying': 'Ya estás en una partida online.',
   'errors.rankedLoginRequired': 'La clasificatoria es solo para jugadores con sesión iniciada en una cuenta de Google.',
+  'errors.rankedNotInFormat': '{format} no tiene cola clasificatoria.',
   'errors.invalidRoomCode': 'Código de sala no válido.',
   'errors.roomNotFound': 'Sala no encontrada o ya empezada.',
   'errors.ownRoom': 'Esta es tu sala: envía el código a otra persona.',
@@ -2960,6 +3011,7 @@ export default {
   'labels.deckGroup.mine': 'Mis mazos',
   'labels.deckGroup.community': 'Mazos de la comunidad',
   'labels.deckGroup.builtin': 'Starter Decks',
+  'labels.deckGroup.allBlue': 'Mazos de All Blue',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Cuartos de final',
@@ -2984,9 +3036,12 @@ export default {
   'rules.leaderColor': '{name} ({id}) no comparte ningún color con el Líder.',
   'rules.unscripted': '{n|# carta|# cartas} con efecto aún no automatizado (se aplica a mano, con las herramientas manuales).',
   // ---- formatos (formatIssues) ----
-  'rules.banned': '{id} está prohibida (no es válida en ningún formato).',
+  'rules.banned': '{id} está prohibida (no es válida en Standard ni en Extra Grand Battle).',
   'rules.rotated': '{id} es del bloque ① y rotó: no es válida en {format}.',
   'rules.bannedPair': '{a} y {b} no se pueden usar juntas en el mismo mazo.',
+  'rules.bannedIn': '{id} está prohibida en {format}.',
+  'rules.rarity': '{id} es {rarity}: no es válida en {format} (solo C, UC, R y promo).',
+  'rules.rarityUnknown': '{id} no tiene rareza conocida: no es válida en {format}.',
   'rules.spoiler': '{n|Carta aún no lanzada (spoiler)|Cartas aún no lanzadas (spoilers)}: {ids}. Los spoilers solo valen en la cola casual y en salas privadas, entrenamientos contra el bot y torneos con spoilers.',
   'rules.spoilerNotNext': '{n|Carta de spoiler de otra colección|Cartas de spoiler de otras colecciones}: {ids}. Con spoilers, fuera de Libre, solo vale la próxima colección en salir ({set}); las demás, solo en Libre.',
   // ---- lista de texto (parseDeckList) ----
@@ -3051,5 +3106,7 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...sealed,
+  ...yonko,
 } satisfies Messages;
 

@@ -76,15 +76,27 @@ export type StatusUntil = Pick<CardStatus, 'until' | 'untilKey' | 'untilParams'>
 const AURA_UNTIL: StatusUntil = { until: 'enquanto o efeito contínuo da outra carta valer', untilKey: 'status.untilAura' };
 const END_OF_TURN: StatusUntil = { until: 'até o fim deste turno', untilKey: 'status.untilEndOfTurn' };
 
-/** Jogador de quem é o turno de número `turn`. */
+/** Jogador de quem é o turno de número `turn` (com dois jogadores, que se alternam). */
 function playerOfTurn(state: GameState, turn: number) {
-  const same = (turn - state.turn) % 2 === 0;
+  const same = (turn - state.turn) % 2 === 0 || state.players.length !== 2;
   return state.players[same ? state.activePlayer : 1 - state.activePlayer];
 }
 
+/** O que diz até quando um efeito vale: a duração e, na mesa com mais de dois jogadores, de quem é o turno que o encerra. */
+type Lasting = Pick<Modifier, 'duration' | 'untilTurn' | 'untilStartOf' | 'untilEndOf'>;
+
 /** `modifierUntil` com a chave de tradução e os parâmetros. */
-export function modifierUntilInfo(state: GameState, m: Pick<Modifier, 'duration' | 'untilTurn'>): StatusUntil {
+export function modifierUntilInfo(state: GameState, m: Lasting): StatusUntil {
   if (m.duration === 'battle') return state.battle ? { until: 'até o fim desta batalha', untilKey: 'status.untilEndOfBattle' } : END_OF_TURN;
+  // Mesa com mais de dois jogadores: o efeito acaba no começo ou no fim do próximo turno de um jogador (`Expiry`).
+  if (m.untilStartOf !== undefined && state.players[m.untilStartOf]) {
+    const name = state.players[m.untilStartOf].name;
+    return { until: `até o início do próximo turno de ${name}`, untilKey: 'status.untilStartOfNextTurn', untilParams: { name } };
+  }
+  if (m.untilEndOf !== undefined && state.players[m.untilEndOf]) {
+    const name = state.players[m.untilEndOf].name;
+    return { until: `até o fim do próximo turno de ${name}`, untilKey: 'status.untilEndOfNextTurn', untilParams: { name } };
+  }
   const until = m.untilTurn ?? state.turn;
   if (m.duration === 'untilYourNextTurn') {
     if (until <= state.turn) return END_OF_TURN;
@@ -97,7 +109,7 @@ export function modifierUntilInfo(state: GameState, m: Pick<Modifier, 'duration'
 }
 
 /** "até o fim deste turno", "até o fim do próximo turno de Kid", "até o início do próximo turno de Luffy"… */
-export function modifierUntil(state: GameState, m: Pick<Modifier, 'duration' | 'untilTurn'>): string {
+export function modifierUntil(state: GameState, m: Lasting): string {
   return modifierUntilInfo(state, m).until;
 }
 
@@ -268,7 +280,8 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
   // "SEM ON PLAY" e a carta que anulou, "EFEITO USADO", enquanto a anulação durar. Sem isso não dá para
   // saber, olhando a mesa, se o efeito já foi usado neste turno.
   const negations = (state.onPlayNegated ?? []).filter((n) => n.untilTurn >= state.turn);
-  const negationUntil = (n: { untilTurn: number }) => modifierUntilInfo(state, { duration: 'nextOpponentTurn', untilTurn: n.untilTurn });
+  const negationUntil = (n: { untilTurn: number; untilStartOf?: number; untilEndOf?: number }) =>
+    modifierUntilInfo(state, { duration: 'nextOpponentTurn', untilTurn: n.untilTurn, untilStartOf: n.untilStartOf, untilEndOf: n.untilEndOf });
   if (loc.zone === 'leader') {
     for (const n of negations) {
       if (n.player !== loc.player) continue;

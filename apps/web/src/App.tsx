@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, isAdmin, isDev, isTeam, type OnlineSeat, type WatchTarget } from './api';
+import { api, isAdmin, isDev, isTeam, type OnlineSeat, type WatchTarget, type YonkoSeatRef } from './api';
 import { audio } from './audio';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
@@ -9,17 +9,23 @@ import { DeckBuilder } from './components/DeckBuilder';
 import { GameScreen, OnlineGameScreen, WatchGameScreen } from './components/GameScreen';
 import { Learn } from './components/Learn';
 import { Lesson } from './components/Lesson';
+import { Draft } from './components/Draft';
 import { Menu } from './components/Menu';
+import { Sealed } from './components/Sealed';
 import { OAuthConsent } from './components/OAuthConsent';
 import { ReplayEmbed } from './components/ReplayEmbed';
 import { Stats } from './components/Stats';
 import { TeamBot } from './components/TeamBot';
 import { Tournaments } from './components/Tournaments';
+import { Yonko } from './components/Yonko';
+import { YonkoOnline } from './components/YonkoOnline';
+import { LocalYonkoTable } from './components/YonkoTable';
 import { Watch } from './components/Watch';
 import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
 import { isReplayPath } from './embed';
 import { syncTutorialProgress } from './game/tutorial/progress';
 import type { GameSetup } from './game/useGame';
+import type { YonkoSetup } from './game/useYonkoGame';
 import { usePushSync, useWakeLock } from './pwa';
 import { useSettings } from './settings';
 
@@ -27,7 +33,7 @@ type Screen =
   | { name: 'menu' }
   /** `link`: lista vinda de um deep link (`/?deck=`); `linkInvalid`: havia um link, mas sem lista legível. */
   /** `open`: id de um deck salvo para abrir direto no editor (vindo do seletor de deck). */
-  | { name: 'builder'; link?: DeckLink; linkInvalid?: boolean; open?: string }
+  | { name: 'builder'; link?: DeckLink; linkInvalid?: boolean; open?: string; yonko?: boolean; back?: Screen }
   | { name: 'coverage' }
   | { name: 'stats' }
   | { name: 'admin' }
@@ -45,7 +51,19 @@ type Screen =
   | { name: 'tournaments'; id?: string; lobby?: boolean }
   /** `back`: tela para onde "Voltar" leva (replay aberto da página de um torneio ou da administração). */
   | { name: 'game'; setup: GameSetup; key: number; back?: Screen }
-  | { name: 'online'; seat: OnlineSeat; tournament?: string; lobby?: boolean };
+  /** `sealed`: sala de Selado aberta pela tela do Selado (e volta para o deck dele). */
+  | { name: 'online'; seat: OnlineSeat; tournament?: string; lobby?: boolean; sealed?: string }
+  /** Selado (Pré-release): abrir boosters, montar o deck de 40 e jogar. `pool`: abre direto esse deck. */
+  | { name: 'sealed'; pool?: string; hub?: 'sealed' | 'draft' }
+  /** Pod de Draft: sala de espera, escolhas e, no fim, a ida para a montagem do deck (tela do Selado). */
+  | { name: 'draft'; pod: string }
+  /**
+   * Yonko: a entrada (`again`: volta de uma mesa local com o mesmo deck; `code`: convite para uma mesa online),
+   * a mesa local contra bots e a mesa online (sala de espera e partida).
+   */
+  | { name: 'yonko'; again?: YonkoSetup; code?: string }
+  | { name: 'yonko-online'; seat: YonkoSeatRef }
+  | { name: 'yonko-game'; setup: YonkoSetup; key: number };
 
 /** Partida online aberta nesta aba: ao recarregar a página, volta direto para ela. */
 const OPEN_MATCH = 'gumgum.openMatch';
@@ -57,6 +75,9 @@ function savedScreen(): Screen {
     const lobby = s && tournament && 'lobby' in s && s.lobby === true ? { lobby: true } : {};
     if (s?.name === 'online' && typeof s.seat?.roomId === 'string' && typeof s.seat.token === 'string') {
       return { name: 'online', seat: { roomId: s.seat.roomId, token: s.seat.token }, tournament, ...lobby };
+    }
+    if (s?.name === 'yonko-online' && typeof s.seat?.id === 'string' && typeof s.seat.token === 'string') {
+      return { name: 'yonko-online', seat: { id: s.seat.id, code: String(s.seat.code ?? ''), token: s.seat.token } };
     }
     if (s?.name === 'watch' && typeof s.target?.roomId === 'string') {
       return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands), ...(s.target.judge ? { judge: true } : {}) }, tournament, ...lobby };
@@ -90,14 +111,15 @@ function MainApp() {
   const [screen, setScreen] = useState<Screen>(savedScreen);
   useEffect(() => {
     try {
-      if (screen.name === 'online' || screen.name === 'watch') sessionStorage.setItem(OPEN_MATCH, JSON.stringify(screen));
+      if (screen.name === 'online' || screen.name === 'watch' || screen.name === 'yonko-online') sessionStorage.setItem(OPEN_MATCH, JSON.stringify(screen));
       else sessionStorage.removeItem(OPEN_MATCH);
     } catch {
       /* sem armazenamento */
     }
   }, [screen]);
   // Música do menu em toda tela fora da mesa (a mesa troca para a música da partida ao abrir).
-  const inMatch = screen.name === 'game' || screen.name === 'online' || screen.name === 'watch' || screen.name === 'lesson';
+  const inMatch =
+    screen.name === 'game' || screen.name === 'online' || screen.name === 'watch' || screen.name === 'lesson' || screen.name === 'yonko-game' || screen.name === 'yonko-online';
   useEffect(() => {
     if (!inMatch) audio.music('menu');
   }, [inMatch]);
@@ -143,6 +165,13 @@ function MainApp() {
       here.searchParams.delete('lobby');
       history.replaceState(null, '', here.toString());
     }
+    // Convite para uma mesa do Yonko (`/?yonko=CODE`): abre a entrada do Yonko com o código preenchido.
+    const yonkoCode = here.searchParams.get('yonko');
+    if (yonkoCode) {
+      setScreen({ name: 'yonko', code: yonkoCode.slice(0, 6).toUpperCase() });
+      here.searchParams.delete('yonko');
+      history.replaceState(null, '', here.toString());
+    }
     // Deep link do construtor (`/?deck=<lista>&name=&format=`): abre o construtor preenchido, sem salvar nada.
     if (here.searchParams.has('deck')) {
       const { link, invalid } = parseDeckLink(here.searchParams);
@@ -158,7 +187,15 @@ function MainApp() {
   }, []);
   const dev = isDev(role);
   if (screen.name === 'builder') {
-    return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} link={screen.link} linkInvalid={screen.linkInvalid} openId={screen.open} />;
+    return (
+      <DeckBuilder
+        onExit={() => setScreen(screen.back ?? { name: 'menu' })}
+        link={screen.link}
+        linkInvalid={screen.linkInvalid}
+        openId={screen.open}
+        startYonko={screen.yonko}
+      />
+    );
   }
   if (screen.name === 'learn') return <Learn onExit={() => setScreen({ name: 'menu' })} onLesson={(id) => setScreen({ name: 'lesson', id })} />;
   if (screen.name === 'lesson') {
@@ -228,10 +265,56 @@ function MainApp() {
       <OnlineGameScreen
         key={screen.seat.roomId}
         seat={screen.seat}
-        onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament, lobby: screen.lobby } : { name: 'menu' })}
+        onExit={() =>
+          setScreen(
+            screen.tournament ? { name: 'tournaments', id: screen.tournament, lobby: screen.lobby } : screen.sealed ? { name: 'sealed', pool: screen.sealed } : { name: 'menu' },
+          )
+        }
         onSwitch={(seat) => setScreen({ ...screen, seat })}
       />
     );
+  }
+  if (screen.name === 'sealed') {
+    return (
+      <Sealed
+        key={screen.pool ?? `hub-${screen.hub ?? 'sealed'}`}
+        openId={screen.pool}
+        hub={screen.hub}
+        onExit={() => setScreen({ name: 'menu' })}
+        onStart={(setup, pool) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'sealed', pool } })}
+        onOnline={(seat, pool) => setScreen({ name: 'online', seat, sealed: pool })}
+        onDraft={(pod) => setScreen({ name: 'draft', pod })}
+      />
+    );
+  }
+  if (screen.name === 'draft') {
+    return <Draft key={screen.pod} podId={screen.pod} onExit={() => setScreen({ name: 'sealed', hub: 'draft' })} onBuild={(pool) => setScreen({ name: 'sealed', pool })} />;
+  }
+  if (screen.name === 'yonko') {
+    return (
+      <Yonko
+        again={screen.again}
+        code={screen.code}
+        onOnline={(seat) => setScreen({ name: 'yonko-online', seat })}
+        onExit={() => setScreen({ name: 'menu' })}
+        onBuildDecks={() => setScreen({ name: 'builder', yonko: true, back: { name: 'yonko' } })}
+        onStart={(setup) => setScreen({ name: 'yonko-game', setup, key: Date.now() })}
+      />
+    );
+  }
+  if (screen.name === 'yonko-online') {
+    return (
+      <YonkoOnline
+        key={screen.seat.id}
+        seat={screen.seat}
+        onExit={() => setScreen({ name: 'yonko' })}
+        onBuildDecks={() => setScreen({ name: 'builder', yonko: true, back: { name: 'yonko-online', seat: screen.seat } })}
+      />
+    );
+  }
+  if (screen.name === 'yonko-game') {
+    const { setup } = screen;
+    return <LocalYonkoTable key={screen.key} setup={setup} onExit={() => setScreen({ name: 'yonko' })} onRematch={() => setScreen({ name: 'yonko', again: setup })} />;
   }
   if (screen.name === 'game') {
     const { setup } = screen;
@@ -267,6 +350,9 @@ function MainApp() {
       onTournamentMatch={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
       onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
       onTeamBot={isTeam(user) ? () => setScreen({ name: 'team' }) : undefined}
+      onSealed={() => setScreen({ name: 'sealed', hub: 'sealed' })}
+      onDraft={() => setScreen({ name: 'sealed', hub: 'draft' })}
+      onYonko={() => setScreen({ name: 'yonko' })}
       dev={dev}
     />
   );
