@@ -320,6 +320,30 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       onCard: true,
     });
   }
+  // [Once Per Turn] já usado neste turno (Líder, Personagem ou Palco): marca "EFEITO USADO" para os dois
+  // jogadores saberem, olhando a mesa, que a habilidade não pode ser usada de novo até o fim do turno.
+  // Fica atrás da tag do Teach (mais informativa e mais longa), que usa a mesma chave.
+  const prefix = `${uid}:`;
+  const usedOnce = def.abilities.filter((a, i) => a.oncePerTurn && state.usedThisTurn.includes(`${prefix}${i}`));
+  if (usedOnce.length) {
+    const total = def.abilities.filter((a) => a.oncePerTurn).length;
+    const all = usedOnce.length === total;
+    add('effectUsed', 0, {
+      kind: 'effectUsed',
+      icon: '✅',
+      label: 'Efeito usado',
+      tag: 'EFEITO USADO',
+      tagKey: 'status.effectUsedTag',
+      text: all
+        ? 'Efeito [Uma Vez por Turno] já usado neste turno'
+        : `${usedOnce.length} de ${total} efeitos [Uma Vez por Turno] já usados neste turno`,
+      textKey: all ? 'status.oncePerTurnUsed' : 'status.oncePerTurnUsedSome',
+      ...(all ? {} : { textParams: { n: usedOnce.length, total } }),
+      ...END_OF_TURN,
+      tone: 'good',
+      onCard: true,
+    });
+  }
   for (const kw of Object.keys(KEYWORD) as Keyword[]) {
     if (def.keywords.includes(kw) || !hasKeyword(state, uid, kw)) continue;
     // O nome da palavra-chave e a etiqueta ficam em inglês, como no jogo.

@@ -3079,6 +3079,8 @@ export default {
   'status.negated': "This card's effects are negated",
   'status.noOnPlay': "{name}'s [On Play] effects are negated",
   'status.effectUsed': "Effect used: {name}'s [On Play] effects are negated",
+  'status.oncePerTurnUsed': '[Once Per Turn] effect already used this turn',
+  'status.oncePerTurnUsedSome': '{n} of {total} [Once Per Turn] effects already used this turn',
   'status.gainedKeyword': 'Gained [{keyword}]',
   'status.gainedAttribute': 'Gained the "{attribute}" attribute',
   'status.cannotBeKO': "Cannot be K.O.'d",

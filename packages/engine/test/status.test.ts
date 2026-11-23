@@ -188,4 +188,45 @@ describe('cardStatuses', () => {
     expect(kinds(s, teach)).toEqual([]);
     expect(kinds(s, kid)).toEqual([]);
   });
+  it('[Once Per Turn] usado: "EFEITO USADO" no Líder ou no Personagem que usou, até o fim do turno', () => {
+    let s = toTurn(started(), 3); // turno de Luffy (0)
+    const luffy = s.players[0].leader.uid;
+    const nami = putOnField(s, 0, 'ST01-007');
+    expect(kinds(s, luffy)).toEqual([]);
+    expect(kinds(s, nami)).toEqual([]);
+
+    s = applyAction(s, { type: 'activate', player: 0, uid: luffy, ability: 0 });
+    while (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    expect(s.pending).toBeNull();
+    const used = cardStatuses(s, luffy);
+    expect(used).toHaveLength(1);
+    expect(used[0]).toMatchObject({
+      kind: 'effectUsed',
+      tag: 'EFEITO USADO',
+      tagKey: 'status.effectUsedTag',
+      text: 'Efeito [Uma Vez por Turno] já usado neste turno',
+      textKey: 'status.oncePerTurnUsed',
+      until: 'até o fim deste turno',
+      untilKey: 'status.untilEndOfTurn',
+      onCard: true,
+    });
+    // Só quem usou: a Nami ainda pode usar o dela.
+    expect(kinds(s, nami)).toEqual([]);
+    s = applyAction(s, { type: 'activate', player: 0, uid: nami, ability: 0 });
+    while (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    expect(kinds(s, nami)).toEqual(['effectUsed']);
+
+    // As visões dos dois jogadores e do espectador mostram o mesmo.
+    const aliases = createAliases(s, randomId);
+    for (const viewer of [0, 1, null] as const) {
+      const v = viewFor(s, viewer, aliases);
+      expect(cardStatuses(v, aliases.toAlias[luffy])).toEqual(cardStatuses(s, luffy));
+      expect(cardStatuses(v, aliases.toAlias[nami])).toEqual(cardStatuses(s, nami));
+    }
+
+    // No fim do turno o uso volta, e a tag some.
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(kinds(s, luffy)).toEqual([]);
+    expect(kinds(s, nami)).toEqual([]);
+  });
 });
