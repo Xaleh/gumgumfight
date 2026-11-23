@@ -148,6 +148,18 @@ describe('Yonko online: sala de espera', () => {
     expect((await post(app, '/api/yonko/tables/join', { code: 'ZZZZZZ', deckId: 'st02-kid' }, BOB)).statusCode).toBe(404);
   });
 
+  it('o Luffy de 6 cores (SEALED-001) é proibido: nem deck de 60, nem deck de teste', async () => {
+    const { app, db } = setup();
+    const cards = listCards(db).filter((c) => c.category !== 'leader' && !c.id.startsWith('SEALED'));
+    upsertDeck(db, { id: 'rb60', name: 'Arco-íris', leader: 'SEALED-001', cards: cards.slice(0, YONKO_DECK_SIZE).map((c) => ({ id: c.id, count: 1 })) }, 'user', 'x');
+    upsertDeck(db, { id: 'rb50', name: 'Arco-íris 50', leader: 'SEALED-001', cards: [...cards.slice(0, 12).map((c) => ({ id: c.id, count: 4 })), { id: cards[12].id, count: 2 }] }, 'user', 'x');
+    for (const deckId of ['rb60', 'rb50']) {
+      const res = await post(app, '/api/yonko/tables', { deckId });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toMatchObject({ errorCode: 'yonkoBanned' });
+    }
+  });
+
   it('o resumo do deck diz se ele serve para o Yonko, e o rascunho de 60+ pode ser salvo', async () => {
     const { app, db } = setup();
     const ids = listCards(db)

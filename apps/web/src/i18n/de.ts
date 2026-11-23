@@ -3079,6 +3079,8 @@ export default {
   'status.negated': 'Die Effekte dieser Karte sind aufgehoben',
   'status.noOnPlay': '[On Play]-Effekte von {name} werden aufgehoben',
   'status.effectUsed': 'Effekt genutzt: [On Play]-Effekte von {name} werden aufgehoben',
+  'status.activateMainUsed': '[Activate: Main] in diesem Zug bereits genutzt',
+  'status.activateMainUsedSome': '{n} von {total} [Activate: Main]-Effekten in diesem Zug bereits genutzt',
   'status.gainedKeyword': 'Hat [{keyword}] erhalten',
   'status.gainedAttribute': 'Hat das Attribut „{attribute}“ erhalten',
   'status.cannotBeKO': 'Kann nicht K.O. gesetzt werden',

@@ -1,7 +1,7 @@
 // Mesa online do Yonko: a sala de espera (lugares, decks, "pronto", bots, regras e o código para convidar) e,
 // quando a partida começa, a mesa (`YonkoTable`) ligada ao servidor, com o relógio de cada jogador.
 
-import type { PlayerId, TableRules } from '@gumgum/engine';
+import { type PlayerId, type TableRules, yonkoBannedIn } from '@gumgum/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type DeckSummary, type YonkoRoomInfo, type YonkoSeatRef } from '../api';
 import { yonkoLegal } from '../deckLibrary';
@@ -21,8 +21,12 @@ export const fmtClock = (ms: number) => {
 /** Link de convite para a mesa (abre a tela do Yonko com o código preenchido). */
 export const inviteLink = (code: string) => `${location.origin}/?yonko=${encodeURIComponent(code)}`;
 
-/** O deck serve para a mesa: um deck de 60 do Yonko ou um deck completo de 50 (vira deck de teste). */
-export const usableForYonko = (d: DeckSummary) => yonkoLegal(d) || d.valid;
+/** O deck serve para a mesa: um deck de 60 do Yonko ou um deck completo de 50 (vira deck de teste), sem carta proibida. */
+export const usableForYonko = (d: DeckSummary) => (yonkoLegal(d) || d.valid) && !yonkoBannedIn({ leader: d.leader, cards: [] });
+
+/** Por que o deck não serve para a mesa (`null`: serve). */
+export const whyNotYonko = (d: DeckSummary, t: Translate): string | null =>
+  usableForYonko(d) ? null : yonkoBannedIn({ leader: d.leader, cards: [] }) ? t('yonko.bannedLeader') : (d.errors[0] ?? t('yonko.deckInvalid'));
 
 export function YonkoOnline({ seat, onExit, onBuildDecks }: { seat: YonkoSeatRef; onExit: () => void; onBuildDecks: () => void }) {
   const online = useYonkoOnline(seat);
@@ -286,7 +290,7 @@ function WaitingRoom({ online, room, seat, onExit, onBuildDecks }: { online: Onl
           decks={usable}
           value=""
           canUse={usableForYonko}
-          whyNot={(d) => (usableForYonko(d) ? null : (d.errors[0] ?? t('yonko.deckInvalid')))}
+          whyNot={(d) => whyNotYonko(d, t)}
           onPick={(id) => {
             setPicking(false);
             ask(api.yonko.deck(seat.id, seat.token, id));

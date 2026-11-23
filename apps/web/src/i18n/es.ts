@@ -3079,6 +3079,8 @@ export default {
   'status.negated': 'Los efectos de esta carta están negados',
   'status.noOnPlay': 'Los efectos [On Play] de {name} quedan negados',
   'status.effectUsed': 'Efecto usado: los efectos [On Play] de {name} quedan negados',
+  'status.activateMainUsed': '[Activate: Main] ya usado en este turno',
+  'status.activateMainUsedSome': '{n} de {total} efectos [Activate: Main] ya usados en este turno',
   'status.gainedKeyword': 'Ganó [{keyword}]',
   'status.gainedAttribute': 'Ganó el atributo "{attribute}"',
   'status.cannotBeKO': 'No puede quedar K.O.',
