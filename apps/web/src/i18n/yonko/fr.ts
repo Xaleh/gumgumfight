@@ -34,7 +34,8 @@ const yonko = {
   'yonko.ruleReward': 'Récompense d’élimination',
   'yonko.ruleRewardHint': 'Cartes piochées par celui qui porte le coup final. Les règles ne prévoient pas de récompense.',
   'yonko.ruleDeck': 'Deck',
-  'yonko.ruleDeckHint': '60 cartes aux couleurs du Leader, un exemplaire de chaque numéro. Un deck de 50 devient un deck d’essai à la table.',
+  'yonko.ruleDeckHint': '60 cartes aux couleurs du Leader, un exemplaire de chaque numéro. Un deck de 50 devient un deck d’essai à la table. Le Luffy 6 couleurs (SEALED-001) est interdit.',
+  'yonko.bannedLeader': 'Le Luffy 6 couleurs (SEALED-001) est interdit en Yonko.',
   'yonko.buildDecks': 'Construire des decks',
   'yonko.howEffects': 'Effets sur « votre adversaire »',
   'yonko.howTarget': 'Cible sur le terrain : n’importe quelle cible légale de n’importe quel adversaire.',
@@ -203,6 +204,8 @@ const yonko = {
   'errors.yonkoOut': 'Vous avez déjà quitté cette partie.',
   'errors.yonkoBusy': 'Trop de tables ouvertes en ce moment ; réessayez bientôt.',
   'errors.yonkoDeckInvalid': 'Ce deck ne convient pas à Yonko : utilisez un deck de 60 (un exemplaire de chaque) ou un deck complet de 50.',
+  'errors.yonkoBanned': 'Le Luffy 6 couleurs (SEALED-001) est interdit en Yonko.',
+  'rules.yonkoBanned': '{name} ({id}) est interdit en Yonko.',
   'errors.yonkoNoBotDeck': 'Aucun deck prêt disponible pour le bot.',
 };
 

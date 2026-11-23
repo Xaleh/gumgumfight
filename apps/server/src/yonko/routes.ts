@@ -5,7 +5,7 @@
 // permite voltar para a mesa depois de recarregar a página (`/api/yonko/active` lista as mesas da pessoa).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { type CardData, type DeckList, validateDeck, yonkoTableDeck } from '@gumgum/engine';
+import { type CardData, type DeckList, validateDeck, yonkoBannedIn, yonkoTableDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { User } from '../auth/store';
 import { type DB, deleteYonkoTable, getCards, getDeck, listCards, listDecks, listYonkoTables, saveYonkoTable } from '../db';
@@ -188,6 +188,7 @@ export function registerYonkoRoutes(app: FastifyInstance, deps: YonkoDeps) {
     const stored = typeof deckId === 'string' && deckId ? getDeck(db, deckId) : null;
     if (!stored) return refusal(400, 'chooseDeck', 'Escolha um deck.');
     const deck: DeckList = { id: stored.id, name: stored.name, leader: stored.leader, cards: stored.cards, ...(stored.arts ? { arts: stored.arts } : {}) };
+    if (yonkoBannedIn(deck)) return refusal(400, 'yonkoBanned', 'O Luffy de 6 cores (SEALED-001) é proibido no Yonko.');
     const made = yonkoTableDeck(deck, allCards(), randomInt(0, 2 ** 31));
     if (!made) return refusal(400, 'yonkoDeckInvalid', 'Esse deck não serve para o Yonko: use um deck de 60 (uma cópia de cada) ou um deck completo de 50.');
     const leader = (getCards(db, [stored.leader]) as unknown as CardData[])[0];

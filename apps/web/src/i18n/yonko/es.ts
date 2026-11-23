@@ -34,7 +34,8 @@ const yonko = {
   'yonko.ruleReward': 'Recompensa por eliminación',
   'yonko.ruleRewardHint': 'Cartas que roba quien da el golpe final. El manual no tiene recompensa.',
   'yonko.ruleDeck': 'Mazo',
-  'yonko.ruleDeckHint': '60 cartas del color del Líder, una copia de cada número. Un mazo de 50 se convierte en mazo de prueba en la mesa.',
+  'yonko.ruleDeckHint': '60 cartas del color del Líder, una copia de cada número. Un mazo de 50 se convierte en mazo de prueba en la mesa. El Luffy de 6 colores (SEALED-001) está prohibido.',
+  'yonko.bannedLeader': 'El Luffy de 6 colores (SEALED-001) está prohibido en Yonko.',
   'yonko.buildDecks': 'Armar mazos',
   'yonko.howEffects': 'Efectos sobre "tu oponente"',
   'yonko.howTarget': 'Objetivo en el campo: cualquier objetivo legal de cualquier oponente.',
@@ -203,6 +204,8 @@ const yonko = {
   'errors.yonkoOut': 'Ya saliste de esta partida.',
   'errors.yonkoBusy': 'Demasiadas mesas abiertas ahora; inténtalo en un rato.',
   'errors.yonkoDeckInvalid': 'Ese mazo no sirve para Yonko: usa un mazo de 60 (una copia de cada) o un mazo completo de 50.',
+  'errors.yonkoBanned': 'El Luffy de 6 colores (SEALED-001) está prohibido en Yonko.',
+  'rules.yonkoBanned': '{name} ({id}) está prohibido en Yonko.',
   'errors.yonkoNoBotDeck': 'Ningún mazo listo disponible para el bot.',
 };
 

@@ -11,7 +11,7 @@
 
 import { buildCardDef, needsManual } from './cards';
 import { DECK_SIZE, hasType, YONKO_DECK_SIZE } from './engine';
-import { formatIssues, type PlayFormat, type RuleParams } from './formats';
+import { formatIssues, type PlayFormat, type RuleParams, SEALED_LEADER_ID } from './formats';
 import { nextRandom } from './rng';
 import type { CardData, DeckList, GameState, LeaderRule, PlayerId } from './types';
 import { HIDDEN_CARD, HIDDEN_REF } from './view';
@@ -98,8 +98,26 @@ export interface ValidateOptions {
  * (a lista do deck já junta as artes num número só). O resto é o de sempre: só cartas da cor do Líder.
  */
 export function validateYonkoDeck(deck: DeckList, cards: Map<string, CardData> | Record<string, CardData>, options: ValidateOptions = {}): DeckReport {
-  return validateDeck(deck, cards, { ...options, size: YONKO_DECK_SIZE, maxCopies: 1 });
+  const report = validateDeck(deck, cards, { ...options, size: YONKO_DECK_SIZE, maxCopies: 1 });
+  const get = (id: string) => (cards instanceof Map ? cards.get(id) : cards[id]);
+  for (const id of new Set([deck.leader, ...deck.cards.map((c) => c.id)].filter(yonkoBanned))) {
+    const name = get(id)?.name ?? id;
+    report.issues.unshift({ level: 'error', message: `${name} (${id}) é proibido no Yonko.`, code: 'rules.yonkoBanned', params: { name, id }, cardId: id });
+  }
+  return { ...report, valid: !report.issues.some((i) => i.level === 'error') };
 }
+
+/**
+ * Cartas proibidas no Yonko: só o Luffy de 6 cores (o Líder do Selado, SEALED-001). É a única proibição do
+ * formato; a lista de banidas da Bandai não vale no Yonko.
+ */
+export const YONKO_BANNED: readonly string[] = [SEALED_LEADER_ID];
+
+/** A carta é proibida no Yonko (`YONKO_BANNED`). */
+export const yonkoBanned = (id: string): boolean => YONKO_BANNED.includes(id);
+
+/** O deck usa uma carta proibida no Yonko (o Líder ou uma carta da lista). */
+export const yonkoBannedIn = (deck: Pick<DeckList, 'leader' | 'cards'>): boolean => yonkoBanned(deck.leader) || deck.cards.some((c) => yonkoBanned(c.id));
 
 /**
  * O deck que vai para a mesa do Yonko: um deck de 60 que fecha as regras do formato vai como está; um deck
@@ -107,6 +125,7 @@ export function validateYonkoDeck(deck: DeckList, cards: Map<string, CardData> |
  * serve (incompleto, ou sem cartas que cheguem para 60).
  */
 export function yonkoTableDeck(deck: DeckList, cards: Iterable<CardData>, seed: number): { deck: DeckList; test: boolean } | null {
+  if (yonkoBannedIn(deck)) return null;
   const byId = new Map<string, CardData>();
   for (const c of cards) byId.set(c.id, c);
   if (validateYonkoDeck(deck, byId).valid) return { deck, test: false };
@@ -125,8 +144,8 @@ export function yonkoDeckFrom(deck: Pick<DeckList, 'leader' | 'cards' | 'name' |
   const byId = new Map<string, CardData>();
   for (const c of cards) byId.set(c.id, c);
   const leader = byId.get(deck.leader);
-  if (!leader || leader.category !== 'leader') return null;
-  const fits = (c: CardData | undefined): c is CardData => Boolean(c && c.category !== 'leader' && isColorCompatible(leader, c) && leaderAllows(leader, c));
+  if (!leader || leader.category !== 'leader' || yonkoBanned(leader.id)) return null;
+  const fits = (c: CardData | undefined): c is CardData => Boolean(c && c.category !== 'leader' && !yonkoBanned(c.id) && isColorCompatible(leader, c) && leaderAllows(leader, c));
   const picked: string[] = [];
   for (const entry of deck.cards) {
     if (picked.length < YONKO_DECK_SIZE && !picked.includes(entry.id) && fits(byId.get(entry.id))) picked.push(entry.id);
