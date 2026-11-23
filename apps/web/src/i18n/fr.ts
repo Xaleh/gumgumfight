@@ -3079,6 +3079,8 @@ export default {
   'status.negated': 'Les effets de cette carte sont annulés',
   'status.noOnPlay': 'Les effets [On Play] de {name} sont annulés',
   'status.effectUsed': 'Effet utilisé : les effets [On Play] de {name} sont annulés',
+  'status.activateMainUsed': '[Activate: Main] déjà utilisé ce tour-ci',
+  'status.activateMainUsedSome': '{n} effets [Activate: Main] sur {total} déjà utilisés ce tour-ci',
   'status.gainedKeyword': 'A gagné [{keyword}]',
   'status.gainedAttribute': 'A gagné l’attribut « {attribute} »',
   'status.cannotBeKO': 'Ne peut pas être mis K.O.',
