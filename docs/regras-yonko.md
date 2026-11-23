@@ -14,6 +14,7 @@ O formato: quatro capitães, todos contra todos, deck de 60 cartas sem repetiç�
 | Deck de **60 cartas**. | `validateYonkoDeck` (`deck.ts`); `YONKO_DECK_SIZE`. `createGame` aceita 60 nas mesas com mais de dois. No construtor, "Montar para o Yonko". Um deck de 50 vira deck de teste na mesa (`yonkoTableDeck`): é uma facilidade nossa, fora do manual, e a sala avisa a todos. |
 | **Singleton**: 1 cópia de cada carta. A carta é o **número** dela (o código no canto), não o nome: dois Roronoa Zoro de números diferentes cabem juntos; duas artes do mesmo número, não. | `validateYonkoDeck` conta por número (a lista do deck já junta as artes num número só). |
 | Só cartas da(s) **cor(es) do Líder**. | A regra de sempre (`isColorCompatible`). |
+| **Única carta proibida: o Luffy de 6 cores** (o Líder do Selado, SEALED-001). Regra do formato, passada pela casa (23/11/2026); não está no PDF. A lista de banidas da Bandai não vale no Yonko. | `YONKO_BANNED` (`deck.ts`): `validateYonkoDeck` dá o erro `rules.yonkoBanned`; `yonkoTableDeck` não faz deck de teste com ele; a sala online recusa o deck (`yonkoBanned`) e os bots não o usam. |
 | Vida = a impressa no Líder **+2**. | `TableRules.extraLife` (2 em `YONKO_TABLE`). |
 
 ## 2. Como se joga
@@ -76,7 +77,8 @@ Decisões tomadas para o motor funcionar. Todas fáceis de mudar.
    "senão" acontece uma vez para cada um que recusar, mirando só esse oponente.
 7. **Cartas "you may have any number of this card in your deck":** no Yonko também é 1 cópia (a regra do formato
    vence a da carta).
-8. **Lista de banidas:** o manual não tem. Nenhuma lista é aplicada por `validateYonkoDeck`.
+8. **Lista de banidas:** o manual não tem. Por regra do formato (23/11/2026), a única proibida é o Luffy de 6
+   cores (SEALED-001, seção 1); a lista da Bandai não é aplicada por `validateYonkoDeck`.
 9. **Ataque redirecionado por quem está de fora.** Pela regra 4, um [On Your Opponent's Attack] de um terceiro que
    troca o alvo do ataque para um Personagem dele (ST36-005) deve fazer dele o defensor daquela batalha: o motor
    tira o defensor do alvo atual do ataque. Ainda não há um teste dedicado a esse caso.

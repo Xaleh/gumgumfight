@@ -34,7 +34,8 @@ const yonko = {
   'yonko.ruleReward': '脱落させたときの報酬',
   'yonko.ruleRewardHint': 'とどめを刺したプレイヤーが引く枚数。公式ルールに報酬はありません。',
   'yonko.ruleDeck': 'デッキ',
-  'yonko.ruleDeckHint': 'リーダーの色のカード60枚、カード番号ごとに1枚。50枚デッキは卓でテスト用デッキになります。',
+  'yonko.ruleDeckHint': 'リーダーの色のカード60枚、カード番号ごとに1枚。50枚デッキは卓でテスト用デッキになります。6色のLuffy（SEALED-001）は禁止です。',
+  'yonko.bannedLeader': '6色のLuffy（SEALED-001）は四皇では禁止です。',
   'yonko.buildDecks': 'デッキを作る',
   'yonko.howEffects': '「相手」への効果',
   'yonko.howTarget': '場の対象：どの相手の対象でも選べます。',
@@ -203,6 +204,8 @@ const yonko = {
   'errors.yonkoOut': 'あなたはすでにこの対戦から脱落しています。',
   'errors.yonkoBusy': '現在開いている卓が多すぎます。少し後でお試しください。',
   'errors.yonkoDeckInvalid': 'そのデッキは四皇で使えません。60枚（各1枚）のデッキか、完成した50枚のデッキを使ってください。',
+  'errors.yonkoBanned': '6色のLuffy（SEALED-001）は四皇では禁止です。',
+  'rules.yonkoBanned': '{name}（{id}）は四皇では禁止です。',
   'errors.yonkoNoBotDeck': 'ボット用のデッキがありません。',
 };
 

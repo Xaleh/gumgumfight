@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { actingPlayer, legalActions } from '../src/actions';
 import { chooseBotAction } from '../src/bot/simple';
-import { isColorCompatible, validateYonkoDeck, yonkoDeckFrom, yonkoTableDeck } from '../src/deck';
+import { isColorCompatible, validateDeck, validateYonkoDeck, YONKO_BANNED, yonkoDeckFrom, yonkoTableDeck } from '../src/deck';
 import {
   applyAction,
   attackError,
@@ -246,6 +246,28 @@ describe('Yonko: o deck (60 cartas, uma cópia de cada)', () => {
     expect(validateYonkoDeck(deck(ids.slice(0, 50)), base).issues).toContainEqual(expect.objectContaining({ code: 'rules.tooFewCards', params: { total: 50, missing: 10 } }));
     const offColor = [...base.values()].find((c) => c.category === 'character' && !isColorCompatible(leader, c))!.id;
     expect(validateYonkoDeck(deck([...ids.slice(0, 59), offColor]), base).issues).toContainEqual(expect.objectContaining({ code: 'rules.leaderColor', cardId: offColor }));
+  });
+
+  it('a única carta proibida é o Luffy de 6 cores (SEALED-001); a lista de banidas da Bandai não vale', () => {
+    expect(YONKO_BANNED).toEqual(['SEALED-001']);
+    const rainbow = base.get('SEALED-001')!;
+    expect(rainbow.colors).toHaveLength(6);
+    const any = [...base.values()].filter((c) => c.category !== 'leader' && !c.id.startsWith('SEALED')).map((c) => c.id);
+    const banned = { ...deck(any.slice(0, YONKO_DECK_SIZE)), leader: rainbow.id };
+    const report = validateYonkoDeck(banned, base);
+    expect(report.valid).toBe(false);
+    expect(report.issues[0]).toMatchObject({ level: 'error', code: 'rules.yonkoBanned', cardId: 'SEALED-001' });
+    // Nem como deck de teste a partir de um de 50 (que vale fora de formato).
+    const fifty = { ...deck([]), leader: rainbow.id, cards: any.slice(0, 13).map((id) => ({ id, count: 4 })) };
+    fifty.cards[12].count = 2;
+    expect(validateDeck(fifty, base).valid).toBe(true);
+    expect(yonkoTableDeck(fifty, base.values(), 1)).toBeNull();
+    expect(yonkoDeckFrom(fifty, base.values(), 1)).toBeNull();
+    // Carta banida pela Bandai no jogo normal cabe no Yonko.
+    // (o Líder Trafalgar Law ST10-001, banido pela Bandai).
+    const law = base.get('ST10-001')!;
+    const lawPool = [...base.values()].filter((c) => c.category !== 'leader' && isColorCompatible(law, c)).map((c) => ({ id: c.id, count: 1 }));
+    expect(validateYonkoDeck({ id: 'law', name: 'law', leader: law.id, cards: lawPool.slice(0, YONKO_DECK_SIZE) }, base).valid).toBe(true);
   });
 
   it('`yonkoDeckFrom`: um deck comum vira um deck de Yonko com as cartas dele e o resto sorteado', () => {

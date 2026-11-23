@@ -11,7 +11,7 @@ import type { YonkoSetup } from '../game/useYonkoGame';
 import { useT } from '../i18n';
 import { DeckPicker } from './DeckPicker';
 import { Icon } from './Icons';
-import { usableForYonko } from './YonkoOnline';
+import { usableForYonko, whyNotYonko } from './YonkoOnline';
 import { MANUAL_RULES, RulesPanel } from './YonkoRules';
 
 const DECK_KEY = 'gumgum.yonko.deck';
@@ -45,7 +45,7 @@ const compactRules = (r: TableRules): TableRules => ({
 
 /** Sorteia `n` decks prontos para os bots, com Líderes diferentes entre si (e do de quem joga) enquanto der. */
 function drawBotDecks(decks: DeckSummary[], mine: DeckSummary | undefined, n: number): DeckSummary[] {
-  const pool = decks.filter((d) => d.kind === 'builtin' && d.valid && !d.allBlue);
+  const pool = decks.filter((d) => d.kind === 'builtin' && usableForYonko(d) && !d.allBlue);
   const out: DeckSummary[] = [];
   const used = new Set(mine ? [mine.leader] : []);
   const shuffled = [...pool].sort(() => Math.random() - 0.5);
@@ -111,8 +111,8 @@ export function Yonko({
     () =>
       decks?.find((d) => d.id === deckId && usableForYonko(d)) ??
       decks?.find((d) => d.mine && yonkoLegal(d)) ??
-      decks?.find((d) => d.mine && d.valid) ??
-      decks?.find((d) => d.kind === 'builtin' && d.valid && !d.allBlue),
+      decks?.find((d) => d.mine && usableForYonko(d)) ??
+      decks?.find((d) => d.kind === 'builtin' && usableForYonko(d) && !d.allBlue),
     [decks, deckId],
   );
   // Os decks dos bots da mesa local: sorteados ao abrir e quando o Líder de quem joga muda.
@@ -336,7 +336,7 @@ export function Yonko({
           decks={decks.filter((d) => !d.allBlue)}
           value={mine?.id ?? ''}
           canUse={usableForYonko}
-          whyNot={(d) => (usableForYonko(d) ? null : (d.errors[0] ?? t('yonko.deckInvalid')))}
+          whyNot={(d) => whyNotYonko(d, t)}
           onPick={(id) => {
             setDeckId(id);
             setPicking(false);
