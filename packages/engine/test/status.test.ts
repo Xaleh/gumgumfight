@@ -188,7 +188,7 @@ describe('cardStatuses', () => {
     expect(kinds(s, teach)).toEqual([]);
     expect(kinds(s, kid)).toEqual([]);
   });
-  it('[Once Per Turn] usado: "EFEITO USADO" no Líder ou no Personagem que usou, até o fim do turno', () => {
+  it('[Activate: Main] [Once Per Turn] usado: "EFEITO USADO" no Líder ou no Personagem que usou, até o fim do turno', () => {
     let s = toTurn(started(), 3); // turno de Luffy (0)
     const luffy = s.players[0].leader.uid;
     const nami = putOnField(s, 0, 'ST01-007');
@@ -204,8 +204,8 @@ describe('cardStatuses', () => {
       kind: 'effectUsed',
       tag: 'EFEITO USADO',
       tagKey: 'status.effectUsedTag',
-      text: 'Efeito [Uma Vez por Turno] já usado neste turno',
-      textKey: 'status.oncePerTurnUsed',
+      text: '[Ativar: Principal] já usado neste turno',
+      textKey: 'status.activateMainUsed',
       until: 'até o fim deste turno',
       untilKey: 'status.untilEndOfTurn',
       onCard: true,
@@ -215,6 +215,11 @@ describe('cardStatuses', () => {
     s = applyAction(s, { type: 'activate', player: 0, uid: nami, ability: 0 });
     while (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
     expect(kinds(s, nami)).toEqual(['effectUsed']);
+
+    // Só [Activate: Main]: um [Once Per Turn] automático (Basil Hawkins, ao batalhar) não ganha a tag.
+    const hawkins = putOnField(s, 1, 'ST02-010');
+    s.usedThisTurn.push(`${hawkins}:0`);
+    expect(kinds(s, hawkins)).toEqual([]);
 
     // As visões dos dois jogadores e do espectador mostram o mesmo.
     const aliases = createAliases(s, randomId);

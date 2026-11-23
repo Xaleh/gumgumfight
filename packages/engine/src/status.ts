@@ -320,13 +320,14 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       onCard: true,
     });
   }
-  // [Once Per Turn] já usado neste turno (Líder, Personagem ou Palco): marca "EFEITO USADO" para os dois
-  // jogadores saberem, olhando a mesa, que a habilidade não pode ser usada de novo até o fim do turno.
-  // Fica atrás da tag do Teach (mais informativa e mais longa), que usa a mesma chave.
+  // [Activate: Main] [Once Per Turn] já usado neste turno (Líder, Personagem ou Palco): marca "EFEITO USADO"
+  // para os dois jogadores saberem, olhando a mesa, que a habilidade não pode ser ativada de novo até o fim
+  // do turno. Fica atrás da tag do Teach (mais informativa e mais longa), que usa a mesma chave.
   const prefix = `${uid}:`;
-  const usedOnce = def.abilities.filter((a, i) => a.oncePerTurn && state.usedThisTurn.includes(`${prefix}${i}`));
+  const activateMain = def.abilities.map((a, i) => ({ a, i })).filter(({ a }) => a.timing === 'activateMain' && a.oncePerTurn);
+  const usedOnce = activateMain.filter(({ i }) => state.usedThisTurn.includes(`${prefix}${i}`));
   if (usedOnce.length) {
-    const total = def.abilities.filter((a) => a.oncePerTurn).length;
+    const total = activateMain.length;
     const all = usedOnce.length === total;
     add('effectUsed', 0, {
       kind: 'effectUsed',
@@ -335,9 +336,9 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       tag: 'EFEITO USADO',
       tagKey: 'status.effectUsedTag',
       text: all
-        ? 'Efeito [Uma Vez por Turno] já usado neste turno'
-        : `${usedOnce.length} de ${total} efeitos [Uma Vez por Turno] já usados neste turno`,
-      textKey: all ? 'status.oncePerTurnUsed' : 'status.oncePerTurnUsedSome',
+        ? '[Ativar: Principal] já usado neste turno'
+        : `${usedOnce.length} de ${total} [Ativar: Principal] já usados neste turno`,
+      textKey: all ? 'status.activateMainUsed' : 'status.activateMainUsedSome',
       ...(all ? {} : { textParams: { n: usedOnce.length, total } }),
       ...END_OF_TURN,
       tone: 'good',
