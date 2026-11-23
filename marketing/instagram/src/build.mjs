@@ -350,6 +350,74 @@ Object.assign(slides, {
   },
 });
 
+// ------------------------------------------ stories: novidades e treino de Selado
+// Stories (1080x1920): o topo (250 px) e o rodapé (340 px) ficam livres para a interface do Instagram.
+/** Três boosters em silhueta, com brilho: mostra que vem booster sem dizer qual. */
+const mysteryPacks = `<div class="mystery">
+  ${['RUSH', 'DRAFT', 'CUBE'].map((b, i) => `<div class="mp mp${i}"><img src="boosters/${b}.webp" alt=""><span>?</span></div>`).join('')}
+</div>`;
+const step = (n, title, sub) => `<div class="step"><b>${n}</b><div><div class="t">${title}</div><div class="s">${sub}</div></div></div>`;
+Object.assign(slides, {
+  'novos-modos/stories/teaser-novidades': {
+    cls: 'story deep burst vignette',
+    html: `<div class="layer col center" style="--by:28%;padding:240px 70px 0;gap:0">
+      ${mysteryPacks}
+      <div class="eyebrow" style="font-size:40px;margin-top:48px">Vem aí</div>
+      <div class="h h2" style="margin-top:26px;font-size:126px">Preparados<br>para as <em>novidades</em><br>do GumGum Fight?</div>
+      <div class="chip" style="margin-top:50px;font-size:34px">Fique de olho nos próximos stories</div>
+      <img src="logo.svg" style="height:90px;margin-top:44px" alt="">
+    </div>`,
+  },
+  'novos-modos/stories/selado-treino-1': {
+    cls: 'story burst vignette',
+    html: `<div class="layer col center" style="--by:62%;padding:262px 70px 0;gap:18px">
+      <div class="eyebrow" style="font-size:38px">Pré-release chegando?</div>
+      <div class="h h2">Treine antes<br>no <em>Selado</em></div>
+      <div class="lead" style="max-width:900px;margin-top:8px">Abra boosters, monte o deck e jogue quantas vezes quiser. De graça, no navegador.</div>
+      <div style="margin-top:40px">${phone('modos-selado.jpg', { w: 560, rot: -3 })}</div>
+    </div>`,
+  },
+  'novos-modos/stories/selado-treino-2': {
+    cls: 'story deep burst',
+    html: `<div class="layer col" style="--by:20%;padding:262px 80px 0;gap:18px">
+      <div class="eyebrow" style="font-size:38px">Selado · como funciona</div>
+      <div class="h h2">Em <em>4 passos</em></div>
+      <div class="col" style="gap:30px;margin-top:50px">
+        ${step(1, 'Escolha a coleção', 'As coleções de booster, OP e EB.')}
+        ${step(2, 'Abra 6 boosters', '12 cartas cada, com taxas tiradas de aberturas de caixas.')}
+        ${step(3, 'Monte um deck de 40', 'Com o que sair: qualquer cor, qualquer Líder, sem banidas.')}
+        ${step(4, 'Jogue', 'Contra o bot ou numa sala privada com um amigo.')}
+      </div>
+    </div>`,
+  },
+  'novos-modos/stories/selado-treino-3': {
+    cls: 'story burst',
+    html: `<div class="layer col" style="--bx:80%;--by:70%;padding:262px 70px 0;gap:18px">
+      <div class="eyebrow" style="font-size:38px">O que dá para treinar</div>
+      <div class="h h2">Chegue no<br><em>pré-release</em><br>afiado</div>
+    </div>
+    <div class="layer" style="top:860px;left:70px;right:auto;bottom:auto;width:470px">
+      <div class="col tips" style="gap:22px">
+        <div><b>Escolher o Líder</b>Um que sair ou o Luffy de 6 cores, que todo mundo tem.</div>
+        <div><b>Curva e Counters</b>O app conta enquanto você monta.</div>
+        <div><b>Montar sozinho</b>Um deck jogável para começar e ajustar.</div>
+        <div><b>Abrir de novo</b>Cada abertura sai diferente.</div>
+      </div>
+    </div>
+    <div class="layer" style="left:auto;right:56px;top:840px;bottom:auto">${phone('modos-selado-deck.jpg', { w: 430, rot: 4 })}</div>`,
+  },
+  'novos-modos/stories/selado-treino-4': {
+    cls: 'story burst vignette',
+    html: `<div class="layer col center" style="--by:42%;padding:0 70px 360px;justify-content:center;gap:40px">
+      <div class="h h1 y">Bora<br>treinar?</div>
+      <div class="lead" style="max-width:860px">Na tela inicial, em <b>Modos especiais</b>, toque em <b>Abrir boosters</b>.</div>
+      <span class="swipe" style="margin-top:10px">toque no link ↓</span>
+      <div class="btn">${URL_TEXT}</div>
+      <img src="logo.svg" style="height:84px;margin-top:20px" alt="">
+    </div>`,
+  },
+});
+
 // ------------------------------------------- série "Mihawk aprende a jogar"
 // Sobreposições com fundo transparente, para pôr por cima do vídeo do cosplay no editor.
 const MIHAWK_EPISODES = [

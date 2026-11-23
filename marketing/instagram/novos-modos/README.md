@@ -234,6 +234,22 @@ Textos para escrever por cima, um por dia da semana dos modos novos:
 | Sábado | `stories/story-draft-cubo.mp4` | "420 cartas. Nenhuma repetida." | Link |
 | Domingo | `stories/story-all-blue.mp4` | "Sem SR, sem SEC. Topa?" | Enquete: "Topo / Prefiro meu meta" |
 
+## Sequência de stories: chamada e treino de Selado
+
+Para publicar em sequência, no mesmo dia, antes de um pré-release:
+
+| Ordem | Arquivo | O que diz | Figurinha |
+|---|---|---|---|
+| 1 | `stories/teaser-novidades.jpg` ou `teaser-novidades.mp4` (animado, 7 s) | "Preparados para as novidades do GumGum Fight?" | Contagem regressiva ou enquete "Sim / Muito" |
+| 2 | `stories/selado-treino-1.jpg` | "Pré-release chegando? Treine antes no Selado" | |
+| 3 | `stories/selado-treino-2.jpg` | Como funciona, em 4 passos | |
+| 4 | `stories/selado-treino-3.jpg` | O que dá para treinar: Líder, curva e Counters, Montar sozinho, abrir de novo | |
+| 5 | `stories/story-selado.mp4` | O Selado em ação: booster abrindo | Link |
+| 6 | `stories/selado-treino-4.jpg` | "Bora treinar?" e onde fica o modo no app | Link, por cima do botão amarelo |
+
+A chamada não diz qual é a novidade: mostra três boosters em silhueta, com interrogação. Dá para publicá-la um ou
+dois dias antes e a sequência do Selado no dia do anúncio.
+
 ## Aviso para o Discord e o WhatsApp
 
 ```

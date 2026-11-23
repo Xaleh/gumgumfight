@@ -99,3 +99,16 @@ body { font-family: Nunito, 'M PLUS Rounded 1c', sans-serif; color: var(--cream)
 .slide.pano { width: 3240px; }
 /* Sobreposições de vídeo: sem fundo e com a altura do conteúdo. */
 .slide.clear { background: transparent; height: auto; }
+/* Stories de novidades: boosters em silhueta, passos numerados e dicas. */
+.mystery { position: relative; width: 900px; height: 560px; display: flex; justify-content: center; align-items: flex-end; }
+.mystery::before { content: ''; position: absolute; left: 50%; top: 52%; width: 720px; height: 720px; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(247, 205, 72, 0.55), rgba(247, 205, 72, 0) 65%); }
+.mp { position: relative; margin: 0 -36px; }
+.mp img { display: block; height: 440px; filter: brightness(0) drop-shadow(0 0 3px #f7cd48) drop-shadow(0 0 26px rgba(247, 205, 72, 0.85)); }
+.mp span { position: absolute; inset: 0; display: grid; place-items: center; font-family: Bangers, sans-serif; font-size: 230px; color: var(--yellow); -webkit-text-stroke: 12px var(--brown); paint-order: stroke fill; text-shadow: 0 0 40px rgba(247, 205, 72, 0.6); }
+.mp0 { transform: rotate(-12deg) translateY(30px); } .mp1 { z-index: 2; } .mp1 img { height: 505px; } .mp2 { transform: rotate(12deg) translateY(30px); }
+.step { display: flex; gap: 30px; align-items: center; background: rgba(11, 23, 38, 0.66); border: 3px solid var(--line); border-radius: 36px; padding: 30px 34px; }
+.step > b { flex: none; width: 116px; height: 116px; border-radius: 50%; display: grid; place-items: center; font-family: Bangers, sans-serif; font-weight: 400; font-size: 78px; color: var(--brown); background: var(--yellow); border: 6px solid var(--brown); box-shadow: 0 8px 0 var(--ink); }
+.step .t { font-weight: 900; font-size: 50px; line-height: 1.1; }
+.step .s { font-weight: 700; font-size: 34px; line-height: 1.3; color: var(--muted); margin-top: 8px; }
+.tips > div { font-weight: 700; font-size: 32px; line-height: 1.3; color: var(--muted); background: rgba(11, 23, 38, 0.66); border: 3px solid var(--line); border-left: 12px solid var(--yellow); border-radius: 24px; padding: 20px 24px; }
+.tips b { display: block; font-weight: 900; font-size: 40px; color: var(--cream); margin-bottom: 6px; }

@@ -282,6 +282,18 @@ const reels = {
   'novos-modos/stories/story-draft': [story({ dur: 8, eyebrow: 'Novo modo', title: '<em>Draft</em>', lead: 'Pod de 8. Pegue 1 carta e passe o resto.', file: 'draft', start: 8.3 })],
   'novos-modos/stories/story-draft-cubo': [story({ dur: 8, eyebrow: 'Novo modo', title: 'Draft <em>Cubo</em>', lead: 'As 420 cartas mais usadas, uma cópia de cada.', file: 'cubo', start: 12.6 })],
   'novos-modos/stories/story-all-blue': [story({ dur: 7.5, eyebrow: 'Novo formato', title: 'All <em>Blue</em>', lead: 'Só C, UC, R e promo. O Líder é livre.', file: 'allblue', start: 5.6, color: '#6aa9ff' })],
+  // Story animado de chamada: o mesmo do teaser-novidades.jpg, com o brilho pulsando.
+  'novos-modos/stories/teaser-novidades': [{
+    dur: 7,
+    cls: 'deep burst spin vignette',
+    html: `<div class="layer col center" style="--by:28%;padding:240px 70px 0;gap:0">
+      ${a('pop', 0.05, `<div class="mystery pulse">${['RUSH', 'DRAFT', 'CUBE'].map((b, i) => `<div class="mp mp${i}"><img src="boosters/${b}.webp" alt=""><span class="bob" style="--bd:${i * 0.35}s">?</span></div>`).join('')}</div>`)}
+      ${a('up', 0.55, '<div class="eyebrow" style="font-size:40px">Vem aí</div>', 'margin-top:48px')}
+      ${a('pop', 0.75, '<div class="h h2" style="font-size:126px">Preparados<br>para as <em>novidades</em><br>do GumGum Fight?</div>', 'margin-top:26px')}
+      ${a('up', 1.3, '<div class="chip" style="font-size:34px">Fique de olho nos próximos stories</div>', 'margin-top:50px')}
+      ${a('up', 1.5, '<img src="logo.svg" style="height:90px" alt="">', 'margin-top:44px')}
+    </div>`,
+  }],
 };
 
 
@@ -297,6 +309,10 @@ img.full { position: absolute; inset: 0; width: 1080px; height: 1920px; }
 .scrim { position: absolute; inset: 0 0 auto 0; height: 640px; background: linear-gradient(#0b1726 0%, rgba(11, 23, 38, 0.88) 45%, transparent 100%); z-index: 1; }
 .a-pop { animation: pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.25) both; animation-delay: var(--d, 0s); }
 .a-up { animation: up 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+.pulse::before { animation: glow 1.6s ease-in-out infinite alternate; }
+@keyframes glow { from { opacity: 0.45; transform: translate(-50%, -50%) scale(0.88); } to { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } }
+.bob { animation: bob 1.2s ease-in-out infinite alternate; animation-delay: var(--bd, 0s); }
+@keyframes bob { from { transform: translateY(-14px) rotate(-6deg); } to { transform: translateY(14px) rotate(6deg); } }
 @keyframes pop { 0% { opacity: 0; transform: scale(0.6) rotate(-6deg); } 100% { opacity: 1; transform: none; } }
 /* Cartela "Banido": aviso em papel e carimbo. */
 .notice { width: 900px; background: #f6e7c1; border: 10px solid var(--brown); border-radius: 26px; padding: 64px 40px 330px; color: var(--brown); text-align: center; box-shadow: 16px 20px 0 var(--ink); transform: rotate(-3deg); }
