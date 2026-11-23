@@ -418,6 +418,80 @@ Object.assign(slides, {
   },
 });
 
+// ------------------------------------------------------------ modo espectador
+const ESP = 8;
+const monitor = (img, w = 940, rot = 0) => `<div class="monitor" style="--mw:${w}px;--rot:${rot}deg"><div class="scr"><img src="shots/${img}" alt=""></div></div>`;
+const head = (eyebrow, title, lead) => `<div class="eyebrow">${eyebrow}</div><div class="h h2">${title}</div><div class="lead sm" style="margin-top:6px;max-width:920px">${lead}</div>`;
+Object.assign(slides, {
+  'espectador/posts/espectador-1': {
+    cls: 'burst vignette',
+    html: `<div class="layer pad col center" style="--by:58%;gap:18px">
+      <div class="eyebrow">Assistir partidas</div>
+      <div class="h h1" style="font-size:150px">Modo<br><em>espectador</em></div>
+      <div style="margin-top:40px">${monitor('espectador-lateral.jpg', 900, -2)}</div>
+      <div class="chips" style="margin-top:42px;gap:14px"><span class="chip solid">Ao vivo</span><span class="chip solid">Mãos só se liberar</span><span class="chip solid">Do seu jeito</span></div>
+    </div>
+    ${foot('<span class="swipe">arrasta ➜</span>')}`,
+  },
+  'espectador/posts/espectador-2': {
+    cls: 'deep burst',
+    html: `<div class="layer pad col" style="gap:18px">${head('Ao vivo', 'Assista a <em>qualquer partida</em>', 'As partidas online ficam em Assistir partidas, com ou sem login. Sala privada: é só ter o código.')}
+      <div style="margin-top:40px;align-self:center">${monitor('espectador-zoom.jpg', 860)}</div>
+      <div class="chips" style="margin-top:40px">${['Sem login', 'Sala privada pelo código', 'Toque na carta para ler'].map((c) => `<span class="chip">${c}</span>`).join('')}</div>
+    </div>${count(2, ESP)}`,
+  },
+  'espectador/posts/espectador-3': {
+    cls: 'burst',
+    html: `<div class="layer pad col" style="--bx:50%;--by:75%;gap:18px">${head('As mãos', 'Quem cria a sala <em>decide</em>', 'Ao criar a sala privada, marque "Liberar as mãos para transmissão". Sem marcar, ninguém vê a mão de ninguém.')}</div>
+    <div class="layer" style="top:640px;bottom:auto;display:flex;justify-content:center;gap:40px">
+      <div class="col center" style="gap:26px">${phone('espectador-celular-sala.jpg', { w: 340, rot: -4, top: '-20px' })}<span class="chip solid">Na hora de criar</span></div>
+      <div class="col center" style="gap:26px">${phone('espectador-celular-mesa.jpg', { w: 340, rot: 4 })}<span class="chip solid">Os dois veem o aviso</span></div>
+    </div>${count(3, ESP)}`,
+  },
+  'espectador/posts/espectador-4': {
+    cls: 'deep burst',
+    html: `<div class="layer pad col" style="gap:18px">${head('Mãos liberadas', 'As duas mãos, <em>com atraso</em>', 'Quem transmite vê as mãos dos dois jogadores, sempre com pelo menos 1 minuto de atraso. Assim ninguém espia o oponente pela live.')}
+      <div style="margin-top:34px;align-self:center">${monitor('espectador-maos.jpg', 840)}</div>
+      <div class="chips" style="margin-top:36px">${['Pelo menos 1 min de atraso', 'Torneios e salas liberadas', 'Perfil Streamer'].map((c) => `<span class="chip">${c}</span>`).join('')}</div>
+    </div>${count(4, ESP)}`,
+  },
+  'espectador/posts/espectador-5': {
+    cls: 'burst',
+    html: `<div class="layer pad col" style="--by:62%;gap:18px">${head('Do seu jeito', 'Escolha o <em>playmat</em>', 'Quatro cores para a mesa de quem assiste, com a bússola dourada no meio.')}
+      <div class="mats">
+        ${[['espectador-lateral.jpg', 'Azul'], ['espectador-vermelho.jpg', 'Vermelho'], ['espectador-verde.jpg', 'Verde'], ['espectador-branco.jpg', 'Branco']].map(([img, n]) => `<div>${monitor(img, 440)}<span class="chip solid">${n}</span></div>`).join('')}
+      </div>
+    </div>${count(5, ESP)}`,
+  },
+  'espectador/posts/espectador-6': {
+    cls: 'deep burst',
+    html: `<div class="layer pad col" style="gap:18px">${head('Do seu jeito', 'Mesa lateral <em>ou em pé</em>', 'Os jogadores à esquerda e à direita, como na câmera de cima, ou a mesa em pé, como no celular.')}
+      <div class="col center" style="gap:34px;margin-top:34px">
+        <div style="display:flex;gap:26px;align-items:center">${monitor('espectador-lateral.jpg', 560)}<span class="chip solid">Lateral</span></div>
+        <div style="display:flex;gap:26px;align-items:center">${monitor('espectador-em-pe.jpg', 560)}<span class="chip solid">Em pé</span></div>
+      </div>
+    </div>${count(6, ESP)}`,
+  },
+  'espectador/posts/espectador-7': {
+    cls: 'burst',
+    html: `<div class="layer pad col" style="--by:60%;gap:18px">${head('Modo transmissão', 'Leve para <em>a live</em>', 'Um link para pôr no OBS como Fonte de navegador. A carta jogada aparece grande, em destaque.')}
+      <div style="margin-top:40px;align-self:center">${monitor('espectador-obs.jpg')}</div>
+      <div class="chips" style="margin-top:44px">${['Atraso de até 10 min', 'Chat na live: você escolhe', 'Sua mão nas suas partidas'].map((c) => `<span class="chip">${c}</span>`).join('')}</div>
+    </div>${count(7, ESP)}`,
+  },
+  'espectador/posts/espectador-8': {
+    cls: 'burst vignette',
+    html: `<div class="layer pad col center" style="--by:40%;justify-content:center;gap:40px;padding-bottom:230px">
+      <div class="h h2 y">Bora<br>assistir?</div>
+      <div class="lead" style="max-width:860px">No menu, toque em <b>Assistir</b>. Para transmitir com as mãos, fale com a gente.</div>
+      <div class="btn" style="margin-top:14px">${URL_TEXT}</div>
+      <div class="chip" style="margin-top:6px">Link na bio</div>
+    </div>
+    ${count(ESP, ESP)}
+    <div class="foot" style="justify-content:center;flex-direction:column;gap:22px"><img src="logo.svg" alt=""><div class="note">${DISCLAIMER}</div></div>`,
+  },
+});
+
 // ------------------------------------------- série "Mihawk aprende a jogar"
 // Sobreposições com fundo transparente, para pôr por cima do vídeo do cosplay no editor.
 const MIHAWK_EPISODES = [

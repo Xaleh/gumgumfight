@@ -157,6 +157,37 @@ function showcase({ dur, eyebrow, title, lead, file, start, link = false, color 
 }
 const story = (opts) => showcase({ ...opts, link: true });
 
+// ------------------------------------------------------------ modo espectador
+// Gravações da tela do computador (1920x1080) em src/clips/espectador-*.mp4.
+/** Título em cima e uma tela de computador com um trecho da gravação. `speed` acelera o trecho. */
+function desk({ dur, eyebrow, title, lead, file, start, speed = 1, chips = [] }) {
+  return {
+    dur,
+    clip: { file: `espectador-${file}.mp4`, start, width: 1000, speed },
+    cls: 'deep burst spin',
+    html: `<div class="layer col center" style="padding:250px 40px 0;gap:14px">
+      ${a('up', 0.04, `<div class="eyebrow">${eyebrow}</div>`)}
+      ${a('pop', 0.1, `<div class="h h3">${title}</div>`)}
+      ${lead ? a('up', 0.26, `<div class="lead sm" style="max-width:940px">${lead}</div>`) : ''}
+      ${a('pop', 0.16, `<div class="monitor" style="--mw:1000px"><div class="scr"><img data-clip alt=""></div></div>`, 'margin-top:60px')}
+      ${chips.length ? a('up', 0.5, `<div class="chips" style="justify-content:center;margin-top:30px">${chips.map((c) => `<span class="chip">${c}</span>`).join('')}</div>`) : ''}
+    </div>`,
+  };
+}
+/** Título em cima e o celular com uma captura parada (aproximando devagar). */
+function mobileStill({ dur, eyebrow, title, lead, img, top = '0' }) {
+  return {
+    dur,
+    cls: 'burst spin',
+    html: `<div class="layer col center" style="padding:250px 60px 0;gap:14px">
+      ${a('up', 0.04, `<div class="eyebrow">${eyebrow}</div>`)}
+      ${a('pop', 0.1, `<div class="h h3">${title}</div>`)}
+      ${a('up', 0.26, `<div class="lead sm" style="max-width:940px">${lead}</div>`)}
+      ${a('pop', 0.16, `<div class="phone" style="--pw:600px;--rot:-2deg"><div><img class="slowzoom" src="shots/${img}" style="top:${top};animation-duration:${dur}s" alt=""></div></div>`, 'margin-top:34px')}
+    </div>`,
+  };
+}
+
 const reels = {
   'reel-01-apresentacao': [
     intro('One Piece Card Game', 'Direto do<br><em>navegador</em>'),
@@ -294,6 +325,23 @@ const reels = {
       ${a('up', 1.5, '<img src="logo.svg" style="height:90px" alt="">', 'margin-top:44px')}
     </div>`,
   }],
+  'espectador/reels/reel-maos': [
+    intro('Modo espectador', 'Quem vê<br>as <em>mãos</em>?', 2.4),
+    desk({ dur: 3.6, eyebrow: 'Sem liberar', title: 'Só a <em>mesa</em>', lead: 'Quem assiste vê o campo, mas não as mãos.', file: 'mesa', start: 3.4 }),
+    mobileStill({ dur: 3.8, eyebrow: 'Sala privada', title: 'Quem cria <em>decide</em>', lead: 'Marque "Liberar as mãos para transmissão".', img: 'espectador-celular-sala.jpg', top: '-80px' }),
+    mobileStill({ dur: 3.2, eyebrow: 'Na mesa', title: 'Os dois <em>sabem</em>', lead: 'O aviso "Mãos liberadas" fica na tela de quem joga.', img: 'espectador-celular-mesa.jpg' }),
+    desk({ dur: 7, eyebrow: 'Liberou', title: 'As duas <em>mãos</em>', lead: 'Para quem transmite, com pelo menos 1 min de atraso.', file: 'maos', start: 1.6, chips: ['Ninguém espia pela live'] }),
+    desk({ dur: 5.5, eyebrow: 'Modo transmissão', title: 'Direto <em>para o OBS</em>', lead: 'Um link para a sua live, com a carta jogada em destaque.', file: 'obs', start: 3 }),
+    outro(3),
+  ],
+  'espectador/reels/reel-do-seu-jeito': [
+    intro('Modo espectador', 'Assista<br><em>do seu jeito</em>', 2.2),
+    desk({ dur: 7, eyebrow: 'Playmat', title: 'Escolha <em>a cor</em>', lead: 'Azul, vermelho, verde ou branco.', file: 'mesa', start: 24.4, speed: 2 }),
+    desk({ dur: 6, eyebrow: 'Layout', title: 'Lateral <em>ou em pé</em>', lead: 'Como na câmera de cima, ou como no celular.', file: 'mesa', start: 40.9, speed: 1.6 }),
+    desk({ dur: 7, eyebrow: 'Chat', title: 'Liga <em>e desliga</em>', lead: 'As mensagens dos jogadores somem só para você.', file: 'mesa', start: 15, chips: ['Olá! 👋', 'Boa partida! 🤝'] }),
+    desk({ dur: 4.2, eyebrow: 'Cartas', title: 'Toque <em>para ler</em>', lead: 'Qualquer carta à vista abre com o efeito.', file: 'mesa', start: 53.7 }),
+    outro(3),
+  ],
 };
 
 
@@ -313,6 +361,8 @@ img.full { position: absolute; inset: 0; width: 1080px; height: 1920px; }
 @keyframes glow { from { opacity: 0.45; transform: translate(-50%, -50%) scale(0.88); } to { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } }
 .bob { animation: bob 1.2s ease-in-out infinite alternate; animation-delay: var(--bd, 0s); }
 @keyframes bob { from { transform: translateY(-14px) rotate(-6deg); } to { transform: translateY(14px) rotate(6deg); } }
+.slowzoom { animation: slowzoom linear both; transform-origin: 50% 30%; }
+@keyframes slowzoom { from { transform: scale(1); } to { transform: scale(1.06); } }
 @keyframes pop { 0% { opacity: 0; transform: scale(0.6) rotate(-6deg); } 100% { opacity: 1; transform: none; } }
 /* Cartela "Banido": aviso em papel e carimbo. */
 .notice { width: 900px; background: #f6e7c1; border: 10px solid var(--brown); border-radius: 26px; padding: 64px 40px 330px; color: var(--brown); text-align: center; box-shadow: 16px 20px 0 var(--ink); transform: rotate(-3deg); }
@@ -365,7 +415,7 @@ ${scenes.map((s, i) => `<section class="slide story scene ${s.cls}" id="s${i}">$
     if (scene.clip) {
       const dir = join(tmp, `clip${i}`);
       mkdirSync(dir);
-      execFileSync('ffmpeg', ['-loglevel', 'error', '-ss', String(scene.clip.start), '-t', String(scene.dur + 0.2), '-i', join(SRC, 'clips', scene.clip.file ?? 'partida.mp4'), '-vf', `fps=${FPS},scale=${scene.clip.width}:-2:flags=lanczos`, '-q:v', '2', join(dir, '%05d.jpg')]);
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-ss', String(scene.clip.start), '-t', String((scene.dur + 0.2) * (scene.clip.speed ?? 1)), '-i', join(SRC, 'clips', scene.clip.file ?? 'partida.mp4'), '-vf', `setpts=PTS/${scene.clip.speed ?? 1},fps=${FPS},scale=${scene.clip.width}:-2:flags=lanczos`, '-q:v', '2', join(dir, '%05d.jpg')]);
       clipFrames = readdirSync(dir).sort().map((f) => pathToFileURL(join(dir, f)).href);
     }
     await tab.evaluate((id) => { document.querySelectorAll('.scene').forEach((s) => s.classList.toggle('on', s.id === id)); }, `s${i}`);
