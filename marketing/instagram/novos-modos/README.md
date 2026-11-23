@@ -159,13 +159,95 @@ Monta o seu e conta qual Líder você escolheu.
 #onepiececardgame #optcg #onepiecetcg #allblue #pauper #optcgbrasil #gumgumfight
 ```
 
+### Reels curtos com as amostras
+
+Para os dias seguintes à semana dos modos novos: uma amostra sozinha, com música e só a legenda.
+
+`selado-02-abrindo-o-booster.mp4`:
+
+```
+O som que todo mundo conhece: o do booster abrindo. 📦✨
+
+No Selado do GumGum Fight você abre 6 boosters de verdade, com as taxas tiradas de aberturas de caixas da comunidade. Saiu SR? Saiu SEC? Só abrindo para saber.
+
+Comenta a carta que você queria tirar. 👇
+
+#onepiececardgame #optcg #onepiecetcg #boosteropening #optcgbrasil #gumgumfight
+```
+
+`pack-rush-02-abrindo-o-booster.mp4`:
+
+```
+O booster é dourado até a hora de abrir. Depois, vira uma coleção qualquer. 🎲
+
+No Pack Rush cada booster é sorteado entre as coleções que você escolheu. Esse aqui caiu em qual?
+
+#onepiececardgame #optcg #onepiecetcg #packrush #optcgbrasil #gumgumfight
+```
+
+`cubo-02-escolhas.mp4`:
+
+```
+Booster do Cubo: só carta que já foi meta. 🧊
+
+Qual dessas você pegaria primeiro? Responde com a posição (1 a 12). 👇
+
+#onepiececardgame #optcg #onepiecetcg #cube #draft #optcgbrasil #gumgumfight
+```
+
+`draft-02-escolhas.mp4`:
+
+```
+46 segundos para escolher 1 carta de 12. ⏱️
+
+No Draft o relógio encurta a cada escolha, e quando acaba o servidor escolhe por você. Pressão de mesa de verdade, no navegador.
+
+#onepiececardgame #optcg #onepiecetcg #draft #optcgbrasil #gumgumfight
+```
+
+## Texto alternativo do carrossel
+
+Em "Configurações avançadas → Acessibilidade", uma por imagem:
+
+1. "Três boosters do GumGum Fight (Pack Rush, Draft e Cube) e o título '5 modos novos'."
+2. "Celular com as 12 cartas de um booster aberto no Selado."
+3. "Celular com o booster dourado do Pack Rush."
+4. "Celular com a escolha de cartas do Draft, os 8 lugares do pod e o relógio."
+5. "Celular com o booster do Cubo GumGum."
+6. "Celular com o deck 'Luffy Vermelho (All Blue)' equipado e o formato All Blue marcado."
+7. "Convite: 'Qual você joga primeiro?' e o endereço gumgumfight.app."
+
 ## Stories
 
 Os cinco vídeos de `stories/` já têm o título, o trecho do app e o botão amarelo com o endereço. Ao publicar, ponha
 a figurinha de **Link** (`https://gumgumfight.app`) por cima do botão.
 
-Para os outros dias, as amostras rendem stories rápidos: publique `selado-02-abrindo-o-booster.mp4` com a enquete
-"SR ou só comum?", ou `draft-02-escolhas.mp4` com "qual você pegaria?".
+Textos para escrever por cima, um por dia da semana dos modos novos:
+
+| Dia | Arquivo | Texto no story | Figurinha |
+|---|---|---|---|
+| Segunda | `amostras/selado-02-abrindo-o-booster.mp4` | "Chegou coisa nova no GumGum 👀" | Enquete: "Qual você joga primeiro?" com Selado · Draft (e um segundo story com Pack Rush · Cubo · All Blue) |
+| Terça | `stories/story-selado.mp4` | "Pré-release sem sair de casa" | Link |
+| Quarta | `amostras/selado-03-abrindo-os-outros.mp4` | "Abri 6 boosters de OP09. E você?" | Caixa de perguntas: "O que saiu no seu booster?" |
+| Quinta | `stories/story-pack-rush.mp4` | "Quais coleções você misturaria?" | Link |
+| Sexta | `stories/story-draft.mp4` | "Pod aberto hoje às 20h! Código: ______" | Link e contagem regressiva |
+| Sábado | `stories/story-draft-cubo.mp4` | "420 cartas. Nenhuma repetida." | Link |
+| Domingo | `stories/story-all-blue.mp4` | "Sem SR, sem SEC. Topa?" | Enquete: "Topo / Prefiro meu meta" |
+
+## Aviso para o Discord e o WhatsApp
+
+```
+🏴‍☠️ 5 modos novos no GumGum Fight!
+
+📦 Selado: abra 6 boosters e monte um deck de 40
+🎲 Pack Rush: o Selado com várias coleções misturadas
+🔁 Draft: pod de 8, pega 1 carta e passa o resto (os lugares vazios viram bots)
+🧊 Draft Cubo: as 420 cartas mais usadas, uma de cada
+🌊 All Blue: só C, UC, R e promo, com Líder livre
+
+Tudo de graça, no navegador: https://gumgumfight.app
+Os vídeos estão no nosso Instagram. 👀
+```
 
 ## Na hora de publicar
 
