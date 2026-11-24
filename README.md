@@ -1164,6 +1164,7 @@ original em inglês, como nas cartas oficiais. Nomes de cartas, DON!!, Blocker, 
 
 A documentação técnica completa do produto (stacks, banco, cartas, partidas, torneios, transmissão ao vivo,
 infraestrutura e capacidade da VPS, com medições) está em [`docs/documentacao-tecnica.md`](docs/documentacao-tecnica.md).
+O que vem pela frente, em ordem e com o que já foi feito marcado, está em [`docs/roadmap.md`](docs/roadmap.md).
 
 ```
 packages/engine   Motor de regras em TypeScript puro (sem dependências), bot e testes
