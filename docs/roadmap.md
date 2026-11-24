@@ -9,6 +9,9 @@ quando o item fica pronto e o campo **Feito em**, com a data e o link do PR.
 - Item grande (marcado com 🧱) vira um `docs/plano-<nome>.md` com fases próprias. Cada PR entrega uma fase, e o item
   só ganha `[x]` quando a última fase fica pronta. Até lá, as fases concluídas são anotadas numa linha **Progresso** do item (logo acima do **Feito em**).
 - A ordem pode mudar a qualquer momento: é só mover o item (e trocar o ID, se mudar de fase) neste arquivo.
+- Cada item também é um card no Trello (quadro **GumGum Fight**, lista **Planejamento**), com o ID no início do
+  título. A sessão move o card para **Em execução** e **Em teste/Validação**; **Concluído** fica com o dono do
+  projeto, depois do merge. Se um item mudar de ID aqui, renomeie o card também.
 
 ## Regras para todo item
 
@@ -238,6 +241,12 @@ Como trabalhar:
 8. Faça commit, dê push e abra o PR para a main com um resumo do que mudou e de como testar.
    NÃO faça merge na main (ela publica em produção). Se der, publique a branch na homologação
    pelo workflow "CI e deploy" (Run workflow).
+9. Trello (quadro "GumGum Fight", card cujo título começa pelo ID do item, ex.: "B1 · "):
+   - ao começar a implementar (depois do plano), mova o card para "Em execução";
+   - ao abrir o PR, mova o card para "Em teste/Validação" e comente nele o link do PR, o que ficou
+     pronto e, se o item foi dividido, qual fase foi entregue.
+   Não mova para "Concluído": isso eu faço depois do merge. Se o Trello não estiver disponível
+   nesta sessão, pule este passo e me avise no fim.
 
 No fim, me diga em poucas linhas o que ficou pronto, o que ficou de fora e qual é o próximo item.
 ```
