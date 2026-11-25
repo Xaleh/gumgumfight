@@ -131,7 +131,9 @@ export interface Weights {
   /**
    * A mão provável do oponente (`handguess.ts`, com o deck provável do Líder dele): `guessHold` é a vantagem das
    * cartas com Counter (razão de chances) sobre a composição do deck — quem joga guarda os Counters e gasta as
-   * outras cartas; 1,45 leva os 64% de cartas com Counter dos decks prontos aos 72% do modelo fixo (`counterCard`).
+   * outras cartas. 1,45 levaria os 64% de cartas com Counter dos decks prontos aos 72% do modelo fixo
+   * (`counterCard`); no auto-jogo, 1 (a composição pura, mais otimista para o atacante) saiu um pouco melhor
+   * (docs/bot-tempo.md, seção 13).
    * `guessRush`: um [Rush] que cabe no DON!! dele entra na ameaça do próximo ataque como mais um atacante quando a
    * chance de ele ter ao menos um na mão passa disto.
    */
@@ -216,7 +218,7 @@ export const DEFAULT_WEIGHTS: Weights = {
   counterBig: 0.2,
   counterWill: 1,
   counterStack: 0.6,
-  guessHold: 1.45,
+  guessHold: 1,
   guessRush: 0.5,
   winCap: 120_000,
   lethalPlan: 60_000,

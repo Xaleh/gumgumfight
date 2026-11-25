@@ -652,8 +652,9 @@ Líder costuma jogar: "ele já gastou três dos oito +2000", "esse deck tem quat
 
 **O que o bot deduz** (`handModel`, uma vez por decisão, na visão): do deck provável saem as cartas desse oponente que
 o bot já viu (campo, lixo, Vida aberta, cartas da mão reveladas). Cada carta escondida da mão é uma carta sorteada do
-que sobra, com uma vantagem para as que têm Counter (`guessHold`, 1,45 de razão de chances: quem joga guarda os
-Counters e gasta as outras; com os 64% de cartas com Counter dos decks prontos, isso dá os 72% do modelo fixo). O
+que sobra, com uma vantagem opcional para as que têm Counter (`guessHold`, razão de chances: quem joga guarda os
+Counters e gasta as outras; 1,45 levaria os 64% de cartas com Counter dos decks prontos aos 72% do modelo fixo). O
+padrão é 1, a composição pura, que saiu um pouco melhor na medida abaixo. O
 Evento [Counter] conta pelo +poder só se o DON!! ativo dele paga o custo. O resultado é a chance de uma carta
 escondida cobrir 0, 1, 2, 3 ou 4 mil, e os [Rush] que ainda podem estar lá.
 
@@ -680,4 +681,17 @@ escondida cobrir 0, 1, 2, 3 ou 4 mil, e os [Rush] que ainda podem estar lá.
 **Medida** (`packages/engine/scripts/duel-handguess.ts`: nível `hard`, decks prontos sorteados, assentos trocados, o
 deck provável de cada lado é o deck pronto do Líder adversário):
 
-MEDIDA_AQUI
+| Versão | Auto-jogo, com x sem a estimativa | Humano fraco (`GUESS=1 vs-human.ts`), com x sem, 200 partidas |
+|---|---|---|
+| `guessHold` 1,45 | 197 x 203 (49,3%, 400 partidas) | 160 x 155 vitórias do bot (80% x 77,5%) |
+| `guessHold` 1 (o padrão) | 206 x 194 (51,5%, 400 partidas) | 157 x 155 (78,5% x 77,5%) |
+| `guessHold` 1,45 sem o [Rush] (`guessRush` 2) | 93 x 107 (46,5%, 200 partidas) | — |
+
+Tudo dentro do ruído (±3,5 pontos no auto-jogo, ±4 contra o humano), como nas rodadas da seção 9: o ganho não
+aparece nessas medidas. Nos decks prontos, a composição de cada deck fica perto da média que o modelo fixo já usa
+(e o deck provável é exatamente o deck do oponente, o caso mais favorável à estimativa), e as posições em que ela
+muda a decisão (deck quase sem Counter, Evento [Counter] sem DON!! para pagar, [Rush] que fecha a partida) são raras.
+A parte do Counter sozinha, com a vantagem de 1,45, deixava o bot cauteloso demais: o mesmo que a seção 9 viu, o
+modelo mais otimista para o atacante ganha no auto-jogo. A estimativa fica pelo raciocínio e pelos testes de posição;
+o próximo passo é medir onde ela pesa de verdade: nos decks do meta (Rocks.D.Xebec, quase sem Counter) e nas partidas
+de gente (o extrator da seção 11 com `--leader`).
