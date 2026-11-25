@@ -2,6 +2,7 @@ export * from './types';
 export * from './engine';
 export * from './actions';
 export { chooseBotAction as chooseSimpleBotAction } from './bot/simple';
+export { BOT_PERSONALITIES, type BotPersonality, isBotPersonality, PERSONALITY_WEIGHTS, personalityWeights, SIMPLE_STYLES, type SimpleStyle } from './bot/personality';
 export { BOT_LEVELS, type BotExplanation, type BotLevel, chooseBotAction, isBotLevel, LEVELS as BOT_LEVEL_OPTIONS, planAction, type PlannerOptions, plannerOptions, resetPlanner, sameAction, scoreDecision, type DecisionScore, type ScoredLine } from './bot/planner';
 export {
   accuracyOf,

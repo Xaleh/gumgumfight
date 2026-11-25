@@ -1,4 +1,4 @@
-import { type BotLevel, cardLegality, FORMATS, hasRanked, isFormat, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
+import { type BotLevel, type BotPersonality, cardLegality, FORMATS, hasRanked, isFormat, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
@@ -47,6 +47,7 @@ const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 const LAST_DECKS = 'gumgum.lastDecks';
 const LAST_FORMAT = 'gumgum.format';
 const LAST_BOT_LEVEL = 'gumgum.botLevel';
+const LAST_BOT_PERSONALITY = 'gumgum.botPersonality';
 const LAST_PRIVATE_RULES = 'gumgum.privateRules';
 const LAST_BOT_RULES = 'gumgum.botRules';
 
@@ -85,6 +86,23 @@ function savedBotLevel(): BotLevel {
     return v === 'easy' || v === 'normal' || v === 'team' ? v : 'hard';
   } catch {
     return 'hard';
+  }
+}
+
+/** As opções do estilo do bot: o valor, o rótulo e a explicação (aparece embaixo e no título do botão). */
+const BOT_STYLE_OPTIONS = [
+  ['balanced', 'menu.botBalanced', 'menu.botBalancedTitle'],
+  ['aggressive', 'menu.botAggressive', 'menu.botAggressiveTitle'],
+  ['control', 'menu.botControl', 'menu.botControlTitle'],
+  ['cautious', 'menu.botCautious', 'menu.botCautiousTitle'],
+] as const satisfies ReadonlyArray<readonly [BotPersonality, MessageKey, MessageKey]>;
+
+function savedBotPersonality(): BotPersonality {
+  try {
+    const v = localStorage.getItem(LAST_BOT_PERSONALITY);
+    return v === 'aggressive' || v === 'control' || v === 'cautious' ? v : 'balanced';
+  } catch {
+    return 'balanced';
   }
 }
 
@@ -361,6 +379,9 @@ export function Menu({
   /** O nível Time (o Bot do Time) só vale para quem é do Time; para os outros, o guardado vira "difícil". */
   const team = isTeam(user);
   const botLevel: BotLevel = savedLevel === 'team' && !team ? 'hard' : savedLevel;
+  /** Estilo do bot (D3). O Bot do Time não tem: o estilo dele sai do perfil do deck. */
+  const [botPersonality, setBotPersonality] = useState<BotPersonality>(savedBotPersonality);
+  const personality: BotPersonality | undefined = botLevel === 'team' || botPersonality === 'balanced' ? undefined : botPersonality;
   const [format, setFormat] = useState<FormatId>(savedFormat);
   /** Coleções disponíveis no Selado (null: ainda não se sabe, ou o servidor é antigo). */
   const [sealedSets, setSealedSets] = useState<number | null>(null);
@@ -549,7 +570,7 @@ export function Menu({
       // O Bot do Time joga no servidor sempre que dá (o perfil do deck e o relógio maior ficam lá).
       if (broadcasting || (botLevel === 'team' && botRooms && user)) {
         try {
-          onOnline(await api.online.botRoom(mine, opp, botMode, firstPlayer, botLevel === 'easy' ? undefined : botLevel));
+          onOnline(await api.online.botRoom(mine, opp, botMode, firstPlayer, botLevel === 'easy' ? undefined : botLevel, personality));
           return;
         } catch (e) {
           // Servidor lotado: o treino roda no navegador, sem transmissão.
@@ -559,6 +580,7 @@ export function Menu({
       }
       try {
         localStorage.setItem(LAST_BOT_LEVEL, botLevel);
+        localStorage.setItem(LAST_BOT_PERSONALITY, botPersonality);
       } catch {
         /* sem armazenamento local */
       }
@@ -567,7 +589,14 @@ export function Menu({
       // com o mesmo Líder).
       const oppLeader = decks.find((d) => d.id === opp)?.leader;
       const botProfile = botLevel === 'team' ? ((await api.bot.profile(opp, oppLeader).catch(() => null))?.profile ?? undefined) : undefined;
-      onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(botProfile ? { botProfile } : {}), ...(notice ? { notice } : {}) });
+      onStart({
+        ...setup,
+        spoilers: botMode.spoilers,
+        botLevel,
+        ...(personality ? { botPersonality: personality } : {}),
+        ...(botProfile ? { botProfile } : {}),
+        ...(notice ? { notice } : {}),
+      });
     } catch (e) {
       fail(e);
       setLoading(false);
@@ -1066,6 +1095,21 @@ export function Menu({
                     ))}
                   </div>
                 </div>
+                {botLevel !== 'team' && (
+                  <div className="mode-field">
+                    <span className="mode-field-label" id="bot-style-label">
+                      {t('menu.botStyle')}
+                    </span>
+                    <div className="seg small level-seg" role="group" aria-labelledby="bot-style-label">
+                      {BOT_STYLE_OPTIONS.map(([v, label, title]) => (
+                        <button key={v} type="button" className={botPersonality === v ? 'on' : ''} aria-pressed={botPersonality === v} title={t(title)} onClick={() => setBotPersonality(v)}>
+                          {t(label)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {botLevel !== 'team' && <p className="muted small mode-hint">{t(BOT_STYLE_OPTIONS.find(([v]) => v === botPersonality)![2])}</p>}
                 {botLevel === 'team' && botRooms && user && <p className="muted small mode-hint">{t('menu.botTeamServer')}</p>}
                 {botRooms && (
                   <label className={['check', user ? '' : 'disabled'].join(' ')} title={user ? t('menu.broadcastTitle') : undefined}>

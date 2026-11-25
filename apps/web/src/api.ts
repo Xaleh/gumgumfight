@@ -4,6 +4,7 @@ import {
   barredSpoilers,
   type BotExplanation,
   type BotLevel,
+  type BotPersonality,
   type CardData,
   type CardDef,
   type ChallengeSpec,
@@ -1037,13 +1038,14 @@ export const api = {
     /** Contadores do menu; a consulta também conta este navegador como conectado. */
     stats: () => get<OnlineStats>('/api/online/stats'),
     /** Treino contra o bot transmitido: o servidor joga pelo bot e a partida aparece em "Assistir" (exige login). */
-    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId, level?: BotLevel) =>
+    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId, level?: BotLevel, personality?: BotPersonality) =>
       send<{ roomId: string; token: string }>('POST', '/api/online/bot', {
         deckId,
         botDeckId,
         ...mode,
         ...(first !== undefined ? { first } : {}),
         ...(level ? { level } : {}),
+        ...(personality ? { personality } : {}),
       }),
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
@@ -1274,6 +1276,8 @@ export interface OnlineRoomInfo {
   rematch: [boolean, boolean];
   /** Treino contra o bot: o nível do bot do servidor (servidores antigos não mandam). */
   botLevel?: BotLevel;
+  /** Treino contra o bot: o estilo do bot (ausente = equilibrado). */
+  botPersonality?: BotPersonality;
   /** Treino contra o bot: o deck que o bot joga (relatório do Bot do Time). */
   botDeckId?: string | null;
   botDeckName?: string | null;
