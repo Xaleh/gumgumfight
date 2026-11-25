@@ -6,6 +6,7 @@ import {
   actionFromView,
   type BotExplanation,
   type BotLevel,
+  type BotPersonality,
   chooseBotAction,
   chooseSimpleBotAction,
   type DeckProfile,
@@ -19,6 +20,8 @@ export interface BotRequest {
   state: GameState;
   player: PlayerId;
   level: BotLevel;
+  /** Estilo do bot (agressivo, controle, conservador); o Bot do Time ignora. */
+  personality?: BotPersonality;
   /** Bot do Time: o perfil do deck que o bot joga (pesos, papéis das cartas, mulligan). */
   profile?: DeckProfile;
   /** Bot do Time: devolve as explicações da jogada (painel do treinador). */
@@ -36,7 +39,7 @@ export interface BotMove {
  * Se a tradução de volta falhar (não deveria), o bot heurístico decide pelo estado completo para a
  * partida não travar.
  */
-export function computeBotMove({ state, player, level, profile, explain }: BotRequest): BotMove {
+export function computeBotMove({ state, player, level, personality, profile, explain }: BotRequest): BotMove {
   const aliases = identityAliases(state);
   const toReal = (a: Action): Action => {
     const r = actionFromView(state, aliases, a);
@@ -54,7 +57,9 @@ export function computeBotMove({ state, player, level, profile, explain }: BotRe
               }
             : {}),
         }
-      : undefined;
+      : personality && level !== 'team'
+        ? { personality }
+        : undefined;
   const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, player, aliases), player, level, over));
   return { action: typeof real === 'string' ? chooseSimpleBotAction(state, player) : real, explanations };
 }

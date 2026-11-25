@@ -15253,6 +15253,54 @@ div.dk-tile-main {
 .dv-out {
   color: var(--danger-text);
 }
+.deck-tips .seg {
+  align-self: flex-start;
+}
+.tip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tip {
+  --cw: 44px;
+  --ch: calc(var(--cw) * 1.396);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tip-missing {
+  flex: none;
+  width: var(--cw);
+  height: var(--ch);
+  border-radius: 4px;
+  background: var(--panel);
+}
+.tip-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+}
+.tip-text b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tip > .btn {
+  flex: none;
+  min-width: 36px;
+}
+.tip-loser .tip-text span {
+  color: var(--danger-text);
+}
+.tip-winner .tip-text span {
+  color: var(--ok);
+}
 .dk-dupe {
   display: flex;
   flex-wrap: wrap;

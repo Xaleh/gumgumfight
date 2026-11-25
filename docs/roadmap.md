@@ -129,11 +129,11 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   *Pronto quando:* o deck mostra as versões (o que entrou e saiu) e as partidas e a taxa de vitória de cada uma.
   *Feito em:* 25/11/2026, [PR #232](https://github.com/Xaleh/gumgumfight/pull/232)
 
-- [ ] **C3. Sugestões de cartas pelas estatísticas**
+- [x] **C3. Sugestões de cartas pelas estatísticas**
   "Decks com este Líder usam X e você não usa", "esta carta tem lift negativo" e a comparação com o Deck médio do Líder.
   *Pronto quando:* o construtor mostra as sugestões com o número de partidas por trás de cada uma, e esconde as que têm
   amostra pequena demais.
-  *Feito em:* —
+  *Feito em:* 2026-11-25, [PR #231](https://github.com/Xaleh/gumgumfight/pull/231)
 
 - [ ] **C4. Minha coleção**
   Marcar as cartas que a pessoa tem na vida real, filtrar o construtor por elas e mostrar o que falta comprar.
@@ -155,10 +155,10 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   ganho contra a versão anterior.
   *Feito em:* —
 
-- [ ] **D3. Bots com personalidade**
+- [x] **D3. Bots com personalidade**
   Agressivo, controle e conservador com a Vida, além de fácil, normal e difícil.
   *Pronto quando:* a escolha aparece ao jogar contra o bot e cada personalidade tem teste que mostra o estilo dela.
-  *Feito em:* —
+  *Feito em:* 2026-11-25 — [PR #230](https://github.com/Xaleh/gumgumfight/pull/230)
 
 - [ ] **D4. Yonko, fase 4** 🧱
   Espectador e replay da mesa de 4 e o bot com busca, que o [`plano-modos-de-jogo.md`](plano-modos-de-jogo.md) aponta
