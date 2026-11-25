@@ -36,6 +36,7 @@ import { StaticCard } from './CardView';
 import { DeckLibrary } from './DeckLibrary';
 import { CostCurve, useFavoriteToggle } from './DeckTile';
 import { DeckViewer } from './DeckViewer';
+import { HandTestPanel } from './HandTest';
 import { Icon } from './Icons';
 
 interface Draft {
@@ -126,7 +127,7 @@ export function DeckBuilder({
   /** Aviso rápido da última mudança, com "Desfazer". */
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   /** O deck atual em lista, grade ou curva. */
-  const [mode, setMode] = useState<'list' | 'grid' | 'curve'>('list');
+  const [mode, setMode] = useState<'list' | 'grid' | 'curve' | 'hand'>('list');
   /** Tela estreita: catálogo ou deck (abas no pé da tela). */
   const [mobileTab, setMobileTab] = useState<'catalog' | 'deck'>('catalog');
   /** Deck salvo com a mesma lista (aviso antes de criar uma cópia sem mudança). */
@@ -917,9 +918,9 @@ export function DeckBuilder({
           </div>
 
           <div className="seg small dk-modes" role="group" aria-label={t('decks.builder.modeLabel')}>
-            {(['list', 'grid', 'curve'] as const).map((m) => (
+            {(['list', 'grid', 'curve', 'hand'] as const).map((m) => (
               <button key={m} type="button" className={mode === m ? 'on' : ''} aria-pressed={mode === m} onClick={() => setMode(m)}>
-                <Icon name={m === 'list' ? 'list' : m === 'grid' ? 'grid' : 'bars'} size={14} /> {t(`decks.builder.mode.${m}`)}
+                <Icon name={m === 'list' ? 'list' : m === 'grid' ? 'grid' : m === 'curve' ? 'bars' : 'flask'} size={14} /> {t(`decks.builder.mode.${m}`)}
               </button>
             ))}
           </div>
@@ -950,6 +951,8 @@ export function DeckBuilder({
               )}
             </div>
           )}
+
+          {mode === 'hand' && <HandTestPanel cards={deckList.cards} byId={byId} shown={shown} onHover={setHovered} onLongPress={setZoom} />}
 
           {mode === 'curve' && (
             <div className="dk-deck-curve">
