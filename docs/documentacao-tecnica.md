@@ -165,6 +165,7 @@ gumgumfight/
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
 │   ├── src/friends/             store.ts (código de amigo e amizades), routes.ts (lista, pedidos, status online e convite)
+│   ├── src/monitor/             store.ts (erros agrupados e horas dos canais SSE, SQL), sse.ts (SseMetrics), routes.ts (onError, relato do navegador, painel)
 │   └── test/                    9 arquivos de teste + fixtures da optcgapi/optcgleaks
 ├── apps/web/                    React + Vite
 │   ├── src/App.tsx              seleção de tela (useState<Screen>, sem roteador)
@@ -556,6 +557,9 @@ no pacote de produção é `release/server/decisions-cli.mjs`. `--tournament <id
 ### Ciclo de vida do processo (`index.ts`)
 
 1. `env.ts` lê `.env` (só fora de produção).
+   `watchProcess(db)` (`monitor/routes.ts`) escuta `uncaughtExceptionMonitor`: exceções e promessas rejeitadas sem
+   tratamento ficam gravadas em `monitor_errors` antes de o processo cair (o comportamento de cair não muda; o pm2
+   sobe de novo).
 2. `openDb()` abre `DB_PATH` (padrão `apps/server/var/gumgum.db`; produção `~gumgum/apps/gumgumfight/shared/gumgum.db`),
    `PRAGMA journal_mode = WAL`, `foreign_keys = ON`, roda as migrações (`CREATE TABLE IF NOT EXISTS` + `ALTER` condicionais).
 3. `seed(db)`: cartas provisórias de `data/cards` (nunca sobrescrevem cartas da API), spoilers de `data/spoilers`,
@@ -566,7 +570,8 @@ no pacote de produção é `release/server/decisions-cli.mjs`. `--tournament <id
 ### Módulos e rotas
 
 `app.ts` registra, nesta ordem: health/config, cartas, coverage, traduções pendentes, `registerBearerAuth` (hook
-`onRequest` dos tokens de parceiros, antes de todas as rotas), `registerAuth`, decks,
+`onRequest` dos tokens de parceiros, antes de todas as rotas), `registerAuth`, `registerMonitorRoutes` (hook `onError`
+de todas as rotas e o `SseMetrics` que vai para as rotas online e do Yonko; ver seção 13), decks,
 `registerPushRoutes` (devolve o `Notifier`), `registerStatsRoutes` (que registra também as rotas do meta global,
 `stats/global-routes.ts`), `registerPartnerMatchRoutes`,
 `registerTokenRoutes`, `registerOAuthRoutes`, `registerOnlineRoutes` (devolve o `Lobby`; recebe o
@@ -845,7 +850,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (42)
+### Tabelas (44)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -892,6 +897,8 @@ baixadas quando tocam) + `public/`.
 | `bot_feedback` | `id` autoincrement | Correções do Bot do Time: `match_id`, `user_id`, `kind` (`mark`/`rating`), `bot_level`, `bot_seat`, `bot_deck`, `leader`, `opp_leader`, `action_index`, `step` (o passo da linha marcado), `turn`, `bot_action` (JSON), `expected` (JSON), **`position` (JSON: a visão do bot na jogada)**, `rating`, `comment`, `status` (`open/test/fixed/dismissed`), `note`, `resolved_at/by` | `POST /api/bot/feedback`, admin |
 | `bot_reports` | `id` autoincrement | Relatório de uma partida contra o Bot do Time (o texto que a mesa monta com os passos marcados como errados): `match_id`, `user_id`, `bot_level`, `bot_deck`, `leader`, `opp_leader`, `rating`, `marks`, **`report` (markdown)**, `used_at/by`, `created_at`; um por pessoa e partida (o reenvio substitui) | `POST /api/bot/feedback`, admin |
 | `meta_profiles` | `deck_id` | Guia (`guide`, markdown) e perfil (`profile`, JSON `DeckProfile`) de um deck do meta salvos pela tela "Bot do Time", por cima dos arquivos de `data/decks/meta` (a semente); `updated_by`, `updated_at` | `PUT /api/bot/profiles/:id` |
+| `monitor_errors` | `id` (impressão digital, 16 hex) | Erros do monitoramento (A2), agrupados: `source` (`server`/`web`), `kind` (`route`, `uncaught`, `rejection`, `window`, `promise`, `render`, `test`), `message`, `stack`, `url` (rota ou caminho, sem query), `status`, `release`, `user_agent`, `count`, `first_seen`, `last_seen`, `resolved_at` (null = aberto; o mesmo erro de novo reabre). Sem conta nem IP; no máximo 500 linhas (saem as mais antigas por `last_seen`). Índice por `last_seen` | hook `onError` (5xx), `watchProcess`, `POST /api/monitor/errors`; admin resolve e apaga |
+| `monitor_sse_hours` | `(hour, channel)` `WITHOUT ROWID` | Canais SSE por hora (UTC, `AAAA-MM-DDTHH`) e canal (`online`/`yonko`): `opened`, `client_closed` (quedas), `server_closed`, `reconnects` (o mesmo lugar em até 2 min), `peak`, `seconds` (duração somada). Somado a cada minuto (o deploy não zera a hora); 30 dias | `SseMetrics.flush` |
 | `sqlite_sequence` | — | interna (autoincrement) | — |
 
 Diagrama das relações principais:
@@ -1779,6 +1786,29 @@ importa `IMPORT_SETS` se pedido; o workflow então confere `https://<site>/api/h
 | Banco | `~gumgum/apps/gumgumfight/shared/gumgum.db`; backup diário 04:15 (7 cópias) |
 | Logs | `pm2 logs gumgumfight` (Fastify com logger JSON em produção) |
 
+### Monitoramento (`monitor/`, `apps/web/src/monitor.ts`, `.github/workflows/uptime.yml`)
+
+- **Erros do servidor**: hook `onError` do Fastify (exceção numa rota que vira 5xx; a resposta não muda) e
+  `watchProcess` (exceções sem tratamento). **Do navegador**: `installMonitor()` no `main.tsx` escuta `error` e
+  `unhandledrejection`, e o `ErrorBoundary` relata as telas que caíram; no máximo 10 relatos por página, o mesmo erro
+  uma vez por minuto, sem o barulho de `ResizeObserver`, `Script error.` e extensões; `POST /api/monitor/errors` com
+  `fetch(keepalive)`. A versão do navegador é o nome do arquivo do build (`import.meta.url`); a do servidor, `RELEASE`
+  ou o `VERSION` do pacote.
+- **Agrupamento**: impressão digital = origem + tipo + mensagem e 3 primeiras linhas da pilha, sem números, ids,
+  linha/coluna nem o hash do build. **Limpeza** (`scrub`): sem query string (o `?t=` dos canais leva o token do lugar),
+  sem tokens `ggf_`, sequências longas de hex/base64url nem e-mails.
+- **Canais SSE** (`SseMetrics`): `stream` (`online/routes.ts`) e o canal da mesa (`yonko/routes.ts`) chamam `track`
+  ao abrir; `conn.end()` marca o encerramento como do servidor; o resto é queda. Reconexão = a mesma chave (sala +
+  token; espectador: sala + IP) em até 2 min. Totais desde que o processo subiu em memória; por hora em
+  `monitor_sse_hours`, somados a cada minuto e no `onClose`.
+- **Painel**: Administração → Monitoramento (`components/Monitor.tsx`), atualiza a cada 15 s.
+- **Site fora do ar**: o workflow **Site no ar** roda no GitHub a cada 5 min (de fora da VPS, então pega também a VPS
+  inteira fora). 3 falhas seguidas em `/api/health` (`UPTIME_URL` troca o endereço) → issue "Site fora do ar"
+  (rótulo `site-fora-do-ar`, atribuída ao dono; o run fica vermelho só nessa primeira vez) e, com o secret
+  `ALERT_WEBHOOK_URL`, um POST para Discord/Slack (`{content, text}`) ou ntfy.sh (texto). Na volta: comentário com o
+  tempo fora e a issue fechada. *Run workflow* com uma `url` que falha simula a queda. Complementa o
+  `gumgum-watchdog` da VPS (que reinicia o Nginx, mas não avisa ninguém).
+
 ### Homologação
 
 Servidor que já roda outros apps (`deploy/setup-vm.sh`): detecta Nginx no host ou Nginx Proxy Manager em Docker,
@@ -1906,7 +1936,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 
 ## 15. Quando e como escalar a VPS
 
-### Sinais para agir (monitorar com `pm2 monit`, `pm2 logs`, `htop`, `GET /api/online/stats`)
+### Sinais para agir (monitorar com Administração → Monitoramento, `pm2 monit`, `pm2 logs`, `htop`, `GET /api/online/stats`)
 
 | Sinal | Limiar sugerido | Ação |
 |---|---|---|
@@ -1994,6 +2024,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | `PM2_MAX_MEMORY` | `1500M` | só em `shared/deploy.env` da VM: memória em que o pm2 reinicia o app |
 | `PARTNER_IPS` | vazio | só em `shared/deploy.env` da VM: IPs dos servidores de apps parceiros, fora do limite por IP do Nginx |
 | `NODE_ENV` | — | `production` desliga a leitura do `.env`; `test` desliga o sync |
+| `RELEASE` | `VERSION` do pacote (12 primeiros caracteres do commit) ou `dev` | versão mostrada no monitoramento e gravada nos erros do servidor |
 
 ### B. Rotas da API
 
@@ -2051,6 +2082,10 @@ Quem chama, na coluna da direita:
 | GET | `/api/bot/feedback?status=` · `/summary` · `/:id` | Caixa de correções; resumo por deck do bot; uma correção com a posição | Time |
 | PUT | `/api/bot/feedback/:id` | Estado e resposta (`{ status, note }`) | Admin |
 | GET | `/api/admin/tutorial?days=` | Funil anônimo das lições do tutorial | Admin |
+| POST | `/api/monitor/errors` | Relato de erro do navegador (`{kind: window\|promise\|render\|test, message, stack?, url?, release?}`, até 16 KB; 20 por IP a cada 10 min, 429 acima) → 204 | Pública |
+| GET | `/api/admin/monitor?resolved=1` | Painel do monitoramento: versão, tempo no ar, memória, erros (abertos; com `resolved=1`, todos) e os canais SSE (abertos agora, desde que subiu e as últimas 48 h) | Admin |
+| POST | `/api/admin/monitor/test-error` | Lança um erro (500) para conferir a captura | Admin |
+| POST · DELETE | `/api/admin/monitor/errors/:id/resolve` · `/api/admin/monitor/errors?all=1` | Marca um erro como resolvido; apaga os resolvidos (ou todos) | Admin |
 | GET · POST · PUT · DELETE | `/api/admin/sponsors`, `/api/admin/sponsors/:id`, `/api/admin/sponsors/:id/logo` | Lojas parceiras | Admin |
 | GET | `/api/admin/support/payments` | Pagamentos recebidos (Apoia.se, Ko-fi) | Admin |
 | GET | `/api/decks?mine=1` | Lista decks com validação (os de quem pede trazem `cards`); `mine=1`: só os de quem pede | Pública; Token (`decks:read`) |

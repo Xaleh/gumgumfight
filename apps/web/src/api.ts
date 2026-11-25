@@ -499,6 +499,56 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
   return (res.status === 204 ? undefined : res.json()) as Promise<T>;
 }
 
+/** Um erro agrupado do monitoramento (mesma impressão digital = mesma linha). */
+export interface MonitorError {
+  id: string;
+  source: 'server' | 'web';
+  kind: string;
+  message: string;
+  stack: string | null;
+  url: string | null;
+  status: number | null;
+  release: string | null;
+  userAgent: string | null;
+  count: number;
+  firstSeen: string;
+  lastSeen: string;
+  resolvedAt: string | null;
+}
+
+export interface MonitorSseTotals {
+  opened: number;
+  clientClosed: number;
+  serverClosed: number;
+  reconnects: number;
+  seconds: number;
+  avgSeconds: number;
+}
+
+export interface MonitorSseHour {
+  /** AAAA-MM-DDTHH (UTC). */
+  hour: string;
+  opened: number;
+  clientClosed: number;
+  serverClosed: number;
+  reconnects: number;
+  peak: number;
+  seconds: number;
+}
+
+export interface MonitorPanel {
+  release: string;
+  startedAt: string;
+  uptimeSeconds: number;
+  memory: { rssMb: number; heapMb: number };
+  errors: { counts: { open: number; resolved: number; last24h: number }; list: MonitorError[] };
+  sse: {
+    open: { online: number; yonko: number; total: number };
+    sinceStart: { online: MonitorSseTotals; yonko: MonitorSseTotals };
+    hours: MonitorSseHour[];
+  };
+}
+
 /** Status de um amigo: jogando uma partida, com o app aberto (menu, sala de espera, fila) ou fora. */
 export type FriendPresence = 'playing' | 'online' | 'offline';
 
@@ -868,6 +918,14 @@ export const api = {
       order: (order: string[]) => send<{ queue: string[] }>('PUT', '/api/admin/daily/queue', { order }),
     },
     tutorial: (days = 30) => get<{ days: number; since: string; lessons: TutorialFunnel[] }>(`/api/admin/tutorial?days=${days}`),
+    /** Monitoramento (A2): erros do servidor e do navegador, canais SSE e o processo. */
+    monitor: {
+      get: (resolved = false) => get<MonitorPanel>(`/api/admin/monitor${resolved ? '?resolved=1' : ''}`),
+      /** Lança um erro no servidor (a resposta é um 500 de propósito). */
+      testError: () => send<void>('POST', '/api/admin/monitor/test-error'),
+      resolve: (id: string) => send<{ ok: true }>('POST', `/api/admin/monitor/errors/${encodeURIComponent(id)}/resolve`),
+      clear: (all = false) => send<{ removed: number }>('DELETE', `/api/admin/monitor/errors${all ? '?all=1' : ''}`),
+    },
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
     setRole: (id: string, role: Role) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { role }),
     /** Entra no (ou sai do) Time do bot. */

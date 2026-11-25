@@ -35,6 +35,7 @@ import {
   validateDeck,
 } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { SseMetrics } from '../monitor/sse';
 import { accountOwnerKey, isTeam, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLeaders, listLiveMatches, saveLiveMatch } from '../db';
 import { ResponseCache } from '../cache';
@@ -78,6 +79,8 @@ import {
 
 interface Deps {
   db: DB;
+  /** Métricas dos canais SSE (monitoramento). */
+  sse?: SseMetrics;
   viewerHash: (req: FastifyRequest) => string | null;
   user: (req: FastifyRequest) => User | null;
   present: (cards: ApiCard[]) => ApiCard[];
@@ -557,6 +560,8 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
       'x-accel-buffering': 'no',
     });
     res.write('retry: 2000\n\n');
+    // Métricas: o lugar (sala + token) ou o espectador (sala + IP) conta como reconexão se voltar logo.
+    const metric = deps.sse?.track('online', `${room.id}:${init.seat === null ? `w:${req.ip}` : (req.query as { t?: string }).t}`);
     const conn: Connection = {
       ...init,
       sentDefs: new Set(),
@@ -565,7 +570,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
       sendJson: (event, json) => {
         if (!res.writableEnded) res.write(`event: ${event}\ndata: ${json}\n\n`);
       },
-      end: () => res.end(),
+      end: () => {
+        metric?.serverEnd();
+        res.end();
+      },
     };
     // Evento (e não comentário) para o navegador perceber um canal parado e reconectar.
     const heartbeat = setInterval(() => conn.send('ping', {}), deps.heartbeatMs ?? 20_000);
@@ -573,9 +581,11 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const close = () => {
       clearInterval(heartbeat);
       room.detach(conn);
+      metric?.close();
     };
     req.raw.on('close', close);
     res.on('error', close);
+    res.on('close', () => metric?.close());
   };
 
   /** Canal da partida (SSE): estado, presença, emotes, chat e avisos. */

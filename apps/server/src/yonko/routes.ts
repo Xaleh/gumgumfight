@@ -7,6 +7,7 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import { type CardData, type DeckList, validateDeck, yonkoBannedIn, yonkoTableDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { SseMetrics } from '../monitor/sse';
 import type { User } from '../auth/store';
 import { type DB, deleteYonkoTable, getCards, getDeck, listCards, listDecks, listYonkoTables, saveYonkoTable } from '../db';
 import { type ErrorParams, fail } from '../errors';
@@ -35,6 +36,8 @@ const STALE_PLAYING_MS = 6 * 60 * 60_000;
 
 export interface YonkoDeps {
   db: DB;
+  /** Métricas dos canais SSE (monitoramento). */
+  sse?: SseMetrics;
   viewerHash: (req: FastifyRequest) => string | null;
   user: (req: FastifyRequest) => User | null;
   present: (cards: CardData[]) => ApiCard[];
@@ -277,6 +280,7 @@ export function registerYonkoRoutes(app: FastifyInstance, deps: YonkoDeps) {
     const raw = res.raw;
     raw.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache, no-transform', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     raw.write('retry: 2000\n\n');
+    const metric = deps.sse?.track('yonko', `${table.id}:${token}`);
     const conn: YonkoConnection = {
       token,
       sentDefs: new Set(),
@@ -284,16 +288,21 @@ export function registerYonkoRoutes(app: FastifyInstance, deps: YonkoDeps) {
       send: (event, data) => {
         if (!raw.writableEnded) raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       },
-      end: () => raw.end(),
+      end: () => {
+        metric?.serverEnd();
+        raw.end();
+      },
     };
     const heartbeat = setInterval(() => conn.send('ping', {}), deps.heartbeatMs ?? 20_000);
     table.attach(conn);
     const close = () => {
       clearInterval(heartbeat);
       table.detach(conn);
+      metric?.close();
     };
     req.raw.on('close', close);
     raw.on('error', close);
+    raw.on('close', () => metric?.close());
   });
 
   type Body = { t?: unknown; [k: string]: unknown };

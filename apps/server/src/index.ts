@@ -6,6 +6,7 @@ import { countCards, type DB, openDb, recordCardGaps } from './db';
 import { DEFAULT_API_BASE } from './optcgapi';
 import { join } from 'node:path';
 import { DATA_DIR, DB_PATH } from './paths';
+import { watchProcess } from './monitor/routes';
 import { seed } from './seed';
 import { scheduleSpoilerSync } from './spoiler-sync';
 import { scheduleGlobalStatsSync } from './stats/global';
@@ -21,6 +22,8 @@ try {
   console.error('Verifique se a pasta tem permissão de escrita e se o Node é 22.13 ou mais recente (node -v).\n');
   throw err;
 }
+// Monitoramento: exceções e promessas rejeitadas sem tratamento ficam gravadas antes de o processo cair.
+watchProcess(db);
 // Sempre sincroniza os decks e cartas provisórias (nunca sobrescreve cartas da API).
 const r = seed(db);
 console.log(`Banco ${DB_PATH}: ${countCards(db)} cartas, ${r.decks} decks.`);

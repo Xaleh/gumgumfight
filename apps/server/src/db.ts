@@ -15,6 +15,7 @@ import { artId, baseCardId } from './optcgapi';
 import { migrateDeckVersions, recordDeckVersion } from './decks/versions';
 import { DB_PATH } from './paths';
 import { migrateSealed } from './sealed/store';
+import { migrateMonitor } from './monitor/store';
 
 export type DB = DatabaseSync;
 
@@ -264,6 +265,7 @@ function migrateDecks(db: DB) {
   `);
   db.exec("DELETE FROM decks WHERE kind = 'user' AND trim(leader) = ''");
   migrateDeckVersions(db);
+  migrateMonitor(db);
 }
 
 /**

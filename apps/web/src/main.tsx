@@ -5,12 +5,15 @@ import { AuthProvider } from './auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { isReplayPath, parseReplayEmbed } from './embed';
 import { loadLocale, t } from './i18n';
+import { installMonitor } from './monitor';
 import { registerServiceWorker, reloadOnStaleChunks } from './pwa';
 import { initialLocale, SettingsProvider } from './settings';
 import './styles.css';
 
 // Replay embutido (`/replay/<id>`, num iframe de parceiro): sem service worker (ele baixaria o app
 // inteiro para o cache dentro do site do parceiro) e no idioma do link (`lang=`), se houver.
+// Monitoramento: erros sem tratamento vão para a aba "Monitoramento" da Administração.
+installMonitor();
 const replayPage = isReplayPath(location.pathname);
 if (!replayPage) registerServiceWorker();
 reloadOnStaleChunks();
