@@ -70,6 +70,7 @@ import { registerCardImageRoutes } from './card-images';
 import { registerDraftRoutes } from './draft/routes';
 import { registerSealedRoutes } from './sealed/routes';
 import { registerTutorialRoutes } from './tutorial/routes';
+import { registerDailyRoutes } from './daily/routes';
 import { reportFromGame } from './tournaments/store';
 import { currentSpoilerSet } from './spoiler-set';
 
@@ -514,6 +515,7 @@ export function buildApp(
     syncHours: opts.now ? 0 : apoiaseSyncHours(),
   });
   registerTutorialRoutes(app, { db, viewerHash, user: auth.viewer, now: opts.now });
+  registerDailyRoutes(app, { db, viewerHash, user: auth.viewer, present, now: opts.now });
   registerSealedRoutes(app, { db, viewerHash });
   // Exposto para os testes (os prazos das escolhas e os bots ficam na memória do servidor).
   app.decorate('draftPods', registerDraftRoutes(app, { db, viewerHash, now: opts.now }));

@@ -19588,3 +19588,56 @@ div.dk-tile-main {
     font-size: 28px;
   }
 }
+
+/* ---- desafio do dia (DailyChallenge.tsx): o painel reaproveita o treinador; o cartão da home, o do tutorial */
+.daily-banner {
+  background: var(--brown);
+}
+.daily-streak {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--amber-text);
+}
+.daily-attacks {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+.daily-outcome {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 2px solid var(--ok);
+  color: var(--ok);
+}
+.daily-outcome div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text);
+}
+.daily-outcome strong {
+  font-family: Bangers, Impact, sans-serif;
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: 1px;
+  color: var(--heading);
+}
+.daily-history {
+  display: flex;
+  gap: 6px;
+  font-size: 22px;
+  line-height: 1;
+}
+.daily-history .today {
+  outline: 2px solid var(--brand-yellow);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

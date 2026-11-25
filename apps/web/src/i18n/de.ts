@@ -9,6 +9,7 @@ import team from './team/de';
 import chamber from './chamber/de';
 import sealed from './sealed/de';
 import yonko from './yonko/de';
+import daily from './daily/de';
 
 export default {
   // ---- Allgemein ----
@@ -3110,5 +3111,6 @@ export default {
   ...chamber,
   ...sealed,
   ...yonko,
+  ...daily,
 } satisfies Messages;
 
