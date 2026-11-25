@@ -73,11 +73,11 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   jogada sugerida em cada um. A análise só usa o que o jogador sabia naquele momento.
   *Feito em:* —
 
-- [ ] **B2. Mão de teste no construtor**
+- [x] **B2. Mão de teste no construtor**
   Sorteia mãos iniciais do deck, simula o mulligan e mostra as chances: ter jogada de custo 2 no turno 2, ter X de
   Counter na mão, comprar a carta-chave até o turno N.
   *Pronto quando:* o construtor tem o botão de mão de teste e um painel de probabilidades calculadas no motor e testadas.
-  *Feito em:* —
+  *Feito em:* 2026-11-25, [PR #220](https://github.com/Xaleh/gumgumfight/pull/220)
 
 - [ ] **B3. Treino de matchup para todos**
   Versão pública do Bot do Time: "treinar contra o Enel do meta", usando os perfis do meta que hoje só o Time usa
