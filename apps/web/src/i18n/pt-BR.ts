@@ -10,6 +10,7 @@ import chamberPtBR from './chamber/pt-BR';
 import profilePtBR from './profile/pt-BR';
 import sealedPtBR from './sealed/pt-BR';
 import yonkoPtBR from './yonko/pt-BR';
+import dailyPtBR from './daily/pt-BR';
 import analysisPtBR from './analysis/pt-BR';
 
 const ptBR = {
@@ -3123,6 +3124,7 @@ const ptBR = {
   ...sealedPtBR,
   // ==== Yonko: a sala e a mesa de todos contra todos (i18n/yonko) ====
   ...yonkoPtBR,
+  ...dailyPtBR,
   // ==== Análise da partida: revisão do replay terminado (i18n/analysis) ====
   ...analysisPtBR,
 } as const;

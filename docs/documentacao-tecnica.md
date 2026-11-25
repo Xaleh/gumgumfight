@@ -255,6 +255,22 @@ deck ao simular efeitos que leem o topo.
 troca cada um por um apelido aleatório (`createAliases`, HMAC-SHA256 com salt da sala). `actionFromView` traduz de
 volta a ação feita sobre a visão.
 
+### Desafio do dia (`challenge.ts`)
+
+`ChallengeSpec` descreve um desafio: o objetivo (`lethal`: o jogador 0 vence antes de passar a vez; `survive`: chega
+vivo ao próprio turno), os decks, a semente, a mesa (`ScenarioSpec` de `scenario.ts`) e, no `survive`, o roteiro de
+ataques do oponente. O oponente não sorteia nem usa o bot: na defesa, bloqueia e usa o Counter dos Personagens da mão
+(do maior para o menor) só quando isso segura um ataque ao Líder dele, e nunca ativa [Trigger]; no ataque, faz o primeiro
+ataque do roteiro que ainda é legal e então passa a vez. Assim a mesma lista de jogadas sempre dá o mesmo resultado.
+`runChallenge(início, spec, ações, traduzir)` aplica as jogadas do jogador (só as de jogo: nada de ferramentas manuais
+ou desistência), com as do oponente entre elas, e para no fim do desafio ou na primeira jogada recusada.
+`resolveMove`/`playMoves` jogam uma solução escrita por número de carta (usadas nos testes do catálogo).
+
+No servidor (`apps/server/src/daily/`), o catálogo (`catalog.ts`) guarda os desafios com a solução e uma linha errada,
+que nunca saem do servidor. A visão vai com apelidos de carta (HMAC com o segredo `daily` e o dia), e as jogadas voltam
+traduzidas por `actionFromView`; com `revealHand`, a mão inicial do oponente entra como cartas visíveis (`extra`). A
+cada pedido o servidor refaz a tentativa inteira a partir da mesa montada (guardada na memória por 10 minutos).
+
 ### Formatos (`formats.ts`)
 
 `standard`, `egb` e `allblue` (`FormatId`: os que têm fila e selo no deck) e `free`, o Livre (`PlayFormat`: só
@@ -757,7 +773,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (36)
+### Tabelas (38)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -780,7 +796,9 @@ baixadas quando tocam) + `public/`.
 | `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício (inclui `engineTexts`, os textos para o motor do começo da partida, para refazer e derivar as estatísticas com as mesmas regras) | lobby (a cada ação) |
 | `yonko_tables` | `id` (mesa) | **`data` (JSON `YonkoTableData`)**: regras, lugares (com os decks), seed de 128 bits e ações de uma mesa do Yonko aberta ou em andamento, para refazê-la após reinício | `YonkoTables` (a cada mudança; apagada quando a mesa fecha) |
 | `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
-| `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`) | servidor |
+| `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`), segredo do link do replay (`replay_link`) e dos apelidos de carta do Desafio do dia (`daily`) | servidor |
+| `daily_schedule` | `day` (AAAA-MM-DD, horário de Brasília) | Desafio do dia publicado: `challenge_id` (id em `daily/catalog.ts`), `number` (único: o "#N"), `published_at`. Fixo depois de publicado | `GET /api/daily` (publica o próximo da fila na primeira consulta do dia) |
+| `daily_results` | `(owner_hash, day)` | Resultado de cada dono (`user:<id>` ou navegador) no dia: `attempts` (tentativas terminadas), `solved_at` (null = ainda não resolveu), `updated_at`. Índice por dia. A sequência de dias seguidos sai daqui | `POST /api/daily/play` |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
 | `tournament_players` | `(tournament_id, user_id)` | `name`, `deck_id`, **`deck` (JSON `DeckList` congelado)**, `seed`, `dropped` | inscrição, início, drop |
 | `tournament_virtuals` | `(tournament_id, id)` | Sala do Tempo: `name`, `leader`, `deck_id`, `skill`, `seed` dos jogadores virtuais (`id` = `v:17`, usado em `tournament_matches`) | início da Sala do Tempo |
@@ -1972,6 +1990,9 @@ Quem chama, na coluna da direita:
 | POST | `/api/draft/pods/:id/leave` | Sai do pod (no meio do draft, o lugar passa a escolher sozinho) | Quem está no pod |
 | GET | `/api/tutorial/progress` · PUT | Progresso do tutorial (`{ done, dismissed, completed, reset? }`) | Navegador |
 | POST | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event }`) | Pública |
+| GET | `/api/daily[?brief=1]` | Desafio do dia: número, enunciado (objetivo, nível, roteiro de ataques, mão revelada), a mesa como o jogador a vê (sem `brief`), quantos resolveram, e o resultado, a sequência e os últimos 7 dias de quem pede. Publica o dia na primeira consulta | Pública (com o código do navegador, o resultado de quem pede) |
+| POST | `/api/daily/play` | Tentativa (`{ day, actions }`, as jogadas sobre a visão): o servidor refaz o desafio, joga pelo oponente e devolve `status` (`playing/solved/failed`), a nova visão, o resultado e a sequência. Vale hoje e ontem; grava a tentativa quando ela termina | Navegador |
+| GET | `/api/admin/daily` | A fila: dias publicados (com quantos jogaram e resolveram) e os próximos do catálogo | Admin |
 | GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |
 | GET | `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=\|deck=` | Totais, Líderes e matchups; tendência semanal; cartas de um Líder. Ranqueada e torneios só com o plano (salvo `mine=1`) | Pública; Token (`stats:read`) |
 | GET | `/api/stats/teaser?format=` | Amostra das Estatísticas Pro para quem não tem o plano | Pública |

@@ -10,6 +10,7 @@ import chamber from './chamber/en';
 import profile from './profile/en';
 import sealed from './sealed/en';
 import yonko from './yonko/en';
+import daily from './daily/en';
 import analysis from './analysis/en';
 
 export default {
@@ -3113,6 +3114,7 @@ export default {
   ...profile,
   ...sealed,
   ...yonko,
+  ...daily,
   ...analysis,
 } satisfies Messages;
 

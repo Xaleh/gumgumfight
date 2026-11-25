@@ -525,6 +525,8 @@ export interface TableTutorial {
   hidePrompt?: boolean;
   /** Celular: o treinador flutua em cima ou embaixo (longe das áreas destacadas). */
   floatAt?: 'top' | 'bottom';
+  /** Texto do botão de sair (padrão: "Sair da lição"). */
+  exitLabel?: string;
 }
 
 /** Nome de cada nível do bot (o relatório do Bot do Time cita o nível). */
@@ -2052,7 +2054,7 @@ function Table({
                 </button>
               )}
               <button className="btn" onClick={onExit}>
-                {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : exitTo === 'back' ? t('game.exitBack') : t('game.exitToMenu')}
+                {tutorial ? (tutorial.exitLabel ?? t('tutorial.exitLesson')) : toTournament ? t('game.exitToTournament') : exitTo === 'back' ? t('game.exitBack') : t('game.exitToMenu')}
               </button>
             </div>
             {lateral && (
@@ -2234,7 +2236,7 @@ function Table({
         <aside className="side-panel lesson-panel">
           <div className="panel-controls">
             <button className="btn small" onClick={onExit}>
-              {t('tutorial.exitLesson')}
+              {tutorial.exitLabel ?? t('tutorial.exitLesson')}
             </button>
           </div>
           {tutorial.coach}

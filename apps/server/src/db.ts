@@ -144,6 +144,7 @@ function migrate(db: DB) {
   migrateCardIds(db);
   migrateSupport(db);
   migrateTutorial(db);
+  migrateDaily(db);
   migrateSealed(db);
   migratePartners(db);
   migrateEngineTexts(db);
@@ -913,6 +914,31 @@ function migrateTutorial(db: DB) {
       count  INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (day, lesson, step, event)
     );
+  `);
+}
+
+/**
+ * Desafio do dia (`daily/`): a fila publicada (um desafio do catálogo por dia, fixo depois de publicado) e o
+ * resultado de cada dono (conta `user:<id>` ou navegador) em cada dia, de onde sai a sequência de dias seguidos.
+ */
+function migrateDaily(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS daily_schedule (
+      day          TEXT PRIMARY KEY,            -- AAAA-MM-DD (horário de Brasília)
+      challenge_id TEXT NOT NULL,               -- id em daily/catalog.ts
+      number       INTEGER NOT NULL UNIQUE,     -- "Desafio do dia #N"
+      published_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS daily_results (
+      owner_hash TEXT NOT NULL,
+      day        TEXT NOT NULL,
+      attempts   INTEGER NOT NULL DEFAULT 0,    -- tentativas terminadas (a que resolveu conta)
+      solved_at  TEXT,                          -- NULL = ainda não resolveu
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (owner_hash, day)
+    );
+    CREATE INDEX IF NOT EXISTS daily_results_day ON daily_results (day);
   `);
 }
 
