@@ -50,6 +50,8 @@ export default defineConfig({
     timezoneId: 'America/Sao_Paulo',
     // O service worker guardaria a casca do app entre testes; cada teste começa do zero.
     serviceWorkers: 'block',
+    // Um clique que não acontece em 10 s falha ali (e não no fim do teste, sem dizer onde).
+    actionTimeout: 10_000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

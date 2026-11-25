@@ -9,14 +9,22 @@ import { label, t } from './support/i18n';
 const PACKS = 6;
 const CARDS_PER_PACK = 12;
 
-/** Pula as animações de abertura (como o jogador com pressa) até o contador chegar a `n` cartas. */
+/**
+ * Passa pelas aberturas como um jogador com pressa, até o contador chegar a `n` cartas. A abertura de um
+ * booster só tem "Pular" na fase de cinema; se ela já chegou às cartas viradas, são "Revelar tudo" e
+ * "Continuar" (a máquina lenta do CI chega lá antes do clique). Várias de uma vez: sempre "Pular".
+ */
 async function finishOpening(page: Page, n: number) {
-  const skip = page.getByRole('button', { name: label('sealed.openSkip'), exact: true });
+  const opening = page.locator('.po');
+  const buttons = ['sealed.openSkip', 'sealed.openRevealAll', 'sealed.openContinue'] as const;
   await expect(async () => {
-    if (await skip.isVisible()) await skip.click();
+    for (const key of buttons) {
+      const button = opening.getByRole('button', { name: label(key), exact: true });
+      if (await button.isVisible()) await button.click({ timeout: 2_000 }).catch(() => {});
+    }
     await expect(page.locator('.sealed-count b')).toHaveText(String(n), { timeout: 500 });
-  }).toPass({ timeout: 30_000 });
-  await expect(skip).toBeHidden();
+    await expect(opening).toHaveCount(0, { timeout: 500 });
+  }).toPass({ timeout: 45_000 });
 }
 
 test('abrir os boosters do Selado @iphone', async ({ page, isMobile }) => {
