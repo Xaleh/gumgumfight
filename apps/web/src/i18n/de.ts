@@ -11,6 +11,7 @@ import profile from './profile/de';
 import sealed from './sealed/de';
 import yonko from './yonko/de';
 import friends from './friends/de';
+import daily from './daily/de';
 import analysis from './analysis/de';
 
 export default {
@@ -2169,6 +2170,35 @@ export default {
   'replay.cueLineTitle': 'Was der Spieler in dieser Aktion angeklickt oder gewählt hat',
   'replay.stepHint': 'Schritt für Schritt: Mit ▶| (oder →) siehst du die nächste Aktion, mit ▶ läuft es von selbst.',
   'replay.stopsAt': 'Das Replay stoppt bei Aktion {n}: {message}',
+  // ---- trecho do replay em vídeo/GIF (F2) ----
+  'clip.button': '✂ Ausschnitt',
+  'clip.buttonTitle': 'Einen Ausschnitt des Replays als Hochformat-Video oder GIF exportieren',
+  'clip.title': 'Ausschnitt als Video oder GIF',
+  'clip.hint': 'Geh an den Anfang des Ausschnitts und markiere den Start; dann ans Ende und markiere das Ende.',
+  'clip.markStart': 'Start markieren ({n})',
+  'clip.markEnd': 'Ende markieren ({n})',
+  'clip.range': 'Aktionen {from} bis {to} · etwa {s} s',
+  'clip.cut': 'Länger als {s} s (das Reels-Limit): Das Video endet vor dem markierten Ende.',
+  'clip.privacy': 'Nur was Zuschauer sehen, wird exportiert: Hände, Decks und verdeckte Leben bleiben verborgen.',
+  'clip.video': 'Video herunterladen',
+  'clip.gif': 'GIF herunterladen',
+  'clip.noVideo': 'Dieser Browser kann kein Video aufnehmen; das GIF funktioniert.',
+  'clip.recording': 'Video wird aufgenommen… {p}%',
+  'clip.keepOpen': 'Das Video wird in Echtzeit aufgenommen: Lass diesen Tab offen.',
+  'clip.building': 'GIF wird erstellt… {p}%',
+  'clip.loading': 'Karten werden geladen…',
+  'clip.cancel': 'Abbrechen',
+  'clip.close': 'Schließen',
+  'clip.error': 'Der Ausschnitt konnte nicht erstellt werden: {message}',
+  'clip.turn': 'Zug {n}',
+  'clip.turnOf': '{name} ist am Zug',
+  'clip.attacks': 'Angriff!',
+  'clip.won': '{name} gewinnt!',
+  'clip.life': 'Leben',
+  'clip.hand': 'Hand',
+  'clip.deck': 'Deck',
+  'clip.trash': 'Ablage',
+  'clip.don': 'DON!!',
   // ---- Replay ansehen (Datei) ----
   'replay.title': 'Replay ansehen',
   'replay.embedFailed': 'Das Replay konnte nicht geöffnet werden',
@@ -3116,6 +3146,7 @@ export default {
   ...yonko,
   // ==== amigos e convite direto (i18n/friends) ====
   ...friends,
+  ...daily,
   ...analysis,
 } satisfies Messages;
 

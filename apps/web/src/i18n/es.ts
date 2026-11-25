@@ -11,6 +11,7 @@ import profile from './profile/es';
 import sealed from './sealed/es';
 import yonko from './yonko/es';
 import friends from './friends/es';
+import daily from './daily/es';
 import analysis from './analysis/es';
 
 export default {
@@ -2169,6 +2170,35 @@ export default {
   'replay.cueLineTitle': 'Lo que el jugador pulsó o eligió en esta acción',
   'replay.stepHint': 'Paso a paso: usa ▶| (o →) para ver la siguiente acción, o ▶ para que avance sola.',
   'replay.stopsAt': 'La repetición se detiene en la acción {n}: {message}',
+  // ---- trecho do replay em vídeo/GIF (F2) ----
+  'clip.button': '✂ Fragmento',
+  'clip.buttonTitle': 'Exportar un fragmento del replay en vídeo vertical o GIF',
+  'clip.title': 'Fragmento en vídeo o GIF',
+  'clip.hint': 'Ve a donde empieza el fragmento y marca el inicio; luego a donde termina y marca el final.',
+  'clip.markStart': 'Marcar inicio ({n})',
+  'clip.markEnd': 'Marcar final ({n})',
+  'clip.range': 'Acciones {from} a {to} · unos {s} s',
+  'clip.cut': 'Pasa de {s} s (el límite de los Reels): el vídeo termina antes del final marcado.',
+  'clip.privacy': 'Solo sale lo que ve el público: las manos, los mazos y la Vida boca abajo quedan ocultos.',
+  'clip.video': 'Descargar vídeo',
+  'clip.gif': 'Descargar GIF',
+  'clip.noVideo': 'Este navegador no graba vídeo; el GIF funciona.',
+  'clip.recording': 'Grabando el vídeo… {p}%',
+  'clip.keepOpen': 'El vídeo se graba en tiempo real: deja esta pestaña abierta.',
+  'clip.building': 'Armando el GIF… {p}%',
+  'clip.loading': 'Cargando las cartas…',
+  'clip.cancel': 'Cancelar',
+  'clip.close': 'Cerrar',
+  'clip.error': 'No se pudo generar el fragmento: {message}',
+  'clip.turn': 'Turno {n}',
+  'clip.turnOf': 'Turno de {name}',
+  'clip.attacks': '¡Ataque!',
+  'clip.won': '¡{name} gana!',
+  'clip.life': 'Vida',
+  'clip.hand': 'Mano',
+  'clip.deck': 'Mazo',
+  'clip.trash': 'Descarte',
+  'clip.don': 'DON!!',
   // ---- ver repetición (archivo) ----
   'replay.title': 'Ver repetición',
   'replay.embedFailed': 'No se pudo abrir la repetición',
@@ -3116,6 +3146,7 @@ export default {
   ...yonko,
   // ==== amigos e convite direto (i18n/friends) ====
   ...friends,
+  ...daily,
   ...analysis,
 } satisfies Messages;
 

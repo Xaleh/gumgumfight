@@ -814,6 +814,12 @@ export const api = {
     pick: (id: string, card: string) => send<DraftPod>('POST', `/api/draft/pods/${encodeURIComponent(id)}/pick`, { card }),
     leave: (id: string) => send<void>('POST', `/api/draft/pods/${encodeURIComponent(id)}/leave`),
   },
+  /** Desafio do dia: o enunciado e a mesa de hoje; cada jogada refaz a tentativa no servidor. */
+  daily: {
+    /** `brief`: sem a mesa (o cartão da home). */
+    today: (brief = false) => get<DailyToday>(`/api/daily${brief ? '?brief=1' : ''}`),
+    play: (day: string, actions: Action[]) => send<DailyPlay>('POST', '/api/daily/play', { day, actions }),
+  },
   tutorial: {
     progress: () => get<TutorialProgressDto>('/api/tutorial/progress'),
     saveProgress: (p: { done: string[]; dismissed: boolean; completed: boolean; reset?: boolean }) => send<TutorialProgressDto>('PUT', '/api/tutorial/progress', p),
@@ -2378,4 +2384,44 @@ function statsQs(f: StatsQuery): string {
     } else q.set(k, v === true ? '1' : String(v));
   }
   return q.toString();
+}
+
+// ------------------------------------------------------------------ desafio do dia
+
+export type DailyStatus = 'playing' | 'solved' | 'failed';
+export interface DailyResult {
+  attempts: number;
+  solved: boolean;
+}
+export interface DailyStreak {
+  current: number;
+  best: number;
+  solved: number;
+}
+export interface DailyToday {
+  day: string;
+  number: number;
+  challenge: {
+    id: string;
+    goal: 'lethal' | 'survive';
+    level: 1 | 2 | 3;
+    revealHand: boolean;
+    /** "Sobreviva": a ordem dos ataques do oponente (número da carta ou 'leader'). */
+    attacks: Array<{ attacker: string; target: string }>;
+  };
+  /** A mesa no começo, como o jogador a vê (sem `brief`). */
+  view?: GameState;
+  stats: { players: number; solvers: number };
+  result: DailyResult;
+  streak: DailyStreak;
+  history: Array<{ day: string; number: number; attempts: number; solved: boolean }>;
+}
+export interface DailyPlay {
+  day: string;
+  status: DailyStatus;
+  applied: number;
+  error?: { index: number; message: string };
+  view: GameState;
+  result: DailyResult;
+  streak: DailyStreak;
 }
