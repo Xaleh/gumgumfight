@@ -5,6 +5,9 @@
 //   GET  /api/daily[?brief=1]    desafio de hoje: enunciado, mesa (sem `brief`), resultado e sequência de quem pede
 //   POST /api/daily/play         { day, actions }: refaz a tentativa e devolve a mesa e a situação
 //   GET  /api/admin/daily        fila publicada e próximos da fila (admin e dev)
+//   GET  /api/admin/daily/challenges          todos os desafios (catálogo e Administração), com os dias em que saíram
+//   POST /api/admin/daily/challenges          salva um desafio do editor, depois de conferido (vai para a fila)
+//   DELETE /api/admin/daily/challenges/:id    apaga um desafio da Administração que ainda não saiu
 
 import { createHmac, randomBytes } from 'node:crypto';
 import {
@@ -21,13 +24,12 @@ import {
   SOLVER,
   viewFor,
 } from '@gumgum/engine';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { isAdmin, type User } from '../auth/store';
 import { type DB, getCards, getDeck } from '../db';
 import { fail } from '../errors';
 import type { ApiCard } from '../present';
-import type { CatalogChallenge } from './catalog';
-import { DAILY_CATALOG } from './catalog';
+import { allChallenges, type DailyChallenge, deleteChallenge, publishedDays, saveChallenge, verifyChallenge, type VerifyError } from './challenges';
 import { DAY, dayOf, dayStats, historyOf, previousDay, publish, publishedOn, queueOrder, recentSchedule, recordAttempt, resultOf, streakOf } from './store';
 
 interface Deps {
@@ -36,7 +38,6 @@ interface Deps {
   user: (req: FastifyRequest) => User | null;
   present: (cards: ApiCard[]) => ApiCard[];
   now?: () => number;
-  catalog?: CatalogChallenge[];
 }
 
 /** Jogadas por tentativa (um desafio de um turno não chega perto disso). */
@@ -62,7 +63,7 @@ interface Built {
   at: number;
 }
 
-export function registerDailyRoutes(app: FastifyInstance, { db, viewerHash, user, present, now = Date.now, catalog = DAILY_CATALOG }: Deps) {
+export function registerDailyRoutes(app: FastifyInstance, { db, viewerHash, user, present, now = Date.now }: Deps) {
   const secret = dailySecret(db);
   const built = new Map<string, Built>();
 
@@ -73,13 +74,16 @@ export function registerDailyRoutes(app: FastifyInstance, { db, viewerHash, user
   };
 
   /** A mesa do desafio publicado em `day` (os apelidos mudam de um dia para outro). */
-  const build = (day: string, c: CatalogChallenge): Built => {
+  const cardsFor = (decks: DeckList[]) =>
+    present(getCards(db, [...new Set(decks.flatMap((d) => [d.leader, ...d.cards.map((x) => x.id)]))])) as CardData[];
+
+  const build = (day: string, c: DailyChallenge): Built => {
     const key = `${day}:${c.id}`;
     const cached = built.get(key);
     if (cached && now() - cached.at < BUILD_TTL_MS) return cached;
-    const decks = c.decks.map(deckOf) as [DeckList, DeckList];
-    const ids = [...new Set(decks.flatMap((d) => [d.leader, ...d.cards.map((x) => x.id)]))];
-    const cards = present(getCards(db, ids)) as CardData[];
+    // Desafio da Administração: as listas congeladas quando foi salvo (editar o deck depois não muda o desafio).
+    const decks = c.lists ?? (c.decks.map(deckOf) as [DeckList, DeckList]);
+    const cards = cardsFor(decks);
     const name = (d: DeckList) => cards.find((x) => x.id === d.leader)?.name ?? d.name;
     const start = buildChallenge({ seed: c.seed, cards, players: [{ name: name(decks[0]), deck: decks[0] }, { name: name(decks[1]), deck: decks[1] }] }, c);
     let i = 0;
@@ -94,7 +98,7 @@ export function registerDailyRoutes(app: FastifyInstance, { db, viewerHash, user
   const viewOf = (b: Built, state: GameState) => viewFor(state, SOLVER, b.aliases, b.extra);
 
   /** Enunciado: o que o jogador precisa saber, sem a solução. */
-  const statement = (c: CatalogChallenge) => ({
+  const statement = (c: DailyChallenge) => ({
     id: c.id,
     goal: c.goal,
     level: c.level ?? 1,
@@ -109,7 +113,7 @@ export function registerDailyRoutes(app: FastifyInstance, { db, viewerHash, user
 
   app.get<{ Querystring: { brief?: string } }>('/api/daily', async (req) => {
     const today = dayOf(now());
-    const pub = publish(db, today, catalog);
+    const pub = publish(db, today, allChallenges(db));
     const brief = req.query.brief === '1';
     const b = brief ? null : build(today, pub.challenge);
     return {
@@ -138,7 +142,7 @@ export function registerDailyRoutes(app: FastifyInstance, { db, viewerHash, user
     const day = typeof body.day === 'string' && DAY.test(body.day) ? body.day : '';
     // Vale o desafio de hoje e o de ontem (quem começou antes da meia-noite termina).
     if (day !== today && day !== previousDay(today)) return reply.code(409).send(fail('dayOver', 'Este desafio já terminou. Abra o de hoje.'));
-    const pub = publishedOn(db, day, catalog);
+    const pub = publishedOn(db, day, allChallenges(db));
     if (!pub) return reply.code(404).send(fail('noChallenge', 'Nenhum desafio publicado neste dia.'));
     if (!Array.isArray(body.actions) || body.actions.length > MAX_ACTIONS || !body.actions.every((a) => a && typeof a === 'object')) {
       return reply.code(400).send(fail('badActions', 'Jogadas inválidas.'));
@@ -171,11 +175,91 @@ export function registerDailyRoutes(app: FastifyInstance, { db, viewerHash, user
     const today = dayOf(now());
     return {
       today,
-      catalog: catalog.length,
+      catalog: allChallenges(db).length,
       published: recentSchedule(db, 30).map((r) => ({ ...r, ...dayStats(db, r.day) })),
-      queue: queueOrder(db, catalog)
+      queue: queueOrder(db, allChallenges(db))
         .slice(0, 10)
         .map((c) => ({ id: c.id, goal: c.goal, level: c.level ?? 1 })),
     };
+  });
+
+  // ---------------------------------------------------------------- editor de desafios (Administração)
+
+  const adminOnly = (req: FastifyRequest, reply: FastifyReply): User | null => {
+    const me = user(req);
+    if (!me) {
+      void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+      return null;
+    }
+    if (!isAdmin(me.role)) {
+      void reply.code(403).send(fail('adminOnly', 'Só para administradores.'));
+      return null;
+    }
+    return me;
+  };
+
+  app.get('/api/admin/daily/challenges', async (req, reply) => {
+    if (!adminOnly(req, reply)) return reply;
+    const days = publishedDays(db);
+    const all = allChallenges(db);
+    const leaders = new Map(
+      getCards(db, [...new Set(all.map((c) => c.lists?.map((l) => l.leader) ?? c.decks.map((d) => getDeck(db, d)?.leader ?? '')).flat().filter(Boolean))]).map(
+        (c) => [c.id, c.name],
+      ),
+    );
+    const queue = queueOrder(db, all).map((c) => c.id);
+    return {
+      challenges: all.map((c) => {
+        const ls = c.lists?.map((l) => l.leader) ?? c.decks.map((d) => getDeck(db, d)?.leader ?? '');
+        return {
+          id: c.id,
+          source: c.source,
+          goal: c.goal,
+          level: c.level ?? 1,
+          decks: c.lists?.map((l) => l.name) ?? c.decks,
+          leaders: ls.map((id) => ({ id, name: leaders.get(id) ?? id })),
+          note: c.note ?? null,
+          createdAt: c.createdAt ?? null,
+          days: days.get(c.id) ?? [],
+          /** Posição na fila (0 = o próximo a sair). */
+          next: queue.indexOf(c.id),
+        };
+      }),
+    };
+  });
+
+  const VERIFY_TEXT: Record<VerifyError['code'], string> = {
+    challengeInvalid: 'Desafio inválido: confira o campo indicado.',
+    challengeDeck: 'Deck não encontrado.',
+    challengeBoard: 'Não deu para montar a mesa.',
+    challengeManualCards: 'A mesa tem cartas com efeito ⚙ (não automático).',
+    challengeNotSolved: 'A solução não resolve o desafio.',
+    challengeWrongSolves: 'A linha errada não falha.',
+  };
+
+  app.post<{ Body: { spec?: unknown; solution?: unknown; wrong?: unknown; note?: unknown; allowManual?: unknown } }>(
+    '/api/admin/daily/challenges',
+    async (req, reply) => {
+      const me = adminOnly(req, reply);
+      if (!me) return reply;
+      const body = req.body ?? {};
+      const v = verifyChallenge(body, { deck: (id) => getDeck(db, id), cards: (ids) => present(getCards(db, ids)) as CardData[] });
+      if ('code' in v) {
+        const { code, ...rest } = v;
+        const params = Object.fromEntries(Object.entries(rest).map(([k, x]) => [k, Array.isArray(x) ? x.join(', ') : String(x)]));
+        return reply.code(400).send(fail(code, VERIFY_TEXT[code], params));
+      }
+      const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 500) : null;
+      const id = saveChallenge(db, v, note, me.id);
+      return reply.code(201).send({ id, next: queueOrder(db, allChallenges(db)).findIndex((c) => c.id === id) });
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>('/api/admin/daily/challenges/:id', async (req, reply) => {
+    if (!adminOnly(req, reply)) return reply;
+    const r = deleteChallenge(db, req.params.id);
+    if (r === 'notFound') return reply.code(404).send(fail('challengeNotFound', 'Desafio não encontrado (os do catálogo em código não se apagam).'));
+    if (r === 'published') return reply.code(409).send(fail('challengePublished', 'Este desafio já saiu e fica no histórico.'));
+    return reply.code(204).send();
   });
 }

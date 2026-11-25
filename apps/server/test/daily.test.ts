@@ -1,10 +1,11 @@
-import { type Action, type ChallengeMove, type GameState, resolveMove } from '@gumgum/engine';
+import { type Action, buildChallenge, type CardData, type ChallengeMove, type DeckList, type GameState, resolveMove, runChallenge } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { DAILY_CATALOG } from '../src/daily/catalog';
+import { verifyChallenge } from '../src/daily/challenges';
 import { dayOf } from '../src/daily/store';
-import { type DB, openDb } from '../src/db';
+import { type DB, getCards, getDeck, openDb } from '../src/db';
 import { seed } from '../src/seed';
 
 const DAY_MS = 86_400_000;
@@ -186,5 +187,119 @@ describe('desafio do dia: segurança', () => {
     expect(r.published).toHaveLength(1);
     expect(r.queue[0].id).toBe(DAILY_CATALOG[1].id);
     expect(JSON.stringify(r)).not.toMatch(/solution/);
+  });
+});
+
+// ------------------------------------------------------------------ editor de desafios (Administração)
+
+/** Desafio do editor: a mesa do "isca" com os decks prontos, e as jogadas em ações reais (como o editor grava). */
+function editorChallenge(db: DB) {
+  const isca = DAILY_CATALOG[0];
+  const { solution, wrong, id: _id, ...spec } = isca;
+  const decks = isca.decks.map((d) => getDeck(db, d)!) as unknown as [DeckList, DeckList];
+  const cards = getCards(db, [...new Set(decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))]) as CardData[];
+  const start = buildChallenge({ seed: spec.seed, cards, players: [{ name: 'a', deck: decks[0] }, { name: 'b', deck: decks[1] }] }, isca);
+  const record = (moves: ChallengeMove[]) => {
+    const acc: Action[] = [];
+    for (const m of moves) {
+      const run = runChallenge(start, isca, acc);
+      if (run.status !== 'playing') break;
+      acc.push(...resolveMove(run.state, m));
+    }
+    return acc;
+  };
+  return { spec, solution: record(solution), wrong: record(wrong), cards, decks };
+}
+
+const admin = (app: App, db: DB, method: 'GET' | 'POST' | 'DELETE', url: string, payload?: object, role: Role = 'admin') =>
+  app.inject({ method, url, headers: login(db, role).headers, payload });
+
+describe('desafio do dia: editor da Administração', () => {
+  it('só admin lista e salva', async () => {
+    const { db, app } = setup();
+    expect((await app.inject({ method: 'GET', url: '/api/admin/daily/challenges' })).statusCode).toBe(401);
+    expect((await admin(app, db, 'GET', '/api/admin/daily/challenges', undefined, 'player')).statusCode).toBe(403);
+    expect((await admin(app, db, 'POST', '/api/admin/daily/challenges', {}, 'organizer')).statusCode).toBe(403);
+  });
+
+  it('salva o desafio conferido, com as listas congeladas, e ele entra na fila depois do catálogo', async () => {
+    const { db, app, clock } = setup();
+    const c = editorChallenge(db);
+    const r = await admin(app, db, 'POST', '/api/admin/daily/challenges', { spec: c.spec, solution: c.solution, wrong: c.wrong, note: '  cópia do isca  ' });
+    expect(r.statusCode).toBe(201);
+    const { id, next } = r.json();
+    expect(id).toMatch(/^a-[0-9a-f]{10}$/);
+    expect(next).toBe(DAILY_CATALOG.length);
+    const row = db.prepare('SELECT spec, note FROM daily_challenges WHERE id = ?').get(id) as { spec: string; note: string };
+    expect(row.note).toBe('cópia do isca');
+    expect(JSON.parse(row.spec).lists.map((l: DeckList) => l.leader)).toEqual(['ST01-001', 'ST03-001']);
+
+    const list = (await admin(app, db, 'GET', '/api/admin/daily/challenges')).json().challenges;
+    expect(list).toHaveLength(DAILY_CATALOG.length + 1);
+    expect(list.at(-1)).toMatchObject({ id, source: 'admin', goal: 'lethal', days: [], next: DAILY_CATALOG.length });
+    expect(list.at(-1).leaders.map((l: { name: string }) => l.name)).toEqual(['Monkey.D.Luffy', 'Crocodile']);
+    expect(JSON.stringify(list)).not.toMatch(/solution|wrong/);
+
+    // Saem os do catálogo; depois, mudar o deck pronto não muda o desafio: ele joga com a lista congelada.
+    for (let d = 0; d < DAILY_CATALOG.length; d++) {
+      clock.t = T0 + d * DAY_MS;
+      await today(app);
+    }
+    db.prepare("UPDATE decks SET cards = '[]' WHERE id = 'st01-luffy'").run();
+    clock.t = T0 + DAILY_CATALOG.length * DAY_MS;
+    const res = await today(app);
+    expect(res.statusCode, res.body).toBe(200);
+    const g = res.json();
+    expect(g.challenge.id).toBe(id);
+    const done = await playLine(app, g.day, g.view, DAILY_CATALOG[0].solution);
+    expect(done.status).toBe('solved');
+  });
+
+  it('recusa solução que não resolve, linha errada que resolve, mesa impossível e campos inválidos', async () => {
+    const { db, app } = setup();
+    const c = editorChallenge(db);
+    const post = (body: object) => admin(app, db, 'POST', '/api/admin/daily/challenges', body);
+    const code = async (body: object) => {
+      const r = await post(body);
+      expect(r.statusCode).toBe(400);
+      return r.json().errorCode;
+    };
+    expect(await code({ spec: c.spec, solution: c.wrong })).toBe('challengeNotSolved');
+    expect(await code({ spec: c.spec, solution: c.solution, wrong: c.solution })).toBe('challengeWrongSolves');
+    expect(await code({ spec: { ...c.spec, decks: ['st01-luffy', 'nao-existe'] }, solution: c.solution })).toBe('challengeDeck');
+    const board = { ...c.spec, scenario: { ...c.spec.scenario, sides: [{ hand: ['OP01-001'] }, {}] } };
+    expect(await code({ spec: board, solution: c.solution })).toBe('challengeBoard');
+    expect(await code({ spec: { ...c.spec, goal: 'draw' }, solution: c.solution })).toBe('challengeInvalid');
+    expect(await code({ spec: { ...c.spec, goal: 'survive' }, solution: c.solution })).toBe('challengeInvalid');
+    const many = { ...c.spec, scenario: { ...c.spec.scenario, sides: [{ characters: Array(6).fill('ST01-003') }, {}] } };
+    expect((await post({ spec: many, solution: c.solution })).json()).toMatchObject({ errorCode: 'challengeInvalid', errorParams: { field: 'Personagens do lado 1' } });
+    expect(await code({ spec: c.spec, solution: 'x' })).toBe('challengeInvalid');
+    expect(db.prepare('SELECT COUNT(*) AS n FROM daily_challenges').get()).toEqual({ n: 0 });
+  });
+
+  it('carta ⚙ na mesa só passa com a confirmação', () => {
+    const { db } = setup();
+    const c = editorChallenge(db);
+    const cards = c.cards.map((x) => (x.id === 'ST01-003' ? { ...x, text: '[Activate: Main] Dance a little and sing a song.' } : x));
+    const deps = { deck: (id: string) => getDeck(db, id), cards: () => cards };
+    expect(verifyChallenge({ spec: c.spec, solution: c.solution }, deps)).toEqual({ code: 'challengeManualCards', cards: ['ST01-003'] });
+    expect(verifyChallenge({ spec: c.spec, solution: c.solution, allowManual: true }, deps)).toHaveProperty('solution');
+  });
+
+  it('apaga o que ainda não saiu; o que já saiu e o do catálogo, não', async () => {
+    const { db, app, clock } = setup();
+    const c = editorChallenge(db);
+    const save = async () => (await admin(app, db, 'POST', '/api/admin/daily/challenges', { spec: c.spec, solution: c.solution })).json().id as string;
+    const a = await save();
+    expect((await admin(app, db, 'DELETE', `/api/admin/daily/challenges/${a}`)).statusCode).toBe(204);
+    expect((await admin(app, db, 'DELETE', `/api/admin/daily/challenges/${a}`)).statusCode).toBe(404);
+    expect((await admin(app, db, 'DELETE', `/api/admin/daily/challenges/${DAILY_CATALOG[0].id}`)).statusCode).toBe(404);
+    const b = await save();
+    for (let d = 0; d <= DAILY_CATALOG.length; d++) {
+      clock.t = T0 + d * DAY_MS;
+      await today(app);
+    }
+    expect((await admin(app, db, 'GET', '/api/admin/daily/challenges')).json().challenges.at(-1)).toMatchObject({ id: b, days: ['2026-10-18'] });
+    expect((await admin(app, db, 'DELETE', `/api/admin/daily/challenges/${b}`)).statusCode).toBe(409);
   });
 });
