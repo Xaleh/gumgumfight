@@ -7,6 +7,7 @@ import recap from './recap/es';
 import decks from './decks/es';
 import team from './team/es';
 import chamber from './chamber/es';
+import profile from './profile/es';
 import sealed from './sealed/es';
 import yonko from './yonko/es';
 
@@ -3108,6 +3109,7 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...profile,
   ...sealed,
   ...yonko,
 } satisfies Messages;

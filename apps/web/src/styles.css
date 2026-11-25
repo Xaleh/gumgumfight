@@ -3528,7 +3528,7 @@ button.hint-pill.undo-pill {
   color: #0a8a3c;
 }
 .power.down {
-  color: #c0392b;
+  color: var(--red);
 }
 .counter-badge {
   font-size: 0.8em;
@@ -19586,5 +19586,105 @@ div.dk-tile-main {
   }
   .yk-code b {
     font-size: 28px;
+  }
+}
+
+/* ---------- Perfil público do jogador (PublicProfile.tsx) ---------- */
+.public-profile .coverage-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.public-profile h3 {
+  margin: 0 0 8px;
+}
+.poster-name.static {
+  cursor: default;
+  font-weight: 800;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.profile-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.profile-leaders,
+.profile-matches,
+.profile-decks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.profile-leaders li,
+.profile-matches li,
+.profile-decks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.profile-leader-name {
+  font-weight: 800;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.profile-matches li {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border-left: 4px solid var(--muted);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+.profile-matches li.won {
+  border-left-color: var(--green);
+}
+.profile-matches li.lost {
+  border-left-color: var(--red);
+}
+.profile-match-leaders {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.profile-match-info,
+.profile-deck-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.profile-match-info .gain {
+  color: var(--green);
+  font-weight: 800;
+}
+.profile-match-info .drop {
+  color: var(--red);
+  font-weight: 800;
+}
+.profile-editor .check {
+  margin: 6px 0;
+  align-items: flex-start;
+}
+.profile-editor h4 {
+  margin: 12px 0 4px;
+}
+.profile-deck-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0 12px;
+}
+@media (max-width: 520px) {
+  .profile-matches li {
+    flex-wrap: wrap;
+  }
+  .profile-matches li .btn {
+    margin-left: auto;
   }
 }

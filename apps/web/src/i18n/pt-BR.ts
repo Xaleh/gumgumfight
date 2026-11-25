@@ -7,6 +7,7 @@ import recapPtBR from './recap/pt-BR';
 import decksPtBR from './decks/pt-BR';
 import teamPtBR from './team/pt-BR';
 import chamberPtBR from './chamber/pt-BR';
+import profilePtBR from './profile/pt-BR';
 import sealedPtBR from './sealed/pt-BR';
 import yonkoPtBR from './yonko/pt-BR';
 
@@ -3115,6 +3116,8 @@ const ptBR = {
   ...teamPtBR,
   // ==== Sala do Tempo: torneio simulado do Time com jogadores virtuais (i18n/chamber) ====
   ...chamberPtBR,
+  // ==== Perfil público do jogador (i18n/profile) ====
+  ...profilePtBR,
   // ==== Selado: boosters, deck de 40 e as partidas com ele (i18n/sealed) ====
   ...sealedPtBR,
   // ==== Yonko: a sala e a mesa de todos contra todos (i18n/yonko) ====
