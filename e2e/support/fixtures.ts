@@ -1,7 +1,7 @@
 // `test` dos testes de ponta a ponta: igual ao do Playwright, mas falha se a página lançar um erro
 // não tratado (o ErrorBoundary esconderia isso atrás de "Algo deu errado"). Quando um teste falha, o
-// log mostra o endereço e as animações em andamento (um clique que espera o elemento parar de se mexer
-// é a falha mais comum no Safari), já que o trace fica num artefato.
+// log mostra o endereço e as animações em andamento (um clique que espera o elemento parar de se mexer),
+// ou avisa que a página caiu, já que o trace fica num artefato.
 
 import { expect, type Page, test as base } from '@playwright/test';
 
@@ -9,9 +9,17 @@ export const test = base.extend<{ pageErrors: string[] }>({
   pageErrors: [
     async ({ page }, use, testInfo) => {
       const errors: string[] = [];
+      let crashed = false;
       page.on('pageerror', (e) => errors.push(e.stack ?? e.message));
+      // O processo da página caiu (visto no WebKit do CI, na mesa): sem isso, aparece como um clique que não acontece.
+      page.on('crash', () => {
+        crashed = true;
+        console.log(`[e2e] a página caiu (crash do navegador) em ${testInfo.titlePath.join(' › ')}`);
+      });
       await use(errors);
-      if (testInfo.status !== testInfo.expectedStatus) console.log(`[e2e] ${testInfo.titlePath.join(' › ')}\n${await diagnose(page)}`);
+      if (testInfo.status !== testInfo.expectedStatus) {
+        console.log(`[e2e] ${testInfo.titlePath.join(' › ')}\n${crashed ? '  a página tinha caído' : await diagnose(page)}`);
+      }
       expect(errors, 'erros não tratados na página').toEqual([]);
     },
     { auto: true },

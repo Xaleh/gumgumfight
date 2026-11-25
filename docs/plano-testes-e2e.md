@@ -41,6 +41,12 @@ do bot e o Safari do iPhone.
   de uma vez, pulando a animação —, 72 cartas reveladas, e os boosters abertos continuam desenhados, dentro da fileira e
   na ordem (no celular, numa linha só): o bug do Safari de novembro (`.sealed-pack` em `styles.css`).
 
+**Conhecido na fase 1:** no WebKit do CI (Linux), a página da mesa às vezes cai (`Target crashed`) logo depois do
+mulligan, no teste de desistir (1 em cada 3 execuções do job, nas primeiras rodadas); a segunda tentativa passa. O
+log agora diz quando a página caiu. Falta saber se é do WebKit de Linux do Playwright ou se acontece também no Safari
+de um iPhone de verdade (a mesa tem muitas camadas com filtro e animação): conferir num aparelho e, se for do app,
+reduzir as camadas da mesa no celular. Até lá, o CI tenta de novo uma vez.
+
 ### Fase 2 — Fila online: fila → partida → fim
 
 - Dois navegadores (dois contextos, dois donos de navegador) entram na fila casual com os decks prontos; a sala abre nos
