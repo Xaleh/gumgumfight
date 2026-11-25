@@ -47,20 +47,27 @@ log agora diz quando a página caiu. Falta saber se é do WebKit de Linux do Pla
 de um iPhone de verdade (a mesa tem muitas camadas com filtro e animação): conferir num aparelho e, se for do app,
 reduzir as camadas da mesa no celular. Até lá, o CI tenta de novo uma vez.
 
-### Fase 2 — Fila online: fila → partida → fim
+### Fase 2 — Fila online: fila → partida → fim ✅
 
-- Dois navegadores (dois contextos, dois donos de navegador) entram na fila casual com os decks prontos; a sala abre nos
-  dois pelo SSE, cada um vê só a própria mão (conferir na tela que a mão do outro aparece virada), jogam turnos de
-  verdade e um desiste; os dois veem o fim de jogo e a partida aparece nas estatísticas.
-- Login de teste para a ranqueada: `e2e/support/accounts.ts` abre o banco temporário (`node:sqlite`), cria a conta com
-  `upsertGoogleUser`, a sessão com `createSession` e põe o cookie no contexto. Fila ranqueada com duas contas.
-- Queda e volta: um dos navegadores recarrega a página no meio da partida e volta para a mesma sala.
+- `newPlayer()` (em `e2e/support/fixtures.ts`): mais um navegador no mesmo teste, outro contexto (outro dono de
+  navegador e outros cookies) com as opções do projeto, também vigiado (erro não tratado reprova, queda da página avisa).
+- Login de teste: `e2e/support/account-cli.ts` abre o banco temporário com o `openDb` do servidor, cria a conta com
+  `upsertGoogleUser` (e o perfil com `setUserRole`, se pedido) e a sessão com `createSession`; `login()`
+  (`e2e/support/accounts.ts`) roda o script com `tsx` e põe o cookie `gg_session` no contexto. Nenhuma rota de teste.
+- `online.spec.ts`, casual: os dois entram na **Partida rápida**, a sala abre nos dois, pulam os dados, quem venceu o
+  sorteio começa e os dois mantêm a mão. Cada um vê a própria mão e a do oponente chega ao navegador só com as
+  referências escondidas do `view.ts` (`~…`) e o verso das cartas. O turno passa de um navegador para o outro; o segundo
+  recarrega a página e volta para a mesma sala ainda com o turno; ele desiste e os dois veem o fim (vitória e derrota) e
+  voltam ao menu.
+- `online.spec.ts`, ranqueada: duas contas de teste, a ranqueada fica liberada, os dois entram na fila, um desiste e o
+  bounty de quem venceu sobe (`/api/players/me`).
+- Só no desktop por enquanto: no iPhone a mesa usa outro arranjo, e a queda do WebKit (acima) somaria instabilidade.
 
 ### Fase 3 — Torneio: criar e jogar
 
-- Organizador (conta com o perfil de Organizador, criada como na fase 2) cria um torneio suíço pela tela; dois ou quatro
+- Organizador (conta com o perfil de Organizador, criada com `login(page, nome, 'organizer')` da fase 2) cria um torneio suíço pela tela; dois ou quatro
   jogadores se inscrevem com as próprias contas; o organizador inicia; cada mesa abre como sala online, os jogos terminam
   (desistência ou partida jogada) e o resultado entra sozinho; a rodada fecha, o torneio termina e a classificação final
   aparece para todos.
-- Fluxo também no `iphone` para o jogador (inscrição, lobby e a mesa da rodada).
+- Fluxo também no `iphone` para o jogador (inscrição, lobby e a mesa da rodada), se a queda do WebKit estiver resolvida.
 - Com as três fases, o A1 fica `[x]`.

@@ -196,7 +196,8 @@ gumgumfight/
 │   └── card-types.json          172 tipos conhecidos (para separar "Heart Pirates Supernovas")
 ├── deploy/                      bootstrap-hostinger.sh, setup-vm.sh, remote-deploy.sh, ecosystem.config.cjs, HOSTINGER.md
 ├── e2e/                         testes de ponta a ponta (Playwright): playwright.config.ts, serve.ts (servidor com banco
-│                                temporário), support/ (textos pela chave do pt-BR, fixture de erros, passos comuns), *.spec.ts
+│                                temporário), support/ (textos pela chave do pt-BR, fixture de erros e de mais jogadores,
+│                                contas de teste no banco temporário, passos comuns e da fila online), *.spec.ts
 ├── scripts/build-release.sh     monta release/
 ├── docs/rules/                  base de regras (CR v1.2.1), interações, divergências do motor, mapeamento da DSL
 └── .github/workflows/ci-deploy.yml
@@ -1775,6 +1776,9 @@ Testes de ponta a ponta (`e2e/`, Playwright, plano em [`plano-testes-e2e.md`](pl
 `e2e/.tmp/<porta>/` (`NODE_ENV=test`, `CARD_IMAGES=off`, `PUSH=off`) servindo `apps/web/dist`. Projetos `desktop`
 (Chromium) e `iphone` (iPhone 13 no WebKit, só os testes `@iphone`; sem WebKit instalado, fora do CI, cai para o
 Chromium com a emulação do iPhone). Um worker, textos pela chave do dicionário pt-BR, erro não tratado na página reprova.
+Os fluxos com dois jogadores abrem outro contexto (`newPlayer()`); o login de teste é o `e2e/support/account-cli.ts`, que
+cria a conta e a sessão no banco temporário com `upsertGoogleUser`/`createSession` e devolve o token para o cookie
+`gg_session` (sem rota de teste no servidor).
 
 Deploy: `scp` do `.tgz` para `~/apps/gumgumfight/releases/<sha>`, `remote-deploy.sh`: grava `GOOGLE_CLIENT_ID`/
 `ADMIN_EMAILS` em `shared/deploy.env`, troca o symlink `current` (atomicamente, `mv -T`), `pm2 startOrReload`,

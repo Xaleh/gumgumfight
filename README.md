@@ -1737,8 +1737,12 @@ npm run e2e                                # testes de ponta a ponta no navegado
 
 `npm run e2e` compila o web e roda os fluxos de `e2e/` num navegador de verdade, contra o servidor de verdade com um
 banco novo (em `e2e/.tmp/`, apagado a cada execução): partida contra o bot do menu ao fim de jogo (com o **Auto**, cerca
-de 2 minutos), desistir pelo menu da mesa e abrir os boosters do Selado. Os testes marcados com `@iphone` rodam também
-no iPhone 13 com o WebKit, o motor do Safari (onde os boosters abertos já saíram do lugar).
+de 2 minutos), desistir pelo menu da mesa, abrir os boosters do Selado e as partidas online com dois navegadores — na
+**Partida rápida** (fila, a mão do oponente escondida, o turno passando de um para o outro, recarregar a página no meio
+e voltar para a mesma sala, desistência) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe). As
+contas de teste são criadas direto no banco temporário, com as funções do servidor (`e2e/support/account-cli.ts`): não
+há rota de login de teste. Os testes marcados com `@iphone` rodam também no iPhone 13 com o WebKit, o motor do Safari
+(onde os boosters abertos já saíram do lugar).
 
 ```bash
 npx playwright install chromium webkit     # uma vez: os navegadores do Playwright
@@ -1749,8 +1753,8 @@ npm run e2e -- --project=iphone            # só o iPhone; -g "boosters" filtra 
 Sem o WebKit instalado, o projeto `iphone` roda no Chromium com a tela e o toque do iPhone (e avisa). A porta padrão é
 3410 (`E2E_PORT` muda). No workflow **CI e deploy**, o job "Testes de ponta a ponta" roda em Chromium e WebKit, guarda o
 relatório e os traces quando falha, e o deploy só sai com ele passando. Os textos dos testes vêm do dicionário pt-BR
-pela chave, e um erro não tratado na página reprova o teste. O que vem nas próximas fases (fila online e torneio) está
-em [`docs/plano-testes-e2e.md`](docs/plano-testes-e2e.md).
+pela chave, e um erro não tratado na página reprova o teste. O que vem na próxima fase (torneio) está em
+[`docs/plano-testes-e2e.md`](docs/plano-testes-e2e.md).
 
 ## API
 
