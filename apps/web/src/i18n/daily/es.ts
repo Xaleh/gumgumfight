@@ -8,8 +8,7 @@ const daily = {
   'daily.level2': 'Medio',
   'daily.level3': 'Difícil',
   'daily.goal.lethal.title': 'Encuentra el letal en este turno',
-  'daily.goal.lethal.body':
-    'Es tu turno. Derrota al oponente antes de pasar el turno.\nSe defiende así: bloquea y usa el Counter de los Personajes de la mano solo cuando eso detiene un ataque a su Líder, y nunca activa [Trigger].',
+  'daily.goal.lethal.body': "Es tu turno. Derrota al oponente antes de pasar el turno.",
   'daily.goal.survive.title': 'Sobrevive a este turno',
   'daily.goal.survive.body': 'Es el turno del oponente. Llega vivo a tu turno eligiendo qué bloquear y qué Counters usar. Ataca en este orden y luego pasa el turno:',
   'daily.attack': '{attacker} ataca a {target}',
@@ -146,6 +145,20 @@ const daily = {
   'errors.pinPublished': "Este día ya tiene un desafío publicado.",
   'errors.pinTaken': "Otro desafío ya está fijado en este día.",
   'errors.badOrder': "Orden inválido.",
+  'daily.defense.title': "Cómo se defiende el oponente:",
+  'daily.defense.block': "Bloquea solo el ataque que golpearía a su Líder.",
+  'daily.defense.characters': "Usa el Counter de los Personajes de la mano solo cuando eso detiene el ataque a su Líder.",
+  'daily.defense.events': "También usa los Eventos de [Counter] que dan poder, pagando con DON!! activos.",
+  'daily.defense.noEvents': "No usa Eventos de [Counter].",
+  'daily.defense.triggers': "Activa el [Trigger] de las cartas que salen de la Vida (en el efecto, la ayuda va al atacado y el daño al atacante).",
+  'daily.defense.noTriggers': "Nunca activa [Trigger].",
+  'daily.admin.defense': "Defensa del oponente",
+  'daily.admin.defenseHint': "Además de bloquear y usar el Counter de los Personajes. En las elecciones de sus efectos: la ayuda va al atacado, el daño al atacante, descarta solo lo mínimo y paga los costos opcionales.",
+  'daily.admin.eventCounters': "Usa Eventos de [Counter] que dan poder (pagando DON!!)",
+  'daily.admin.triggers': "Activa el [Trigger] de la Vida",
+  'daily.admin.intro': "Enunciado (lo ve quien juega)",
+  'daily.admin.introPlaceholder': "Ej.: Xebec acaba de bajarte la Vida. Encuentra el camino hasta su Líder.",
+  'daily.admin.introTranslations': "Traducciones del enunciado (sin traducción, se muestra el portugués)",
 };
 
 export default daily;

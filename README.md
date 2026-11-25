@@ -1214,9 +1214,12 @@ As regras ficam no motor (`packages/engine/src/sandbox.ts`): validação (`sandb
 Um cenário novo por dia (vira à meia-noite de Brasília), em **Desafio do dia** no menu, no cartão da home ou pelo
 link `/?desafio`. Há dois tipos: **Ache o letal neste turno** (derrote o oponente antes de passar a vez) e **Sobreviva a
 este turno** (o oponente ataca numa ordem dada; escolha o que bloquear e quais Counters usar). O oponente segue regras
-fixas, ditas no enunciado: bloqueia e usa o Counter dos Personagens da mão só quando isso segura um ataque ao Líder dele
-e nunca ativa [Trigger]. No "sobreviva", ele ataca na ordem do roteiro. Em alguns desafios a mão dele faz parte do
-enunciado e fica aberta na mesa.
+fixas, listadas no painel do desafio: bloqueia e usa o Counter dos Personagens da mão só quando isso segura um ataque
+ao Líder dele. Cada desafio pode ligar mais duas coisas: usar os Eventos de [Counter] que dão poder (pagando os DON!!
+ativos) e ativar o [Trigger] das cartas que saem da Vida; nas escolhas desses efeitos, a ajuda vai na carta atacada e o
+dano no atacante. Sem isso, ele não usa Eventos nem ativa [Trigger]. No "sobreviva", ele ataca na ordem do roteiro. Em
+alguns desafios a mão dele faz parte do enunciado e fica aberta na mesa (as cartas que ele compra depois continuam de
+verso), e o desafio pode trazer um enunciado próprio, nos seis idiomas.
 
 O navegador recebe só a visão do jogador; cada jogada vai ao servidor, que refaz a tentativa, joga pelo oponente e
 confere o objetivo. Não precisa de login: o resultado fica com a conta ou com o navegador. Cada tentativa terminada
@@ -1237,6 +1240,9 @@ regras do desafio, e marque a tentativa como solução (e, se quiser, uma que fa
 servidor monta a mesa de novo com as cartas dele, confere que a solução resolve e que a linha errada falha, e só então
 põe o desafio na fila. As listas dos decks ficam congeladas no desafio (editar o deck depois não muda nada). Carta com
 efeito ⚙ na mesa pede uma confirmação, porque o efeito não roda sozinho. Um desafio que ainda não saiu pode ser apagado.
+No "ache o letal", **Defesa do oponente** liga os Eventos de [Counter] e o [Trigger] (mudar a defesa pede gravar a
+solução de novo), e o **Enunciado** é um texto livre para quem joga, em português e, se quiser, nos outros idiomas
+(sem tradução, aparece o português).
 
 **Arrumar a fila (mesma aba):** **Datas fixas** mostra os desafios marcados para um dia ("este no dia do torneio");
 **Próximos na fila** mostra a ordem dos dias seguintes com o dia previsto de cada um (pulando as datas fixas), com

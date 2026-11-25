@@ -2,8 +2,8 @@
 // Sem React: os testes chamam direto.
 
 import type { GameState } from '@gumgum/engine';
-import type { DailyResult, DailyStreak, DailyToday } from '../api';
-import type { Translate } from '../i18n';
+import type { DailyDefense, DailyResult, DailyStreak, DailyToday } from '../api';
+import type { MessageKey, Translate } from '../i18n';
 
 /** Endereço que abre o desafio do dia direto (`/?desafio`). */
 export const DAILY_PARAM = 'desafio';
@@ -39,4 +39,19 @@ export function dailyShareText(
 export function scriptName(t: Translate, view: GameState | undefined, ref: string, side: 'attacker' | 'target'): string {
   if (ref === 'leader') return side === 'attacker' ? t('daily.theirLeader') : t('daily.yourLeader');
   return view?.defs[ref]?.name ?? ref;
+}
+
+/** Como o oponente se defende no "ache o letal", linha por linha (o que o desafio liga ou não). */
+export function defenseLines(defense: DailyDefense | undefined): MessageKey[] {
+  return [
+    'daily.defense.block',
+    'daily.defense.characters',
+    defense?.eventCounters ? 'daily.defense.events' : 'daily.defense.noEvents',
+    defense?.triggers ? 'daily.defense.triggers' : 'daily.defense.noTriggers',
+  ];
+}
+
+/** O enunciado livre no idioma da interface (sem ele, o pt-BR; sem nenhum, null). */
+export function introFor(intro: Partial<Record<string, string>> | null | undefined, locale: string): string | null {
+  return intro?.[locale]?.trim() || intro?.['pt-BR']?.trim() || null;
 }

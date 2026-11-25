@@ -209,6 +209,11 @@ export interface TableGame {
   jumped?: boolean;
   /** Bot do Time (navegador): as explicações das jogadas do bot (painel do treinador). */
   coach?: CoachEntry[];
+  /**
+   * Mostra a frente das cartas da mão do oponente que a visão traz abertas (desafio do dia com a mão no enunciado);
+   * as que vêm escondidas continuam de verso.
+   */
+  openOpponentHand?: boolean;
 }
 
 type TableKind = GameSetup['mode'] | 'online';
@@ -1818,7 +1823,7 @@ function Table({
             state={state}
             bottom={bottom}
             revealBottom={!handsSecret}
-            revealTop={showBotHand && !handsSecret}
+            revealTop={(showBotHand || Boolean(game.openOpponentHand)) && !handsSecret}
             layout={layout}
             corner={corner}
             tools={sideTools}
@@ -1841,7 +1846,7 @@ function Table({
           state={state}
           bottom={bottom}
           revealBottom={!handsSecret}
-          revealTop={showBotHand && !handsSecret}
+          revealTop={(showBotHand || Boolean(game.openOpponentHand)) && !handsSecret}
           corner={corner}
           sideTools={sideTools}
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}

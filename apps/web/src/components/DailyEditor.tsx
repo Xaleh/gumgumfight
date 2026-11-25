@@ -37,7 +37,7 @@ import {
   type Zone,
   ZONES,
 } from '../game/dailyEditor';
-import { type MessageKey, useT } from '../i18n';
+import { LOCALES, type MessageKey, useT } from '../i18n';
 import { useSettings } from '../settings';
 import { LessonTable, type TableGame } from './GameScreen';
 import { Icon } from './Icons';
@@ -485,10 +485,53 @@ export function DailyEditor({ start, onClose, onSaved }: { start: EditorStart | 
           </label>
         )}
         <label className="wide">
+          {t('daily.admin.intro')}
+          <textarea
+            rows={2}
+            maxLength={400}
+            value={draft.intro['pt-BR'] ?? ''}
+            placeholder={t('daily.admin.introPlaceholder')}
+            onChange={(e) => setDraft({ ...draft, intro: { ...draft.intro, 'pt-BR': e.target.value } })}
+          />
+        </label>
+        <details className="wide daily-editor-intro">
+          <summary>{t('daily.admin.introTranslations')}</summary>
+          {LOCALES.filter((l) => l.code !== 'pt-BR').map((l) => (
+            <label key={l.code}>
+              {l.name}
+              <textarea
+                rows={2}
+                maxLength={400}
+                value={draft.intro[l.code] ?? ''}
+                onChange={(e) => setDraft({ ...draft, intro: { ...draft.intro, [l.code]: e.target.value } })}
+              />
+            </label>
+          ))}
+        </details>
+        <label className="wide">
           {t('daily.admin.note')}
           <input type="text" maxLength={500} value={draft.note} placeholder={t('daily.admin.notePlaceholder')} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
         </label>
       </fieldset>
+
+      {draft.goal === 'lethal' && (
+        <fieldset className="daily-editor-defense">
+          <legend>{t('daily.admin.defense')}</legend>
+          <p className="muted small">{t('daily.admin.defenseHint')}</p>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={draft.defense.eventCounters}
+              onChange={(e) => change({ ...draft, defense: { ...draft.defense, eventCounters: e.target.checked } })}
+            />
+            {t('daily.admin.eventCounters')}
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={draft.defense.triggers} onChange={(e) => change({ ...draft, defense: { ...draft.defense, triggers: e.target.checked } })} />
+            {t('daily.admin.triggers')}
+          </label>
+        </fieldset>
+      )}
 
       <div className="daily-editor-sides">
         {([0, 1] as const).map((i) => (

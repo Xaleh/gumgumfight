@@ -4,11 +4,13 @@
 //   lethal   é o seu turno: derrote o oponente antes de passar a vez.
 //   survive  é o turno do oponente: ele ataca na ordem do roteiro; chegue vivo ao seu turno.
 //
-// O oponente que defende bloqueia e usa Counter da mão só quando isso segura um ataque ao Líder dele, e nunca
-// ativa [Trigger]. O que ataca segue o roteiro (o primeiro ataque da lista que ainda é legal) e então passa a vez.
+// O oponente que defende bloqueia e usa Counter da mão só quando isso segura um ataque ao Líder dele. Por padrão só
+// usa o Counter dos Personagens e nunca ativa [Trigger]; o desafio pode ligar os Eventos de Counter que dão poder
+// (pagando DON!!) e o [Trigger] (`defense`). Nas escolhas desses efeitos ele segue regras fixas (`effectChoice`).
+// O que ataca segue o roteiro (o primeiro ataque da lista que ainda é legal) e então passa a vez.
 
 import { actingPlayer, legalActions } from './actions';
-import { applyAction, counterValue, getPower, opponent } from './engine';
+import { applyAction, cardDef, counterValue, eventCounterPower, getPower } from './engine';
 import { createScenario, passiveAction, type ScenarioSpec } from './scenario';
 import type { Action, GameConfig, GameState, PlayerId } from './types';
 
@@ -22,6 +24,14 @@ export type ChallengeGoal = 'lethal' | 'survive';
 export interface ScriptedAttack {
   attacker: string;
   target: string;
+}
+
+/** O que o oponente pode fazer na defesa, além de bloquear e usar o Counter dos Personagens da mão. */
+export interface ChallengeDefense {
+  /** Usa os Eventos [Counter] que dão poder, pagando os DON!! ativos. */
+  eventCounters?: boolean;
+  /** Ativa o [Trigger] das cartas que saem da Vida. */
+  triggers?: boolean;
 }
 
 export interface ChallengeSpec {
@@ -40,6 +50,10 @@ export interface ChallengeSpec {
   revealHand?: boolean;
   /** Dificuldade, de 1 a 3 (só para mostrar). */
   level?: 1 | 2 | 3;
+  /** `lethal`: o que o oponente faz além do padrão (sem isso, só bloqueio e Counter dos Personagens). */
+  defense?: ChallengeDefense;
+  /** Enunciado livre, por idioma (`pt-BR` é a base; os outros caem nele). O motor não lê. */
+  intro?: Partial<Record<string, string>>;
 }
 
 export type ChallengeStatus = 'playing' | 'solved' | 'failed';
@@ -70,10 +84,58 @@ function leaderUnderFire(s: GameState, defender: PlayerId): boolean {
   return Boolean(b && b.target === leaderOf(s, defender) && getPower(s, b.attacker) >= getPower(s, b.target));
 }
 
-/** Defesa do oponente: bloqueia e usa Counter só para segurar um ataque ao Líder; nunca ativa [Trigger]. */
-function defend(s: GameState, legal: Action[]): Action | null {
+/** Valor de uma carta da mão no Counter: o impresso dos Personagens; o poder que um Evento [Counter] dá (se ligado). */
+function counterWorth(s: GameState, uid: string, events: boolean): number {
+  const def = cardDef(s, uid);
+  if (def.category === 'event') return events ? Math.max(0, eventCounterPower(s, uid)) : 0;
+  return counterValue(s, uid);
+}
+
+const isEffectsOn = (spec: ChallengeSpec) => Boolean(spec.defense?.eventCounters || spec.defense?.triggers);
+
+/**
+ * Escolhas do oponente nos efeitos dos próprios Eventos e [Trigger]: ajuda vai no atacado (senão no Líder); dano vai
+ * no atacante (senão no Personagem mais forte de quem resolve); descarte só o mínimo; custo opcional é pago; nas
+ * opções, a primeira. Sempre a mesma escolha para a mesma mesa.
+ */
+function effectChoice(s: GameState, legal: Action[]): Action | null {
   const p = s.pending;
   if (!p || p.player !== RIVAL) return null;
+  if (p.kind === 'selectTargets') {
+    const b = s.battle;
+    const rank = (uid: string): [number, number] => {
+      if (p.intent === 'help') return [uid === b?.target ? 0 : uid === leaderOf(s, RIVAL) ? 1 : 2, 0];
+      if (p.intent === 'harm') {
+        let power = 0;
+        try {
+          power = getPower(s, uid);
+        } catch {
+          power = 0;
+        }
+        return [uid === b?.attacker ? 0 : 1, -power];
+      }
+      return [0, 0];
+    };
+    const ordered =
+      p.intent === 'discard'
+        ? [...p.options]
+        : [...p.options].sort((x, y) => {
+            const [a1, a2] = rank(x);
+            const [b1, b2] = rank(y);
+            return a1 - b1 || a2 - b2 || x.localeCompare(y);
+          });
+    const count = p.intent === 'discard' ? p.min : Math.min(Math.max(p.min, 1), p.max, ordered.length);
+    return { type: 'choose', player: RIVAL, uids: ordered.slice(0, count) };
+  }
+  if (p.kind === 'confirm') return legal.find((a) => a.type === 'answer' && a.yes) ?? passiveAction(s, RIVAL);
+  return passiveAction(s, RIVAL);
+}
+
+/** Defesa do oponente: bloqueia e usa Counter só para segurar um ataque ao Líder; Eventos e [Trigger] se o desafio ligar. */
+function defend(s: GameState, spec: ChallengeSpec, legal: Action[]): Action | null {
+  const p = s.pending;
+  if (!p || p.player !== RIVAL) return null;
+  const events = Boolean(spec.defense?.eventCounters);
   if (p.kind === 'block') {
     const block = leaderUnderFire(s, RIVAL) ? legal.find((a) => a.type === 'choose' && a.uids.length === 1) : undefined;
     return block ?? legal.find((a) => a.type === 'choose' && a.uids.length === 0) ?? passiveAction(s, RIVAL);
@@ -82,16 +144,22 @@ function defend(s: GameState, legal: Action[]): Action | null {
     const pass = legal.find((a) => a.type === 'pass') ?? null;
     const b = s.battle;
     if (!b || !leaderUnderFire(s, RIVAL)) return pass;
-    // Só o valor de Counter dos Personagens da mão (sem Eventos): do maior para o menor, e só se der para segurar.
+    // Do maior valor para o menor (Personagem antes de Evento no empate), e só se o total der para segurar.
     const counters = legal
-      .filter((a): a is Extract<Action, { type: 'counter' }> => a.type === 'counter' && a.target === undefined && counterValue(s, a.uid) > 0)
-      .sort((x, y) => counterValue(s, y.uid) - counterValue(s, x.uid) || x.uid.localeCompare(y.uid));
+      .filter((a): a is Extract<Action, { type: 'counter' }> => a.type === 'counter' && a.target === undefined && counterWorth(s, a.uid, events) > 0)
+      .sort((x, y) => {
+        const ev = (u: string) => (cardDef(s, u).category === 'event' ? 1 : 0);
+        return counterWorth(s, y.uid, events) - counterWorth(s, x.uid, events) || ev(x.uid) - ev(y.uid) || x.uid.localeCompare(y.uid);
+      });
     const missing = getPower(s, b.attacker) - getPower(s, b.target) + 1;
-    const total = counters.reduce((n, a) => n + counterValue(s, a.uid), 0);
+    const total = counters.reduce((n, a) => n + counterWorth(s, a.uid, events), 0);
     return total >= missing && counters.length ? counters[0] : pass;
   }
-  if (p.kind === 'lifeCard') return legal.find((a) => a.type === 'answer' && !a.yes) ?? passiveAction(s, RIVAL);
-  return passiveAction(s, RIVAL);
+  if (p.kind === 'lifeCard') {
+    const yes = spec.defense?.triggers ? legal.find((a) => a.type === 'answer' && a.yes) : undefined;
+    return yes ?? legal.find((a) => a.type === 'answer' && !a.yes) ?? passiveAction(s, RIVAL);
+  }
+  return isEffectsOn(spec) ? effectChoice(s, legal) : passiveAction(s, RIVAL);
 }
 
 /** Turno do oponente no "sobreviva": o primeiro ataque do roteiro que ainda é legal; sem nenhum, passa a vez. */
@@ -110,7 +178,7 @@ function attack(s: GameState, spec: ChallengeSpec, legal: Action[]): Action | nu
 export function challengeRivalAction(s: GameState, spec: ChallengeSpec): Action | null {
   if (actingPlayer(s) !== RIVAL) return null;
   const legal = legalActions(s, RIVAL).filter((a) => a.type !== 'cancel' && a.type !== 'concede');
-  if (s.pending && s.pending.player === RIVAL && s.activePlayer === SOLVER) return defend(s, legal);
+  if (s.pending && s.pending.player === RIVAL && s.activePlayer === SOLVER) return defend(s, spec, legal);
   return attack(s, spec, legal);
 }
 
@@ -147,7 +215,14 @@ export function runChallenge(
     for (let guard = 0; guard < RIVAL_GUARD && challengeStatus(s, spec, turn) === 'playing'; guard++) {
       const a = challengeRivalAction(s, spec);
       if (!a) return;
-      s = applyAction(s, a);
+      try {
+        s = applyAction(s, a);
+      } catch {
+        // Jogada do oponente recusada pelo motor (escolha que o efeito não aceita): vale a resposta passiva.
+        const fallback = passiveAction(s, RIVAL);
+        if (!fallback) return;
+        s = applyAction(s, fallback);
+      }
     }
   };
   settle();

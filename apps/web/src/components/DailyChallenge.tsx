@@ -4,8 +4,9 @@
 import type { Action, GameState } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api, type DailyPlay, type DailyResult, type DailyStatus, type DailyStreak, type DailyToday } from '../api';
-import { dailyShareText, scriptName } from '../game/daily';
+import { dailyShareText, defenseLines, introFor, scriptName } from '../game/daily';
 import { type MessageKey, useT } from '../i18n';
+import { useSettings } from '../settings';
 import { LessonTable, type TableGame } from './GameScreen';
 import { Icon } from './Icons';
 
@@ -146,6 +147,8 @@ function DailyRun({ data, start, onExit, onReload }: { data: DailyToday; start: 
     canUndo: status === 'playing' && actions.current.length > 0 && !busy,
     actions: () => actions.current,
     downloadReplay: noop,
+    // A mão do oponente que o enunciado abre aparece de frente (as cartas que ele compra depois continuam de verso).
+    openOpponentHand: data.challenge.revealHand,
   };
   const panel = (
     <DailyPanel
@@ -192,6 +195,8 @@ function DailyPanel({
   const [collapsed, setCollapsed] = useState(() => !window.matchMedia('(min-width: 1000px)').matches);
   const [shared, setShared] = useState(false);
   const { goal } = data.challenge;
+  const { locale } = useSettings();
+  const intro = introFor(data.challenge.intro, locale);
   const yourTurn = view.phase !== 'gameover' && (view.pending ? view.pending.player === 0 : view.activePlayer === 0);
   useEffect(() => {
     if (status !== 'playing') setCollapsed(false);
@@ -233,7 +238,18 @@ function DailyPanel({
       <h3 className="coach-title">{t(GOAL_TITLE[goal])}</h3>
       {status === 'playing' && (
         <>
+          {intro && <p className="coach-body daily-intro">{intro}</p>}
           <p className="coach-body">{t(GOAL_BODY[goal])}</p>
+          {goal === 'lethal' && (
+            <div className="daily-defense">
+              <span className="daily-defense-title">{t('daily.defense.title')}</span>
+              <ul>
+                {defenseLines(data.challenge.defense).map((k) => (
+                  <li key={k}>{t(k)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {goal === 'survive' && (
             <ol className="daily-attacks">
               {data.challenge.attacks.map((a, i) => (

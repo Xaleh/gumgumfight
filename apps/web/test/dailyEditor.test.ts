@@ -105,3 +105,18 @@ describe('editor de desafios: quando a gravação deixa de valer', () => {
     expect(boardKey(addCard(d, 0, 'hand', 'ST01-013'))).not.toBe(k);
   });
 });
+
+describe('editor de desafios: defesa e enunciado', () => {
+  it('a defesa entra só no letal e muda a gravação; o enunciado não muda', async () => {
+    const { boardKey, emptyDraft, setDeck, specOf } = await import('../src/game/dailyEditor');
+    const d = setDeck(setDeck(emptyDraft(5), 0, 'st01-luffy'), 1, 'st03-crocodile');
+    const withDefense = { ...d, defense: { eventCounters: true, triggers: false } };
+    expect(specOf(withDefense)!.defense).toEqual({ eventCounters: true });
+    expect(specOf(d)!.defense).toBeUndefined();
+    expect(specOf({ ...withDefense, goal: 'survive' as const })!.defense).toBeUndefined();
+    expect(boardKey(withDefense)).not.toBe(boardKey(d));
+    const withIntro = { ...d, intro: { 'pt-BR': '  Ache o letal.  ', en: ' ' } };
+    expect(specOf(withIntro)!.intro).toEqual({ 'pt-BR': 'Ache o letal.' });
+    expect(boardKey(withIntro)).toBe(boardKey(d));
+  });
+});

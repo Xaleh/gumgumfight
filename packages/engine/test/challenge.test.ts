@@ -151,3 +151,67 @@ describe('runChallenge', () => {
     expect(() => buildChallenge(config, { ...wall, attacks: [] })).toThrow();
   });
 });
+
+describe('desafio: defensor configurável', () => {
+  const lethal = (opp: ChallengeSpec['scenario']['sides'][1], me: ChallengeSpec['scenario']['sides'][0], defense?: ChallengeSpec['defense']): ChallengeSpec => ({
+    id: 'test-defense',
+    goal: 'lethal',
+    decks: ['st01-luffy', 'st03-crocodile'],
+    seed: 21,
+    scenario: { turn: 7, active: 0, sides: [me, opp] },
+    ...(defense ? { defense } : {}),
+  });
+  const ids = (s: ReturnType<typeof buildChallenge>, uids: string[]) => uids.map((u) => s.cards[u].cardId);
+
+  it('com Eventos de Counter ligados, paga o Love-Love Mellow e põe os +4000 no Líder atacado', () => {
+    const me = { characters: [{ id: 'ST01-013', don: 1 }] };
+    const opp = { hand: ['ST03-017'], life: 2, donActive: 2 };
+    // 7000 contra 5000: sem Evento, acerta.
+    const off = lethal(opp, me);
+    let run = playMoves(buildChallenge(config, off), off, [{ attack: 'ST01-013', target: 'leader' }]);
+    expect(run.state.players[1].life).toHaveLength(1);
+    expect(ids(run.state, run.state.players[1].trash)).not.toContain('ST03-017');
+    // Ligado: segura, o Evento vai para o descarte e os 2 DON!! são pagos.
+    const on = lethal(opp, me, { eventCounters: true });
+    run = playMoves(buildChallenge(config, on), on, [{ attack: 'ST01-013', target: 'leader' }]);
+    expect(run.error).toBeUndefined();
+    expect(run.state.players[1].life).toHaveLength(2);
+    expect(ids(run.state, run.state.players[1].trash)).toContain('ST03-017');
+    expect(run.state.players[1].donActive).toBe(0);
+  });
+
+  it('sem DON!! para pagar, o Evento não entra', () => {
+    const spec = lethal({ hand: ['ST03-017'], life: 2, donActive: 1 }, { characters: [{ id: 'ST01-013', don: 1 }] }, { eventCounters: true });
+    const run = playMoves(buildChallenge(config, spec), spec, [{ attack: 'ST01-013', target: 'leader' }]);
+    expect(run.state.players[1].life).toHaveLength(1);
+  });
+
+  it('Evento só entra se o total segura o ataque, e o Counter de Personagem vem antes no empate', () => {
+    // 9000 contra 5000: falta 4001; Love-Love (+4000) sozinho não segura, com o Jinbe (1000) segura.
+    const spec = lethal({ hand: ['ST03-017', 'ST03-006'], life: 2, donActive: 2 }, { characters: [{ id: 'ST01-013', don: 3 }] }, { eventCounters: true });
+    const run = playMoves(buildChallenge(config, spec), spec, [{ attack: 'ST01-013', target: 'leader' }]);
+    expect(run.state.players[1].life).toHaveLength(2);
+    expect(ids(run.state, run.state.players[1].trash).sort()).toEqual(['ST03-006', 'ST03-017']);
+  });
+
+  it('com Trigger ligado, a Hancock da Vida entra em campo e bloqueia o ataque seguinte', () => {
+    const me = { characters: ['ST01-013'], leader: { don: 1 } };
+    const opp = { life: ['ST03-013'] };
+    const moves = [{ attack: 'ST01-013', target: 'leader' }, { attack: 'leader', target: 'leader' }] as const;
+    const off = lethal(opp, me);
+    expect(playMoves(buildChallenge(config, off), off, [...moves]).status).toBe('solved');
+    const on = lethal(opp, me, { triggers: true });
+    const run = playMoves(buildChallenge(config, on), on, [...moves]);
+    expect(run.status).toBe('playing');
+    expect(run.state.winner).toBeNull();
+    expect(ids(run.state, run.state.players[1].trash)).toContain('ST03-013');
+  });
+
+  it('Trigger de dano (Sables) devolve o atacante à mão de quem resolve', () => {
+    const spec = lethal({ life: ['ST03-002', 'ST03-015'] }, { characters: ['ST01-013', 'ST01-008'] }, { triggers: true });
+    const run = playMoves(buildChallenge(config, spec), spec, [{ attack: 'ST01-013', target: 'leader' }]);
+    expect(run.error).toBeUndefined();
+    expect(ids(run.state, run.state.players[0].hand)).toContain('ST01-013');
+    expect(ids(run.state, run.state.players[0].characters.map((c) => c.uid))).toEqual(['ST01-008']);
+  });
+});

@@ -1,7 +1,7 @@
 // Editor de desafios do dia (Administração): o rascunho da mesa, área por área, e a conversão para o `ChallengeSpec`
 // que o motor monta. Sem React: os testes chamam direto.
 
-import type { ChallengeGoal, ChallengeSpec, ScenarioCard, ScenarioSide, ScriptedAttack } from '@gumgum/engine';
+import type { ChallengeDefense, ChallengeGoal, ChallengeSpec, ScenarioCard, ScenarioSide, ScriptedAttack } from '@gumgum/engine';
 
 export interface FieldDraft {
   id: string;
@@ -36,6 +36,10 @@ export interface EditorDraft {
   note: string;
   sides: [SideDraft, SideDraft];
   attacks: ScriptedAttack[];
+  /** "Ache o letal": o que o oponente faz além de bloquear e usar o Counter dos Personagens. */
+  defense: Required<ChallengeDefense>;
+  /** Enunciado livre por idioma (`pt-BR` é a base). */
+  intro: Record<string, string>;
 }
 
 /** Áreas onde se põe uma carta do deck. */
@@ -60,7 +64,18 @@ const emptySide = (lifeCount: number): SideDraft => ({
 });
 
 export function emptyDraft(seed = Math.floor(Math.random() * 1_000_000)): EditorDraft {
-  return { goal: 'lethal', level: 1, turn: 7, seed, revealHand: true, note: '', sides: [emptySide(3), emptySide(1)], attacks: [] };
+  return {
+    goal: 'lethal',
+    level: 1,
+    turn: 7,
+    seed,
+    revealHand: true,
+    note: '',
+    sides: [emptySide(3), emptySide(1)],
+    attacks: [],
+    defense: { eventCounters: false, triggers: false },
+    intro: {},
+  };
 }
 
 /** Cópias de uma carta já postas em alguma área do lado. */
@@ -168,6 +183,10 @@ export function specOf(d: EditorDraft): Omit<ChallengeSpec, 'id'> | null {
     scenario: { turn: d.turn, active: d.goal === 'lethal' ? 0 : 1, sides: [sideSpec(a), sideSpec(b)] },
     ...(d.goal === 'survive' ? { attacks: d.attacks } : {}),
     ...(d.goal === 'lethal' && d.revealHand ? { revealHand: true } : {}),
+    ...(d.goal === 'lethal' && (d.defense.eventCounters || d.defense.triggers)
+      ? { defense: { ...(d.defense.eventCounters ? { eventCounters: true } : {}), ...(d.defense.triggers ? { triggers: true } : {}) } }
+      : {}),
+    ...(introOf(d.intro) ? { intro: introOf(d.intro)! } : {}),
   };
 }
 
@@ -201,6 +220,8 @@ export function draftFromSpec(spec: Omit<ChallengeSpec, 'id'>, note = ''): Edito
     note,
     sides: [sideFrom(spec.scenario.sides[0], spec.decks[0]), sideFrom(spec.scenario.sides[1], spec.decks[1])],
     attacks: (spec.attacks ?? []).map((a) => ({ ...a })),
+    defense: { eventCounters: Boolean(spec.defense?.eventCounters), triggers: Boolean(spec.defense?.triggers) },
+    intro: Object.fromEntries(Object.entries(spec.intro ?? {}).filter((e): e is [string, string] => typeof e[1] === 'string')),
   };
 }
 
@@ -217,9 +238,15 @@ export function forecastDays(start: string, count: number, pinnedDays: Iterable<
   return out;
 }
 
-/** O que muda a partida gravada (mesa, decks, semente, objetivo, roteiro): mudou, a solução gravada deixa de valer. */
+/** O enunciado sem os idiomas em branco (null = nenhum). */
+function introOf(intro: Record<string, string>): Record<string, string> | null {
+  const out = Object.fromEntries(Object.entries(intro).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()]));
+  return Object.keys(out).length ? out : null;
+}
+
+/** O que muda a partida gravada (mesa, decks, semente, objetivo, roteiro, defesa do oponente): mudou, a solução gravada deixa de valer. */
 export function boardKey(d: EditorDraft): string {
-  return JSON.stringify([d.goal, d.turn, d.seed, d.sides, d.goal === 'survive' ? d.attacks : []]);
+  return JSON.stringify([d.goal, d.turn, d.seed, d.sides, d.goal === 'survive' ? d.attacks : [], d.goal === 'lethal' ? d.defense : null]);
 }
 
 /** O que ainda impede de ir para a mesa (chaves do dicionário), antes de o motor montar. */

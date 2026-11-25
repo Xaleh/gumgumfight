@@ -42,9 +42,18 @@ navegador de quem joga; a mesa de quem joga continua sendo só a visão dele (`v
 - "Despublicar o de amanhã" virou soltar a data fixa: o dia só é publicado quando alguém o abre, então o de amanhã é
   sempre o primeiro da fila ou o fixado, e os dois se mudam pela fila.
 
-### Fase 3 — Defensor configurável
+### Fase 3 — Defensor configurável ✅
 
-- O defensor de hoje só usa o Counter dos Personagens da mão. Com decks atuais pesam também os Eventos de Counter
-  (pagando DON!!), os Blockers com efeito e o [Trigger]. Cada desafio escolhe o que o defensor pode fazer (Eventos de
-  Counter, ativar Trigger, ou respostas fixas), sempre determinístico e dito no enunciado.
-- Texto livre do enunciado por desafio, nos seis idiomas quando houver tradução.
+- `ChallengeSpec.defense` (só no "ache o letal"): `eventCounters` (o oponente usa os Eventos [Counter] que dão poder,
+  pagando DON!!) e `triggers` (ativa o [Trigger] da Vida). Com eles, as escolhas dos efeitos do oponente seguem regras
+  fixas (`effectChoice`: ajuda na carta atacada, dano no atacante, descarte mínimo, custo opcional pago), sempre
+  determinísticas. Desafio sem `defense` joga como antes.
+- O painel do desafio lista como o oponente se defende; a mão aberta no enunciado aparece de frente na mesa (as cartas
+  que ele compra depois continuam de verso). Antes, a mesa sempre mostrava a mão do oponente de verso.
+- `ChallengeSpec.intro`: enunciado livre por idioma (`pt-BR` é a base; sem tradução, aparece o português), escrito no
+  editor.
+- Novo desafio no catálogo, `mellow`: o oponente tem o Love-Love Mellow na mão aberta e 2 DON!!; é preciso gastar o
+  Evento com um ataque fraco (sem a defesa nova, a linha errada resolveria).
+- Ficaram de fora: Eventos de Counter que não dão poder (devolver, K.O., impedir bloqueio), que o defensor ignora, e
+  "respostas fixas" escritas à mão por desafio; com os dois interruptores e as regras de escolha, os desafios com decks
+  atuais já ficam conferíveis.

@@ -8,8 +8,7 @@ const daily = {
   'daily.level2': 'Medium',
   'daily.level3': 'Hard',
   'daily.goal.lethal.title': 'Find lethal this turn',
-  'daily.goal.lethal.body':
-    "It's your turn. Defeat your opponent before you end it.\nThey defend like this: they block and use the Counter of Characters in hand only when that stops an attack on their Leader, and they never activate [Trigger].",
+  'daily.goal.lethal.body': "It's your turn. Defeat your opponent before you end it.",
   'daily.goal.survive.title': 'Survive this turn',
   'daily.goal.survive.body': "It's your opponent's turn. Make it to your turn alive by choosing what to block and which Counters to use. They attack in this order, then end their turn:",
   'daily.attack': '{attacker} attacks {target}',
@@ -146,6 +145,20 @@ const daily = {
   'errors.pinPublished': "That day already has a published challenge.",
   'errors.pinTaken': "Another challenge is already set for that day.",
   'errors.badOrder': "Invalid order.",
+  'daily.defense.title': "How your opponent defends:",
+  'daily.defense.block': "Blocks only an attack that would hit their Leader.",
+  'daily.defense.characters': "Uses the Counter of Characters in hand only when that stops the attack on their Leader.",
+  'daily.defense.events': "Also uses power-giving [Counter] Events, paying with active DON!!.",
+  'daily.defense.noEvents': "Does not use [Counter] Events.",
+  'daily.defense.triggers': "Activates the [Trigger] of cards taken from Life (in the effect, help goes to the attacked card and harm to the attacker).",
+  'daily.defense.noTriggers': "Never activates [Trigger].",
+  'daily.admin.defense': "Opponent's defense",
+  'daily.admin.defenseHint': "Besides blocking and using Character Counters. In their effect choices: help goes to the attacked card, harm to the attacker, discard only the minimum, and optional costs are paid.",
+  'daily.admin.eventCounters': "Uses power-giving [Counter] Events (paying DON!!)",
+  'daily.admin.triggers': "Activates Life [Trigger]s",
+  'daily.admin.intro': "Puzzle text (shown to players)",
+  'daily.admin.introPlaceholder': "E.g.: Xebec just took your Life down. Find the way to their Leader.",
+  'daily.admin.introTranslations': "Puzzle text translations (without one, Portuguese is shown)",
 };
 
 export default daily;

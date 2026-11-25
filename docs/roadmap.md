@@ -96,7 +96,7 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   sequência dele e pode compartilhar o resultado sem entregar a resposta.
   *Feito em:* 25/11/2026, [PR #225](https://github.com/Xaleh/gumgumfight/pull/225)
 
-- [ ] **B4.1. Editor de desafios do dia** 🧱
+- [x] **B4.1. Editor de desafios do dia** 🧱
   Tela na Administração para montar os desafios do dia com os decks atuais (Líderes do OP18, o Xebec do meta), sem
   escrever código: escolher os decks, montar a mesa área por área, gravar a solução jogando na mesa e publicar na fila.
   Os desafios passam a ficar no banco, montados e conferidos com as cartas de produção.
@@ -105,8 +105,10 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   *Plano:* [`plano-editor-desafios.md`](plano-editor-desafios.md) (3 fases).
   *Progresso:* fase 1 de 3 (desafios no banco e o editor com a solução gravada jogando) em 2026-11-25,
   [PR #227](https://github.com/Xaleh/gumgumfight/pull/227); fase 2 de 3 (fila com datas fixas e ordem manual, números
-  por dia, editar e duplicar) em 2026-11-25, [PR #228](https://github.com/Xaleh/gumgumfight/pull/228).
-  *Feito em:* —
+  por dia, editar e duplicar) em 2026-11-25, [PR #228](https://github.com/Xaleh/gumgumfight/pull/228); fase 3 de 3
+  (defensor com Eventos de Counter e [Trigger], enunciado livre) em 2026-11-25,
+  [PR #229](https://github.com/Xaleh/gumgumfight/pull/229).
+  *Feito em:* 25/11/2026, [PR #229](https://github.com/Xaleh/gumgumfight/pull/229)
 
 - [x] **B5. Sandbox de regras**
   Mesa livre para montar uma situação (cartas em campo, na mão, DON!!, Vida) e testar a interação de duas cartas, sem

@@ -511,7 +511,7 @@ export function Hand({
             // A carta erguida deixa uma faixa do próprio lugar a descoberto (`::after` no CSS): o clique ali é nela.
             onClick={slots ? (e) => e.target === e.currentTarget && h.onCard(uid) : undefined}
           >
-            {reveal ? (
+            {reveal && !uid.startsWith(HIDDEN_REF) ? (
               <CardView
                 state={state}
                 uid={uid}

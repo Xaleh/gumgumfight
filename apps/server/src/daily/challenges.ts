@@ -58,6 +58,8 @@ export function publishedDays(db: DB): Map<string, string[]> {
 // ------------------------------------------------------------------ o que vem do editor
 
 const CARD_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{1,23}$/;
+/** Idiomas da interface (o enunciado livre de cada desafio). */
+export const INTRO_LOCALES = ['pt-BR', 'en', 'es', 'fr', 'de', 'ja'];
 const isInt = (v: unknown, min: number, max: number): v is number => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
 const optBool = (v: unknown) => v === undefined || typeof v === 'boolean';
 
@@ -148,7 +150,30 @@ export function parseSpec(input: unknown): Omit<ChallengeSpec, 'id'> {
     );
     attacks = (b.attacks as Array<{ attacker: string; target: string }>).map(({ attacker, target }) => ({ attacker, target }));
   }
+  // Defesa do oponente: só no letal (no "sobreviva" ele ataca pelo roteiro).
+  let defense: ChallengeSpec['defense'];
+  if (b.defense !== undefined && b.defense !== null) {
+    const d = b.defense as Record<string, unknown>;
+    need(typeof d === 'object' && optBool(d.eventCounters) && optBool(d.triggers), 'defesa do oponente');
+    if (b.goal === 'lethal' && (d.eventCounters || d.triggers)) {
+      defense = { ...(d.eventCounters ? { eventCounters: true } : {}), ...(d.triggers ? { triggers: true } : {}) };
+    }
+  }
+  // Enunciado livre: por idioma da interface, até 400 caracteres cada.
+  let intro: ChallengeSpec['intro'];
+  if (b.intro !== undefined && b.intro !== null) {
+    const i = b.intro as Record<string, unknown>;
+    need(typeof i === 'object' && !Array.isArray(i), 'enunciado');
+    const out: Record<string, string> = {};
+    for (const [lang, text] of Object.entries(i)) {
+      need(INTRO_LOCALES.includes(lang) && typeof text === 'string' && text.length <= 400, 'enunciado');
+      if ((text as string).trim()) out[lang] = (text as string).trim();
+    }
+    if (Object.keys(out).length) intro = out;
+  }
   return {
+    ...(defense ? { defense } : {}),
+    ...(intro ? { intro } : {}),
     goal: b.goal as ChallengeSpec['goal'],
     level: (b.level ?? 1) as 1 | 2 | 3,
     decks: b.decks as [string, string],

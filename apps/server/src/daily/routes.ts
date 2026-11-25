@@ -136,6 +136,10 @@ export function registerDailyRoutes(app: FastifyInstance, { db, viewerHash, user
     level: c.level ?? 1,
     revealHand: Boolean(c.revealHand),
     attacks: c.goal === 'survive' ? (c.attacks ?? []) : [],
+    /** O que o oponente faz na defesa além do padrão (bloqueio e Counter dos Personagens). */
+    defense: { eventCounters: Boolean(c.defense?.eventCounters), triggers: Boolean(c.defense?.triggers) },
+    /** Enunciado livre por idioma (o navegador usa o do idioma escolhido, senão o pt-BR). */
+    intro: c.intro ?? null,
   });
 
   const ownerSummary = (owner: string | null, day: string, today: string) =>

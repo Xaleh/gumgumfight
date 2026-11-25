@@ -8,8 +8,7 @@ const daily = {
   'daily.level2': 'Moyen',
   'daily.level3': 'Difficile',
   'daily.goal.lethal.title': 'Trouvez le létal ce tour-ci',
-  'daily.goal.lethal.body':
-    "C'est votre tour. Battez l'adversaire avant de finir votre tour.\nIl se défend ainsi : il bloque et utilise le Counter des Personnages de sa main seulement si cela arrête une attaque sur son Leader, et il n'active jamais de [Trigger].",
+  'daily.goal.lethal.body': "C'est votre tour. Battez l'adversaire avant de finir votre tour.",
   'daily.goal.survive.title': 'Survivez à ce tour',
   'daily.goal.survive.body': "C'est le tour de l'adversaire. Arrivez vivant à votre tour en choisissant quoi bloquer et quels Counters utiliser. Il attaque dans cet ordre, puis finit son tour :",
   'daily.attack': '{attacker} attaque {target}',
@@ -146,6 +145,20 @@ const daily = {
   'errors.pinPublished': "Ce jour a déjà un défi publié.",
   'errors.pinTaken': "Un autre défi est déjà fixé ce jour-là.",
   'errors.badOrder': "Ordre invalide.",
+  'daily.defense.title': "Comment l'adversaire se défend :",
+  'daily.defense.block': "Bloque seulement une attaque qui toucherait son Leader.",
+  'daily.defense.characters': "Utilise le Counter des Personnages en main seulement si cela arrête l'attaque sur son Leader.",
+  'daily.defense.events': "Utilise aussi les Événements [Counter] qui donnent de la puissance, en payant avec les DON!! actifs.",
+  'daily.defense.noEvents': "N'utilise pas d'Événements [Counter].",
+  'daily.defense.triggers': "Active le [Trigger] des cartes qui quittent la Vie (dans l'effet, l'aide va à la carte attaquée et le dommage à l'attaquant).",
+  'daily.defense.noTriggers': "N'active jamais de [Trigger].",
+  'daily.admin.defense': "Défense de l'adversaire",
+  'daily.admin.defenseHint': "En plus de bloquer et d'utiliser le Counter des Personnages. Dans ses choix d'effet : l'aide va à la carte attaquée, le dommage à l'attaquant, il défausse le minimum et paie les coûts facultatifs.",
+  'daily.admin.eventCounters': "Utilise les Événements [Counter] qui donnent de la puissance (en payant les DON!!)",
+  'daily.admin.triggers': "Active les [Trigger] de la Vie",
+  'daily.admin.intro': "Énoncé (visible par les joueurs)",
+  'daily.admin.introPlaceholder': "Ex. : Xebec vient de faire tomber votre Vie. Trouvez le chemin jusqu'à son Leader.",
+  'daily.admin.introTranslations': "Traductions de l'énoncé (sans traduction, le portugais s'affiche)",
 };
 
 export default daily;

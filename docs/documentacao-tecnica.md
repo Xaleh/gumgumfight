@@ -285,8 +285,14 @@ recompensa, e a pessoa vê as duas mãos de propósito (joga os dois lados).
 `ChallengeSpec` descreve um desafio: o objetivo (`lethal`: o jogador 0 vence antes de passar a vez; `survive`: chega
 vivo ao próprio turno), os decks, a semente, a mesa (`ScenarioSpec` de `scenario.ts`) e, no `survive`, o roteiro de
 ataques do oponente. O oponente não sorteia nem usa o bot: na defesa, bloqueia e usa o Counter dos Personagens da mão
-(do maior para o menor) só quando isso segura um ataque ao Líder dele, e nunca ativa [Trigger]; no ataque, faz o primeiro
-ataque do roteiro que ainda é legal e então passa a vez. Assim a mesma lista de jogadas sempre dá o mesmo resultado.
+(do maior para o menor) só quando isso segura um ataque ao Líder dele; no ataque, faz o primeiro ataque do roteiro que
+ainda é legal e então passa a vez. `defense` liga mais duas coisas no letal: `eventCounters` (os Eventos [Counter] que
+dão poder, pelo valor de `eventCounterPower`, pagando os DON!! ativos; no empate, Personagem antes de Evento) e
+`triggers` (ativa o [Trigger] das cartas de Vida). Com uma delas ligada, as escolhas dos efeitos do oponente seguem
+`effectChoice`: alvo de ajuda é a carta atacada (senão o Líder), alvo de dano é o atacante (senão o Personagem mais
+forte de quem resolve), descarte só o mínimo, custo opcional pago, a primeira opção nas opções. Uma jogada do oponente
+que o motor recusar vira a resposta passiva. Assim a mesma lista de jogadas sempre dá o mesmo resultado. `intro` (o
+enunciado livre por idioma) o motor não lê.
 `runChallenge(início, spec, ações, traduzir)` aplica as jogadas do jogador (só as de jogo: nada de ferramentas manuais
 ou desistência), com as do oponente entre elas, e para no fim do desafio ou na primeira jogada recusada.
 `resolveMove`/`playMoves` jogam uma solução escrita por número de carta (usadas nos testes do catálogo).
@@ -2051,7 +2057,7 @@ Quem chama, na coluna da direita:
 | POST | `/api/draft/pods/:id/leave` | Sai do pod (no meio do draft, o lugar passa a escolher sozinho) | Quem está no pod |
 | GET | `/api/tutorial/progress` · PUT | Progresso do tutorial (`{ done, dismissed, completed, reset? }`) | Navegador |
 | POST | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event }`) | Pública |
-| GET | `/api/daily[?brief=1]` | Desafio do dia: número, enunciado (objetivo, nível, roteiro de ataques, mão revelada), a mesa como o jogador a vê (sem `brief`), quantos resolveram, e o resultado, a sequência e os últimos 7 dias de quem pede. Publica o dia na primeira consulta | Pública (com o código do navegador, o resultado de quem pede) |
+| GET | `/api/daily[?brief=1]` | Desafio do dia: número, enunciado (objetivo, nível, roteiro de ataques, mão revelada, defesa do oponente e texto livre por idioma), a mesa como o jogador a vê (sem `brief`), quantos resolveram, e o resultado, a sequência e os últimos 7 dias de quem pede. Publica o dia na primeira consulta | Pública (com o código do navegador, o resultado de quem pede) |
 | POST | `/api/daily/play` | Tentativa (`{ day, actions }`, as jogadas sobre a visão): o servidor refaz o desafio, joga pelo oponente e devolve `status` (`playing/solved/failed`), a nova visão, o resultado e a sequência. Vale hoje e ontem; grava a tentativa quando ela termina | Navegador |
 | GET | `/api/admin/daily` | A fila: dias publicados (com quantos jogaram e resolveram) e os próximos do catálogo | Admin |
 | GET | `/api/admin/daily/challenges` | Todos os desafios (catálogo e Administração, sem as soluções), com a posição na fila, a data fixa, os Líderes e os dias em que saíram; a fila automática, as datas fixas por vir e os últimos 30 dias publicados com os números (abriram, tentaram, resolveram, média de tentativas) | Admin |

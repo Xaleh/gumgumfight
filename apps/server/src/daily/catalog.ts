@@ -155,4 +155,31 @@ export const DAILY_CATALOG: CatalogChallenge[] = [
     solution: [{ play: 'ST01-016' }, { choose: ['leader'] }, { don: 'leader', n: 2 }, { attack: 'leader', target: 'leader' }],
     wrong: [{ play: 'ST01-004' }, { don: 'leader' }, { attack: 'leader', target: 'leader' }, 'end'],
   },
+  {
+    // Evento de Counter na mão aberta: o oponente paga o Love-Love Mellow (+4000) no primeiro ataque que acertaria.
+    // Gaste o Evento com um ataque fraco e guarde a força para os dois golpes que faltam.
+    id: 'mellow',
+    goal: 'lethal',
+    level: 2,
+    decks: LUFFY_X_CROCODILE,
+    seed: 107,
+    revealHand: true,
+    defense: { eventCounters: true },
+    scenario: {
+      turn: 9,
+      active: 0,
+      sides: [
+        { characters: ['ST01-013', 'ST01-003'], donActive: 3, life: 2, deckTop: ['ST01-004'] },
+        { hand: ['ST03-017'], life: ['ST03-003'], deckTop: ['ST03-009'], donActive: 2, donRested: 6 },
+      ],
+    },
+    solution: [
+      { don: 'ST01-003', n: 2 },
+      { attack: 'ST01-003', target: 'leader' },
+      { don: 'leader' },
+      { attack: 'leader', target: 'leader' },
+      { attack: 'ST01-013', target: 'leader' },
+    ],
+    wrong: [{ don: 'ST01-013' }, { attack: 'ST01-013', target: 'leader' }, { don: 'leader', n: 2 }, { attack: 'leader', target: 'leader' }, { attack: 'ST01-003', target: 'leader' }, 'end'],
+  },
 ];
