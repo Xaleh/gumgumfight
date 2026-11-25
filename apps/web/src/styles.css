@@ -19974,6 +19974,7 @@ div.dk-tile-main {
   outline: 2px solid var(--brand-yellow);
   outline-offset: 2px;
   border-radius: 4px;
+}
 /* ---------- Perfil público do jogador (PublicProfile.tsx) ---------- */
 .public-profile .coverage-body {
   display: flex;
