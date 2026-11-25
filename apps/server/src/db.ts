@@ -140,6 +140,7 @@ function migrate(db: DB) {
   migrateStats(db);
   migrateAuth(db);
   migratePush(db);
+  migrateFriends(db);
   migrateTournaments(db);
   migrateCardIds(db);
   migrateSupport(db);
@@ -1029,6 +1030,36 @@ function migratePush(db: DB) {
       name  TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+  `);
+  // Avisos dos amigos (pedido de amizade, aceite e convite para partida).
+  const pushCols = (db.prepare('PRAGMA table_info(push_subscriptions)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!pushCols.includes('friends')) db.exec('ALTER TABLE push_subscriptions ADD COLUMN friends INTEGER NOT NULL DEFAULT 1');
+}
+
+/**
+ * Amigos (`friends/`): o código de amigo de cada conta (criado na primeira vez que a pessoa
+ * abre a lista) e as amizades. Uma linha por par de contas, com a menor id em `user_low`:
+ * `pending` enquanto quem não pediu não aceita, `accepted` depois. Recusar ou remover apaga a linha.
+ */
+function migrateFriends(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS friend_codes (
+      user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      code       TEXT NOT NULL UNIQUE,         -- 8 letras do alfabeto das salas, para adicionar
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS friendships (
+      user_low     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_high    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      requested_by TEXT NOT NULL,                 -- quem pediu (user_low ou user_high)
+      status       TEXT NOT NULL DEFAULT 'pending', -- pending | accepted
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      accepted_at  TEXT,
+      PRIMARY KEY (user_low, user_high),
+      CHECK (user_low < user_high)
+    );
+    CREATE INDEX IF NOT EXISTS friendships_high ON friendships(user_high);
   `);
 }
 

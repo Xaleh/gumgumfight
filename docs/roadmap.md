@@ -168,12 +168,12 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   *Pronto quando:* o perfil abre por link, mostra só o que é público e o jogador escolhe o que aparece.
   *Feito em:* 2026-11-25 — [PR #221](https://github.com/Xaleh/gumgumfight/pull/221)
 
-- [ ] **E2. Amigos e convite direto**
+- [x] **E2. Amigos e convite direto**
   Lista de amigos com quem está online e convite para partida por notificação push (a infraestrutura de push já existe
   em `apps/server/src/push/`).
   *Pronto quando:* dá para adicionar, aceitar e remover amigos, ver quem está online e convidar com um toque. O
   convite abre a sala direto.
-  *Feito em:* —
+  *Feito em:* 25/11/2026 · [PR #223](https://github.com/Xaleh/gumgumfight/pull/223)
 
 - [ ] **E3. Temporadas da ranqueada**
   Ranking geral por temporada, reset parcial do bounty e recompensas cosméticas no fim.

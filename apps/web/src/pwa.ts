@@ -173,6 +173,7 @@ export interface PushPrefs {
   locale: string;
   matches: boolean;
   tournaments: boolean;
+  friends: boolean;
 }
 
 const keyBytes = (b64: string) => Uint8Array.from(atob(b64.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
@@ -235,5 +236,5 @@ export function usePushSync(opts: { serverKey: string | null; enabled: boolean; 
     }
     syncPush(serverKey, prefs).catch(() => undefined);
     // `prefs` e `onRevoked` mudam de identidade a cada render: valem os campos.
-  }, [serverKey, enabled, prefs.locale, prefs.matches, prefs.tournaments, userId]);
+  }, [serverKey, enabled, prefs.locale, prefs.matches, prefs.tournaments, prefs.friends, userId]);
 }

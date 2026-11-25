@@ -477,6 +477,34 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
   return (res.status === 204 ? undefined : res.json()) as Promise<T>;
 }
 
+/** Status de um amigo: jogando uma partida, com o app aberto (menu, sala de espera, fila) ou fora. */
+export type FriendPresence = 'playing' | 'online' | 'offline';
+
+export interface FriendPerson {
+  id: string;
+  /** Nome público (o apelido do jogador, nunca o da conta Google). */
+  name: string;
+  bounty: number;
+}
+
+export interface FriendInvite {
+  from: { id: string; name: string };
+  /** Código da sala privada (o convite entra direto nela). */
+  code: string;
+  format: string;
+  at: string;
+}
+
+export interface FriendList {
+  /** Meu código de amigo (8 letras) e o teto de amigos. */
+  code: string;
+  max: number;
+  friends: Array<FriendPerson & { status: FriendPresence; since: string | null }>;
+  incoming: Array<FriendPerson & { at: string }>;
+  outgoing: Array<FriendPerson & { at: string }>;
+  invites: FriendInvite[];
+}
+
 /**
  * player: joga e assiste sem ver as mãos; streamer: assiste vendo as mãos;
  * organizer: cria e gerencia torneios; admin: tudo isso e muda os perfis;
@@ -676,9 +704,21 @@ export const api = {
   config: () => get<AppConfig>('/api/config'),
   push: {
     /** Grava a inscrição deste navegador nas notificações, com o idioma e os avisos escolhidos. */
-    save: (subscription: PushSubscriptionJSON, prefs: { locale: string; matches: boolean; tournaments: boolean }) =>
+    save: (subscription: PushSubscriptionJSON, prefs: { locale: string; matches: boolean; tournaments: boolean; friends: boolean }) =>
       send<void>('PUT', '/api/push/subscription', { subscription, ...prefs }),
     remove: (endpoint: string) => send<void>('DELETE', '/api/push/subscription', { endpoint }),
+  },
+  /** Amigos (só com login): código de amigo, pedidos, status online e convites para partida. */
+  friends: {
+    /** A lista também conta esta conta como online para os amigos. */
+    list: () => get<FriendList>('/api/friends'),
+    request: (code: string) => send<{ id: string; name: string; status: 'pending' | 'accepted' }>('POST', '/api/friends/requests', { code }),
+    accept: (id: string) => send<{ id: string; status: 'accepted' }>('POST', `/api/friends/${encodeURIComponent(id)}/accept`),
+    /** Recusar um pedido, cancelar o que enviei ou desfazer a amizade. */
+    remove: (id: string) => send<void>('DELETE', `/api/friends/${encodeURIComponent(id)}`),
+    /** Avisa o amigo (push e tela inicial) da sala privada que acabei de criar. */
+    invite: (id: string, seat: OnlineSeat) => send<{ ok: true }>('POST', `/api/friends/${encodeURIComponent(id)}/invite`, seat),
+    declineInvite: (code: string) => send<void>('DELETE', `/api/friends/invites/${encodeURIComponent(code)}`),
   },
   me: () => get<{ user: User | null }>('/api/auth/me'),
   /** Troca o ID token do botão do Google por uma sessão (cookie). */

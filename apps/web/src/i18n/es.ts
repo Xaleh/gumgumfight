@@ -10,6 +10,7 @@ import chamber from './chamber/es';
 import profile from './profile/es';
 import sealed from './sealed/es';
 import yonko from './yonko/es';
+import friends from './friends/es';
 import daily from './daily/es';
 import analysis from './analysis/es';
 
@@ -3143,6 +3144,8 @@ export default {
   ...profile,
   ...sealed,
   ...yonko,
+  // ==== amigos e convite direto (i18n/friends) ====
+  ...friends,
   ...daily,
   ...analysis,
 } satisfies Messages;

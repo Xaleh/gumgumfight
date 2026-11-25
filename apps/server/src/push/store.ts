@@ -4,7 +4,7 @@ import type { DB } from '../db';
 import { generateVapidKeys, type PushTarget, type VapidKeys } from './webpush';
 
 /** Tipos de aviso que a pessoa pode ligar ou desligar. */
-export type PushCategory = 'matches' | 'tournaments';
+export type PushCategory = 'matches' | 'tournaments' | 'friends';
 
 export interface PushSubscriptionRow extends PushTarget {
   ownerHash: string;
@@ -12,6 +12,8 @@ export interface PushSubscriptionRow extends PushTarget {
   locale: string;
   matches: boolean;
   tournaments: boolean;
+  /** Amigos: pedido de amizade, aceite e convite para partida. */
+  friends: boolean;
 }
 
 type Row = {
@@ -23,6 +25,7 @@ type Row = {
   locale: string;
   matches: number;
   tournaments: number;
+  friends: number;
 };
 
 const toSub = (r: Row): PushSubscriptionRow => ({
@@ -34,17 +37,18 @@ const toSub = (r: Row): PushSubscriptionRow => ({
   locale: r.locale,
   matches: Boolean(r.matches),
   tournaments: Boolean(r.tournaments),
+  friends: Boolean(r.friends),
 });
 
 /** Grava (ou atualiza) a inscrição de um navegador: dono, conta, idioma e avisos escolhidos. */
 export function savePushSubscription(db: DB, s: PushSubscriptionRow) {
   db.prepare(
-    `INSERT INTO push_subscriptions (endpoint, p256dh, auth, owner_hash, user_id, locale, matches, tournaments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO push_subscriptions (endpoint, p256dh, auth, owner_hash, user_id, locale, matches, tournaments, friends)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, owner_hash = excluded.owner_hash,
-       user_id = excluded.user_id, locale = excluded.locale, matches = excluded.matches, tournaments = excluded.tournaments,
+       user_id = excluded.user_id, locale = excluded.locale, matches = excluded.matches, tournaments = excluded.tournaments, friends = excluded.friends,
        updated_at = datetime('now')`,
-  ).run(s.endpoint, s.p256dh, s.auth, s.ownerHash, s.userId, s.locale, s.matches ? 1 : 0, s.tournaments ? 1 : 0);
+  ).run(s.endpoint, s.p256dh, s.auth, s.ownerHash, s.userId, s.locale, s.matches ? 1 : 0, s.tournaments ? 1 : 0, s.friends ? 1 : 0);
 }
 
 export function deletePushSubscription(db: DB, endpoint: string) {

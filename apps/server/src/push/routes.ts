@@ -1,7 +1,7 @@
 // Notificações: o navegador se inscreve (PUT /api/push/subscription) quando a pessoa liga
 // os avisos nas configurações e se descadastra (DELETE) quando desliga. Os avisos saem
-// das salas online (oponente chegou, sua vez) e dos torneios (check-in, rodada nova,
-// oponente esperando na sala); `Notifier` é o que essas partes chamam.
+// das salas online (oponente chegou, sua vez), dos torneios (check-in, rodada nova,
+// oponente esperando na sala) e dos amigos (pedido, aceite, convite para partida); `Notifier` é o que essas partes chamam.
 //
 // O service worker do app não mostra o aviso quando o app está aberto na tela: a
 // notificação só aparece para quem está com o app em segundo plano ou fechado.
@@ -64,6 +64,7 @@ type SubscriptionBody = {
   locale?: unknown;
   matches?: unknown;
   tournaments?: unknown;
+  friends?: unknown;
 };
 
 export function registerPushRoutes(app: FastifyInstance, { db, browserHash, user, keys, subject, send, log = () => undefined }: Deps): Notifier {
@@ -85,6 +86,7 @@ export function registerPushRoutes(app: FastifyInstance, { db, browserHash, user
       locale: pushLocale(req.body?.locale),
       matches: req.body?.matches !== false,
       tournaments: req.body?.tournaments !== false,
+      friends: req.body?.friends !== false,
     });
     return reply.code(204).send();
   });
