@@ -2,6 +2,7 @@
 //
 //   npx tsx scripts/vs-human.ts [partidas=100] [nível=hard] ['<pesos do bot (json parcial)>']
 //   HUMAN=careful npx tsx scripts/vs-human.ts 100 hard     # o humano usa Counter sempre com Vida baixa
+//   GUESS=1 npx tsx scripts/vs-human.ts 100 hard   # o bot deduz a mão do humano pelo deck pronto do Líder dele (D2)
 //   saída: "<vitórias do bot> <vitórias do humano>"
 //
 // Mede o que o auto-jogo não mede: o bot contra quem defende como gente (segura o ataque fatal sempre,
@@ -19,6 +20,7 @@ import {
   chooseBotAction,
   createGame,
   type DeckList,
+  deckGuessFrom,
   type GameState,
   identityAliases,
   type PlayerId,
@@ -32,6 +34,8 @@ const load = (p: string) => JSON.parse(readFileSync(join(DATA, p), 'utf8'));
 const cards: CardData[] = readdirSync(join(DATA, 'cards'))
   .filter((f) => f.endsWith('.json'))
   .flatMap((f) => load(`cards/${f}`).cards as CardData[]);
+const byId = new Map(cards.map((c) => [c.id, c]));
+const guess = process.env.GUESS === '1';
 const DECKS = readdirSync(join(DATA, 'decks')).filter((f) => f.endsWith('.json'));
 
 const [gamesArg = '100', level = 'hard', wn = '{}'] = process.argv.slice(2);
@@ -63,7 +67,9 @@ for (let g = 0; g < games; g += 2) {
     for (let i = 0; i < 3000 && s.phase !== 'gameover'; i++) {
       const p = actingPlayer(s)!;
       const view = viewFor(s, p, aliases);
-      const a = p === seatBot ? chooseBotAction(view, p, level as BotLevel, { weights, timeBudgetMs: 1e9 }) : humanAction(view, p);
+      const human = decks[1 - seatBot];
+      const handGuess = guess ? { handGuess: deckGuessFrom(human.leader, human.cards, byId, 'deck') } : {};
+      const a = p === seatBot ? chooseBotAction(view, p, level as BotLevel, { weights, timeBudgetMs: 1e9, ...handGuess }) : humanAction(view, p);
       const action = actionFromView(s, aliases, a);
       if (typeof action === 'string') throw new Error(action);
       s = applyAction(s, action);

@@ -5,6 +5,7 @@ import {
   type BotLevel,
   type BotPersonality,
   type CardEngineText,
+  type DeckGuess,
   type DeckProfile,
   createGame,
   createSandbox,
@@ -42,6 +43,8 @@ export interface GameSetup {
   botPersonality?: BotPersonality;
   /** Bot do Time no navegador: o perfil do deck que o bot joga (pesos, papéis das cartas, mulligan). */
   botProfile?: DeckProfile;
+  /** O deck provável do Líder de quem joga contra o bot: o bot deduz a mão dele por aqui, sem ler a mão real. */
+  botHandGuess?: DeckGuess;
   /** Replay: começa pausado (passo a passo) ou rodando, e em que velocidade; `at`: já na posição `at` do roteiro. */
   replayStart?: { paused: boolean; speed: number; at?: number };
   /** Aviso mostrado na mesa ao começar (ex.: a transmissão não abriu e o treino roda no navegador). */
@@ -246,6 +249,7 @@ export function useGame(setup: GameSetup) {
       level: setup.botLevel ?? 'hard',
       ...(isBot && setup.botPersonality ? { personality: setup.botPersonality } : {}),
       ...(isBot && setup.botProfile ? { profile: setup.botProfile } : {}),
+      ...(isBot && setup.botHandGuess ? { handGuess: setup.botHandGuess } : {}),
       explain: isBot && setup.botLevel === 'team',
     });
     let live = true;

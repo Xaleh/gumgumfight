@@ -61,6 +61,7 @@ import { registerReportRoutes } from './reports/routes';
 import { registerProfileRoutes } from './profiles/routes';
 import { type Complete, sdkCompleter } from './team/agent';
 import { MetaProfiles } from './team/profiles';
+import { HandGuesses } from './stats/handguess';
 import { ChamberPresets } from './tournaments/chamber';
 
 import { registerTeamRoutes } from './team/routes';
@@ -465,6 +466,14 @@ export function buildApp(
   });
   // Bot do Time: os decks do meta com guia e perfil (data/decks/meta, e o que a tela salvou no banco).
   const metaProfiles = new MetaProfiles(undefined, db);
+  // D2: o deck provável de cada Líder, para o bot deduzir a mão do oponente (stats/handguess.ts).
+  const handGuesses = new HandGuesses(db, opts.now ?? Date.now);
+  /**
+   * O deck provável de um Líder para o bot do navegador (o treino contra o bot roda na página). Sem as partidas de
+   * quem pede: é o deck que o meta joga com o Líder, nunca a lista da própria pessoa. É o que as estatísticas
+   * "Por Líder" já mostram em público.
+   */
+  app.get<{ Querystring: { leader?: string } }>('/api/bot/hand-guess', async (req) => ({ guess: handGuesses.forLeader(req.query.leader ?? null, viewerHash(req)) }));
   // O agente fora da partida: só com a chave (BOT_AGENT_API_KEY); os testes passam um `complete` falso.
   const agentComplete = opts.agentComplete ?? (server.botAgent ? sdkCompleter(server.botAgent) : null);
   const lobby = registerOnlineRoutes(app, {
@@ -481,6 +490,7 @@ export function buildApp(
     onMatch: (id) => webhooks.matchFinished(id),
     notifier,
     botProfile: (deckId, leader) => metaProfiles.profileFor(deckId, leader)?.profile,
+    botHandGuess: (leader, ownerHash) => handGuesses.forLeader(leader, ownerHash),
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);

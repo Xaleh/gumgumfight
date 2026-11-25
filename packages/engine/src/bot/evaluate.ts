@@ -22,6 +22,7 @@
 import { cardDef, counterValue, getPower, hasKeyword, opponent, playCost } from '../engine';
 import { HIDDEN_CARD } from '../view';
 import type { Ability, AbilityCost, CardDef, EffectStep, GameState, PlayerId, PlayerState } from '../types';
+import type { HandModel } from './handguess';
 import { type CardRole, type HoldRule, holding, type PlanStep } from './profile';
 
 export interface Weights {
@@ -128,6 +129,17 @@ export interface Weights {
   counterWill: number;
   counterStack: number;
   /**
+   * A mão provável do oponente (`handguess.ts`, com o deck provável do Líder dele): `guessHold` é a vantagem das
+   * cartas com Counter (razão de chances) sobre a composição do deck — quem joga guarda os Counters e gasta as
+   * outras cartas. 1,45 levaria os 64% de cartas com Counter dos decks prontos aos 72% do modelo fixo
+   * (`counterCard`); no auto-jogo, 1 (a composição pura, mais otimista para o atacante) saiu um pouco melhor
+   * (docs/bot-tempo.md, seção 13).
+   * `guessRush`: um [Rush] que cabe no DON!! dele entra na ameaça do próximo ataque como mais um atacante quando a
+   * chance de ele ter ao menos um na mão passa disto.
+   */
+  guessHold: number;
+  guessRush: number;
+  /**
    * Valor de uma vitória *provável* (ataque fatal que o oponente talvez consiga parar), na escala da
    * avaliação: a linha vale `winCap` vezes a chance de passar mais a posição se falhar. Sem o teto, qualquer
    * chance de vencer (vezes `win`) engolia a posição que sobra quando o ataque é parado.
@@ -161,6 +173,8 @@ export interface Weights {
   hold?: Record<string, HoldRule>;
   /** A curva do deck (perfil): a jogada prevista por DON!! disponível (termo `nextTurn`). */
   plan?: PlanStep[];
+  /** A mão provável do oponente nesta decisão (`handModel`); sem ela, vale o modelo fixo (`counterCard`). */
+  oppHand?: HandModel;
 }
 
 export const DEFAULT_WEIGHTS: Weights = {
@@ -204,6 +218,8 @@ export const DEFAULT_WEIGHTS: Weights = {
   counterBig: 0.2,
   counterWill: 1,
   counterStack: 0.6,
+  guessHold: 1,
+  guessRush: 0.5,
   winCap: 120_000,
   lethalPlan: 60_000,
   win: 10_000_000,
@@ -523,7 +539,7 @@ function spendCounters(pool: { value: number; cost: number }[], need: number, do
  * distribui o DON!! para acertar o Líder com o máximo de ataques; a defesa usa os [Blocker]s em pé nos
  * ataques mais caros de cobrir e os Counters da mão nos mais baratos.
  */
-export function incomingHits(state: GameState, player: PlayerId): number {
+export function incomingHits(state: GameState, player: PlayerId, guess?: { model?: HandModel; rushMin: number }): number {
   if (state.phase === 'gameover') return 0;
   const opp = opponent(player);
   const ps = state.players[player];
@@ -544,6 +560,7 @@ export function incomingHits(state: GameState, player: PlayerId): number {
   }
   const onField = (p: PlayerState) => p.donActive + p.donRested + p.leader.don + p.characters.reduce((n, c) => n + c.don, 0) + (p.stage?.don ?? 0);
   let don = oppTurn ? os.donActive : onField(os) + Math.min(2, os.donDeck);
+  if (guess?.model) don -= rushFromHand(state, os, don, guess.model, guess.rushMin, attackers, oppTurn ? 0 : 1);
 
   // DON!! do oponente: primeiro o que falta para cada atacante alcançar o Líder (os mais baratos
   // antes), depois um a um no ataque mais fácil de cobrir (encarece o Counter).
@@ -582,12 +599,44 @@ export function incomingHits(state: GameState, player: PlayerId): number {
 }
 
 /**
+ * O [Rush] que o oponente deve ter na mão e que cabe no DON!! dele (mão provável, `handguess.ts`): entra em
+ * `attackers` como mais um atacante; devolve o DON!! que ele gasta para baixá-lo. Uma carta [Rush] revelada da mão
+ * conta com certeza; as escondidas, quando a chance de ao menos uma ser um [Rush] que cabe passa de `rushMin` — e
+ * aí entra o mais provável deles. `draws`: as cartas que ele ainda compra antes de atacar.
+ */
+function rushFromHand(state: GameState, os: PlayerState, don: number, model: HandModel, rushMin: number, attackers: { power: number; hits: number; blockable: boolean }[], draws: number): number {
+  let known: { power: number; cost: number } | null = null;
+  // No próprio turno do bot, a ameaça é a do turno seguinte dele: a carta que ele compra também conta.
+  let hidden = draws;
+  for (const uid of os.hand) {
+    const def = cardDef(state, uid);
+    if (def.id === HIDDEN_CARD) {
+      hidden++;
+      continue;
+    }
+    if (def.category !== 'character' || !def.keywords.includes('rush')) continue;
+    const cost = playCost(state, uid);
+    if (cost <= don && (!known || (def.power ?? 0) > known.power)) known = { power: def.power ?? 0, cost };
+  }
+  if (known) {
+    attackers.push({ power: known.power, hits: 1, blockable: true });
+    return known.cost;
+  }
+  const fits = model.rush.filter((r) => r.cost <= don);
+  const q = Math.min(1, fits.reduce((s, r) => s + r.p, 0));
+  if (!hidden || !fits.length || 1 - (1 - q) ** hidden < rushMin) return 0;
+  const best = fits.reduce((m, r) => (r.p > m.p || (r.p === m.p && r.power > m.power) ? r : m));
+  attackers.push({ power: best.power, hits: 1, blockable: true });
+  return best.cost;
+}
+
+/**
  * Quanto custa ao `player` o próximo ataque do oponente: `threatHit` por ataque que passa pela
  * defesa completa (`incomingHits`) e, se nem ela salva o Líder, `lethal`.
  */
 export function incomingThreat(state: GameState, player: PlayerId, w: Weights = DEFAULT_WEIGHTS): number {
   if (!w.threat) return 0;
-  const hits = incomingHits(state, player);
+  const hits = incomingHits(state, player, w.oppHand ? { model: w.oppHand, rushMin: w.guessRush } : undefined);
   return w.threat * (hits * w.threatHit + (hits > state.players[player].life.length ? w.lethal : 0));
 }
 

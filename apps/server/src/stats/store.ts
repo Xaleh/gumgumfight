@@ -172,6 +172,8 @@ export interface StatsFilter {
   days?: number;
   /** Só as partidas deste jogador. */
   playerId?: string;
+  /** Sem as partidas deste jogador (o deck provável do bot não usa as listas do próprio oponente). */
+  notPlayerId?: string;
   /** Uma lista exata. */
   deckHash?: string;
   /** Só estas filas (estatísticas gerais: só casual). */
@@ -197,6 +199,10 @@ function where(f: StatsFilter): { sql: string; params: Param[] } {
   eq('s.leader', f.leader);
   eq('s.opp_leader', f.oppLeader);
   eq('s.player_id', f.playerId);
+  if (f.notPlayerId !== undefined) {
+    parts.push('(s.player_id IS NULL OR s.player_id <> ?)');
+    params.push(f.notPlayerId);
+  }
   eq('s.deck_hash', f.deckHash);
   if (f.first !== undefined) eq('s.went_first', f.first ? 1 : 0);
   if (f.tiers?.length) {
