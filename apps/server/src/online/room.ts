@@ -39,6 +39,7 @@ import {
   type CardEngineText,
   type BotExplanation,
   type BotLevel,
+  type BotPersonality,
   type DeckProfile,
   chooseBotAction,
   createAliases,
@@ -209,6 +210,8 @@ export interface RoomData {
   firstPlayer?: PlayerId;
   /** Treino contra o bot: o nível do bot do servidor (ausente = `hard`, o padrão das salas antigas). */
   botLevel?: BotLevel;
+  /** Treino contra o bot: o estilo do bot (ausente = equilibrado; o Bot do Time não tem). */
+  botPersonality?: BotPersonality;
   /**
    * Versão do motor (`REPLAY_VERSION`) em que a partida começou. Salas começadas antes da
    * versão 9 não têm o campo e são refeitas com a preparação antiga (`legacySetup`).
@@ -1081,7 +1084,9 @@ export class Room {
       // joga (a sala tem um mapa só), então a mesa dá o nome de cada carta que ela já vê. Carta que só o bot vê (a mão
       // dele) fica "desconhecida" até aparecer; os uids de verdade nunca saem da sala.
       const explain = coached ? (e: BotExplanation) => this.emitCoach({ index: this.data.actions.length, seat, ...e }) : undefined;
-      const real = actionFromView(state, aliases, chooseBotAction(view, seat, level, profile || explain ? { ...(profile ? { profile } : {}), ...(explain ? { explain } : {}) } : undefined));
+      const personality = level === 'team' ? undefined : this.data.botPersonality;
+      const over = profile || explain || personality ? { ...(profile ? { profile } : {}), ...(explain ? { explain } : {}), ...(personality ? { personality } : {}) } : undefined;
+      const real = actionFromView(state, aliases, chooseBotAction(view, seat, level, over));
       if (typeof real === 'string') throw new Error(real);
       this.commit(real);
     } catch (e) {
@@ -1406,6 +1411,8 @@ export class Room {
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
       /** Treino contra o bot: o nível do bot do servidor (a nota e as marcações do Time citam o nível). */
       ...(this.data.botLevel ? { botLevel: this.data.botLevel } : {}),
+      /** Treino contra o bot: o estilo do bot (ausente = equilibrado). */
+      ...(this.data.botPersonality ? { botPersonality: this.data.botPersonality } : {}),
       /** Treino contra o bot: o deck que o bot joga (relatório do Bot do Time; os decks prontos não são segredo). */
       ...(this.data.queue === 'bot' ? { botDeckId: this.data.seats.find((s) => s.bot)?.deckId ?? null, botDeckName: this.data.seats.find((s) => s.bot)?.deck.name ?? null } : {}),
       /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */

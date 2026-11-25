@@ -1408,6 +1408,32 @@ describe('modo espectador', () => {
     expect((await open({ 'x-deck-owner': 'carol-0123456789abcdef', cookie: admin.cookie }, 'team')).statusCode).toBe(201);
   });
 
+  it('estilo do bot na sala (D3): fica na sala e na informação dela; estilo inválido recusado; o Bot do Time não tem', async () => {
+    const { app, db } = setup();
+    const open = (headers: Record<string, string>, personality: unknown, level: unknown = 'hard') =>
+      app.inject({ method: 'POST', url: '/api/online/bot', headers, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb', first: 0, level, personality } });
+    const zoro = login(db, 'zoro');
+    const bad = await open({ ...ALICE, cookie: zoro.cookie }, 'maluco');
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().errorCode).toBe('invalidBotPersonality');
+    const aggro = await open({ ...ALICE, cookie: zoro.cookie }, 'aggressive');
+    expect(aggro.statusCode, aggro.body).toBe(201);
+    const room = getRoom(app, aggro.json().roomId);
+    expect(room.data.botPersonality).toBe('aggressive');
+    expect(room.info(0).botPersonality).toBe('aggressive');
+    // Equilibrado (ou sem estilo): nada guardado, como nas salas antigas.
+    const nami = login(db, 'nami');
+    const plain = await open({ ...BOB, cookie: nami.cookie }, 'balanced', 'normal');
+    expect(plain.statusCode, plain.body).toBe(201);
+    expect(getRoom(app, plain.json().roomId).data.botPersonality).toBeUndefined();
+    // O Bot do Time ignora o estilo (o dele vem do perfil do deck).
+    const sanji = login(db, 'sanji');
+    setUserTeam(db, sanji.id, true);
+    const team = await open({ 'x-deck-owner': 'carol-0123456789abcdef', cookie: sanji.cookie }, 'cautious', 'team');
+    expect(team.statusCode, team.body).toBe(201);
+    expect(getRoom(app, team.json().roomId).data.botPersonality).toBeUndefined();
+  });
+
   it('Bot do Time: quem é do Time recebe a explicação de cada jogada do bot (evento coach), com a posição no replay', async () => {
     const { app, db } = setup();
     const sanji = login(db, 'sanji');

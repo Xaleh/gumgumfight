@@ -130,6 +130,7 @@ gumgumfight/
 │   ├── src/bot/simple.ts        bot heurístico (nível fácil)
 │   ├── src/bot/evaluate.ts      função de avaliação do bot com busca
 │   ├── src/bot/planner.ts       bot com busca (níveis normal e difícil)
+│   ├── src/bot/personality.ts   estilos do bot (agressivo, controle, conservador): pesos e limiares
 │   ├── src/bot/analysis.ts      análise da partida: cada decisão do replay contra a melhor jogada do bot
 │   ├── scripts/simulate*.ts     simulações bot x bot na linha de comando
 │   └── test/                    46 arquivos de teste + fixtures
@@ -477,6 +478,14 @@ Sem worker (navegador antigo, arquivo indisponível, testes), a mesma conta roda
   as cartas escondidas somam, e um ataque fatal ele defende sempre que pode, parando o acerto mais barato da linha).
   Uma vitória provável vale `winCap` vezes a chance de passar, não `win`, para a posição que sobra se o ataque
   for parado continuar pesando.
+- **Personalidade** (`personality.ts`, roadmap D3): eixo independente do nível, `BotPersonality` =
+  `balanced | aggressive | control | cautious`, passado em `chooseBotAction(..., { personality })`. No `normal`/`hard`,
+  `PERSONALITY_WEIGHTS[p]` entra por cima de `DEFAULT_WEIGHTS` (só pesos numéricos que já existem, como o perfil de
+  deck); no `easy`, `SIMPLE_STYLES[p]` troca os limiares do `simple.ts` (Vida para Counter e bloqueio, custo do
+  Personagem que vale salvar, custo a partir do qual o K.O. vem antes do Líder). O `team` ignora (o estilo sai do
+  perfil). No navegador, `GameSetup.botPersonality` vai para o Worker (`BotRequest.personality`); no servidor,
+  `POST /api/online/bot` valida `personality` (`invalidBotPersonality`) e guarda em `RoomData.botPersonality` (ausente =
+  equilibrado; vai também em `info()`). Sem tabela nova.
 - Para a simulação funcionar na visão, os frames de efeito **do próprio jogador** vão inteiros na visão (passos,
   escolhas, alvos, com uids apelidados); os do oponente seguem só com a carta de origem.
 - O próprio deck é sorteado antes de simular (`determinize`, a partir de `unseen`): efeitos que leem o topo
@@ -2082,7 +2091,7 @@ Quem chama, na coluna da direita:
 | DELETE | `/api/friends/invites/:code` | Recusa o convite (some da tela inicial; a sala de quem convidou continua) | Sessão |
 | POST | `/api/online/rooms` · `/api/online/rooms/join` · `/api/online/queue` | Cria uma sala privada; entra numa; entra na fila (`{ deckId, format, queue }`; ranqueada exige login) | Navegador |
 | GET · DELETE | `/api/online/queue/:ticket` | Consulta a fila / sai dela | Quem tem o ticket |
-| POST | `/api/online/bot` | Treino contra o bot transmitido (`{ deckId, botDeckId \| random, format, first? }`) | Sessão |
+| POST | `/api/online/bot` | Treino contra o bot transmitido (`{ deckId, botDeckId \| random, format, first?, level?, personality? }`) | Sessão |
 | GET | `/api/online/rooms/:id/events?t=` | Canal SSE do jogador | Assento |
 | POST | `/api/online/rooms/:id/{action,dice,emote,chat,focus,rematch,leave}` | Ação, dado, emote, chat (censurado), presença, revanche, sair | Assento |
 | GET | `/api/online/rooms/:id/replay` | Replay completo da sala (depois do fim; nunca de torneio) | Pública |

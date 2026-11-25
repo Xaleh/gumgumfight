@@ -739,7 +739,7 @@ espectadores seguem para a partida nova.
   **Gerar novo link** invalida o anterior; a conta que perde o perfil perde o link.
 - **Transmitir o treino contra o bot:** em **Contra o bot**, quem entrou com o Google pode marcar **Transmitir esta
   partida**. A partida roda no servidor, que joga pelo bot (decidindo só com a visão do bot), e aparece na lista para
-  assistir. "Quem começa" vale como no treino local; a seed e o desfazer ficam só no treino no navegador. Entra nas
+  assistir. "Quem começa" e o [estilo do bot](#estilos-do-bot) valem como no treino local; a seed e o desfazer ficam só no treino no navegador. Entra nas
   estatísticas como partida contra o bot. Com a transmissão lotada (`ONLINE_MAX_BOT_ROOMS`), o treino roda no
   navegador, com um aviso na mesa. `ONLINE_BOT_ROOMS=off` tira a opção do menu e essas salas da lista.
 
@@ -791,6 +791,24 @@ jogada que ele acha:
 
 Fases seguintes (análise guardada no servidor, precisão em "Minhas partidas", prévia da jogada sugerida na mesa):
 [`docs/plano-analise-partida.md`](docs/plano-analise-partida.md).
+
+## Estilos do bot
+
+Em **Contra o bot**, além do **Nível** (Fácil, Normal, Difícil), há o **Estilo do bot**, salvo no navegador:
+
+- **Equilibrado** (padrão): o bot de sempre, com os pesos ajustados em auto-jogo.
+- **Agressivo**: vai na Vida do oponente. Defende pouco (não bloqueia nem na última Vida, guarda o Counter), aceita
+  deixar Personagens expostos e prefere bater no Líder a tirar um Personagem médio.
+- **Controle**: a mão e o campo são o recurso. Tira os Personagens do oponente antes de ir no Líder (mesmo com o
+  oponente em 2 de Vida), guarda cartas e protege os próprios Personagens.
+- **Conservador**: protege a própria Vida. Usa Counter com até 3 de Vida e bloqueia com 2, e evita deixar
+  Personagens virados expostos.
+
+O estilo vale nos três níveis: no Normal e no Difícil é uma camada de pesos sobre a avaliação do bot com busca
+(`packages/engine/src/bot/personality.ts`, `PERSONALITY_WEIGHTS`); no Fácil muda os limiares do bot heurístico
+(`SIMPLE_STYLES`). Vale também no treino transmitido (o servidor joga com o estilo escolhido). O **Bot do Time** não tem
+estilo: o dele vem do perfil do deck. Cada estilo tem testes de posição que mostram a diferença
+(`packages/engine/test/bot-personality.test.ts`).
 
 ## Bot do Time
 

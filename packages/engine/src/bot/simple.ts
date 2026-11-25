@@ -4,13 +4,15 @@
 import { legalActions } from '../actions';
 import { cardDef, counterValue, getPower, isMultiplayer, locate, opponent, opponentsOf, targetCandidates } from '../engine';
 import type { Action, EffectStep, GameState, PlayerId } from '../types';
+import { SIMPLE_STYLES, type SimpleStyle } from './personality';
 
-export function chooseBotAction(state: GameState, player: PlayerId): Action {
+/** `style`: os limiares da personalidade (`personality.ts`); sem ele, os do bot equilibrado. */
+export function chooseBotAction(state: GameState, player: PlayerId, style: SimpleStyle = SIMPLE_STYLES.balanced): Action {
   const actions = legalActions(state, player);
   if (!actions.length) throw new Error('O bot não tem ações legais.');
   const pending = state.pending;
-  if (pending) return choosePending(state, player, actions);
-  return chooseMain(state, player, actions);
+  if (pending) return choosePending(state, player, actions, style);
+  return chooseMain(state, player, actions, style);
 }
 
 /**
@@ -66,7 +68,7 @@ function ownRemoval(state: GameState, player: PlayerId): boolean {
   return step?.do === 'replaceRemoval' && step.action !== 'ko' && step.byPlayer === player;
 }
 
-function choosePending(state: GameState, player: PlayerId, actions: Action[]): Action {
+function choosePending(state: GameState, player: PlayerId, actions: Action[], style: SimpleStyle): Action {
   const pending = state.pending!;
   const me = state.players[player];
 
@@ -119,7 +121,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       const ap = getPower(state, b.attacker);
       const tp = getPower(state, b.target);
       const targetIsLeader = b.target === me.leader.uid;
-      const dangerous = targetIsLeader ? me.life.length <= 1 && ap >= tp : ap >= tp && value(state, b.target) >= 6000;
+      const dangerous = targetIsLeader ? me.life.length <= style.blockLife && ap >= tp : ap >= tp && value(state, b.target) >= style.blockCharValue;
       if (dangerous) {
         const blockers = [...pending.options].sort((x, y) => value(state, x) - value(state, y));
         return { type: 'choose', player, uids: [blockers[0]] };
@@ -135,7 +137,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       const tp = getPower(state, b.target);
       if (ap < tp) return { type: 'pass', player };
       const targetIsLeader = b.target === me.leader.uid;
-      const worth = targetIsLeader ? me.life.length <= 2 : (cardDef(state, b.target).cost ?? 0) >= 4;
+      const worth = targetIsLeader ? me.life.length <= style.counterLife : (cardDef(state, b.target).cost ?? 0) >= style.counterCharCost;
       if (!worth) return { type: 'pass', player };
       const need = ap - tp + 1;
       const boost = (uid: string) => {
@@ -188,7 +190,7 @@ function chooseTargets(state: GameState, player: PlayerId, pending: SelectPendin
   return [leader ?? pool[0]];
 }
 
-function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Action {
+function chooseMain(state: GameState, player: PlayerId, actions: Action[], style: SimpleStyle): Action {
   const me = state.players[player];
   const opp = state.players[rivalOf(state, player)];
   const canBattle = isMultiplayer(state) ? (state.turnsTaken?.[player] ?? 0) > 1 : state.turn > 2;
@@ -276,7 +278,7 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
       const koTarget = mine
         .filter((a) => !isLeader(a.target) && getPower(state, a.target) <= ap)
         .sort((x, y) => value(state, y.target) - value(state, x.target))[0];
-      if (koTarget && (cardDef(state, koTarget.target).cost ?? 0) >= 3) return koTarget;
+      if (koTarget && (cardDef(state, koTarget.target).cost ?? 0) >= style.koFirstCost) return koTarget;
       const leaderAttack = mine.find((a) => a.target === opp.leader.uid);
       if (leaderAttack && ap >= oppLeaderPower) return leaderAttack;
       if (koTarget) return koTarget;

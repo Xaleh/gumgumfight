@@ -3,6 +3,7 @@ import {
   actingPlayer,
   applyAction,
   type BotLevel,
+  type BotPersonality,
   type CardEngineText,
   type DeckProfile,
   createGame,
@@ -37,6 +38,8 @@ export interface GameSetup {
   script?: Action[];
   /** Nível do bot (padrão `hard`). */
   botLevel?: BotLevel;
+  /** Estilo do bot (ausente = equilibrado; o Bot do Time ignora). */
+  botPersonality?: BotPersonality;
   /** Bot do Time no navegador: o perfil do deck que o bot joga (pesos, papéis das cartas, mulligan). */
   botProfile?: DeckProfile;
   /** Replay: começa pausado (passo a passo) ou rodando, e em que velocidade; `at`: já na posição `at` do roteiro. */
@@ -241,6 +244,7 @@ export function useGame(setup: GameSetup) {
       state,
       player: seat,
       level: setup.botLevel ?? 'hard',
+      ...(isBot && setup.botPersonality ? { personality: setup.botPersonality } : {}),
       ...(isBot && setup.botProfile ? { profile: setup.botProfile } : {}),
       explain: isBot && setup.botLevel === 'team',
     });
