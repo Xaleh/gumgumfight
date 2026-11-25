@@ -287,10 +287,12 @@ function Profile({
   me,
   tiers,
   onRename,
+  onProfile,
 }: {
   me: PlayerProfile | null;
   tiers: StatsMeta['tiers'];
   onRename: (p: PlayerProfile) => void;
+  onProfile?: (id: string) => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -344,6 +346,13 @@ function Profile({
             .join(' ')}
         </p>
         <p className="muted small">{me ? t('stats.bountyHintPlayed', { n: me.rankedGames }) : t('stats.bountyHint')}</p>
+        {me && onProfile && (
+          <div className="profile-actions">
+            <button className="btn small" onClick={() => onProfile(me.id)}>
+              {t('profile.open')}
+            </button>
+          </div>
+        )}
         {error && <div className="error">{error}</div>}
       </div>
     </section>
@@ -1831,7 +1840,16 @@ function GlobalPanel({
   );
 }
 
-export function Stats({ onExit, onOpenDeck }: { onExit: () => void; onOpenDeck?: (link: DeckLink) => void }) {
+export function Stats({
+  onExit,
+  onOpenDeck,
+  onProfile,
+}: {
+  onExit: () => void;
+  onOpenDeck?: (link: DeckLink) => void;
+  /** Abre o perfil público do jogador (id de `players`). */
+  onProfile?: (id: string) => void;
+}) {
   const t = useT();
   const locale = useLocale();
   const [meta, setMeta] = useState<StatsMeta | null>(null);
@@ -1934,7 +1952,7 @@ export function Stats({ onExit, onOpenDeck }: { onExit: () => void; onOpenDeck?:
       </header>
       <div className="coverage-body stats-body">
         {error && <div className="error">{error}</div>}
-        {meta && <Profile me={meta.me} tiers={meta.tiers} onRename={(me) => setMeta({ ...meta, me })} />}
+        {meta && <Profile me={meta.me} tiers={meta.tiers} onRename={(me) => setMeta({ ...meta, me })} onProfile={onProfile} />}
 
         {(gated || globalOn) && (
           <div className="seg stats-scope" role="tablist" aria-label={t('stats.scopeLabel')}>

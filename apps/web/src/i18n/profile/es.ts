@@ -1,0 +1,45 @@
+// Textos del perfil público del jugador (español).
+
+import type profilePtBR from './pt-BR';
+
+const profile: Record<keyof typeof profilePtBR, string> = {
+  'profile.title': 'Perfil del jugador',
+  'profile.open': '👤 Mi perfil público',
+  'profile.loading': 'Cargando…',
+  'profile.notFound': 'Este perfil no existe o el jugador prefirió no mostrarlo.',
+  'profile.hiddenNotice': 'Tu perfil está oculto: el enlace no se abre para los demás. Solo tú ves esta página.',
+  'profile.rankedGames': '{n|# partida clasificatoria|# partidas clasificatorias}',
+  'profile.since': 'jugando desde {date}',
+  'profile.record': '{games} partidas, {wins} victorias ({pct})',
+  'profile.copyLink': '🔗 Copiar enlace',
+  'profile.copied': '✓ Enlace copiado',
+  'profile.copyPrompt': 'Copia el enlace del perfil:',
+  'profile.leadersTitle': 'Líderes más jugados',
+  'profile.noGames': 'Todavía no hay partidas.',
+  'profile.leaderLine': '{games|# partida|# partidas} · {pct} de victorias',
+  'profile.matchesTitle': 'Partidas recientes',
+  'profile.win': 'Victoria',
+  'profile.loss': 'Derrota',
+  'profile.draw': 'Empate',
+  'profile.vsBot': 'contra el bot',
+  'profile.vsPlayer': 'contra un jugador',
+  'profile.watchReplay': '▶ Replay',
+  'profile.decksTitle': 'Mazos',
+  'profile.deckLine': '{games|# partida|# partidas} · {pct} de victorias',
+  'profile.openDeck': 'Abrir en el constructor',
+  'profile.editTitle': 'Qué muestra tu perfil',
+  'profile.editIntro': 'Elige qué ven los demás al abrir tu enlace. Los cambios se aplican al momento.',
+  'profile.optVisible': 'Perfil visible',
+  'profile.optVisibleHint': '(desactivado, el enlace no se abre para nadie)',
+  'profile.optLeaders': 'Líderes más jugados y total de victorias',
+  'profile.optMatches': 'Partidas recientes',
+  'profile.optReplays': 'Replays de las partidas',
+  'profile.optReplaysHint': '(contra otro jugador, solo si él también comparte sus replays)',
+  'profile.decksPick': 'Mazos en el perfil (hasta {max})',
+  'profile.noDecks': 'Todavía no tienes mazos guardados.',
+  'errors.profileNotFound': 'Perfil no encontrado.',
+  'errors.profileReplayHidden': 'El replay de esta partida no es público.',
+  'errors.profileDecksInvalid': 'Elige hasta {max} mazos.',
+};
+
+export default profile;
