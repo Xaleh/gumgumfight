@@ -124,10 +124,10 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   *Pronto quando:* cada formato tem teste de ida e volta, e o link curto abre o deck no construtor.
   *Feito em:* —
 
-- [ ] **C2. Versões do deck**
+- [x] **C2. Versões do deck**
   Histórico de mudanças do deck com a taxa de vitória de cada versão, usando o hash do `deck_lists`.
   *Pronto quando:* o deck mostra as versões (o que entrou e saiu) e as partidas e a taxa de vitória de cada uma.
-  *Feito em:* —
+  *Feito em:* 25/11/2026, [PR #232](https://github.com/Xaleh/gumgumfight/pull/232)
 
 - [ ] **C3. Sugestões de cartas pelas estatísticas**
   "Decks com este Líder usam X e você não usa", "esta carta tem lift negativo" e a comparação com o Deck médio do Líder.
