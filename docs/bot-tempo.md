@@ -347,8 +347,10 @@ Medida (nível `hard`, decks prontos sorteados, assentos trocados): contra os pe
 
 ## 8. O que o bot ainda não sabe
 
-- **Mão do oponente**: só o tamanho, mais as cartas que ele revelou e ainda não saíram da mão (`GameState.knownHand`,
-  seção 12); o resto da mão continua sendo só uma contagem.
+- **Mão do oponente**: a mão real nunca, mas, com o deck provável do Líder dele, a composição provável das cartas
+  escondidas (seção 13): o Counter que deve estar lá e o [Rush] que ele pode baixar. Sem deck provável, só o tamanho da
+  mão e as cartas reveladas (`GameState.knownHand`, seção 12). O resto do que o deck provável diz (remoções, a carta
+  que muda o turno dele) ainda não pesa em nada.
 - **O próprio deck** entra por sorteio (seção 7a), mas a composição não é usada para mais nada: quantos Counters
   ainda há e os **[Trigger]s** prováveis não pesam em decisão nenhuma.
 - **Sinergias de deck** além do que o texto das cartas faz quando simulado: nada. Um deck de combo
@@ -631,3 +633,51 @@ prontos: **60%** (400 partidas).
 
 O p50 baixo do `hard` vem do plano guardado: a busca roda uma vez por turno e as decisões seguintes
 saem do plano enquanto a partida segue o previsto.
+
+## 13. A mão provável do oponente
+
+O bot sabia só o tamanho da mão do oponente: todo deck tinha 72% de cartas com Counter, o Rocks.D.Xebec (quase sem
+Counter) e um Law cheio de +2000 do mesmo jeito. Um jogador de verdade sabe o Líder e, pelo meta, a lista que esse
+Líder costuma jogar: "ele já gastou três dos oito +2000", "esse deck tem quatro [Rush] de custo 5".
+
+**De onde vem o deck provável** (`DeckGuess`, `packages/engine/src/bot/handguess.ts`; montado no servidor por
+`apps/server/src/stats/handguess.ts`):
+
+1. As listas das partidas de pessoas com o Líder nos últimos 60 dias (as mesmas das estatísticas "Por Líder", sem os
+   torneios em andamento), com as cópias esperadas de cada carta (uma carta em 3 cópias em metade das partidas vale
+   1,5). Só com partidas de pelo menos 3 jogadores e 20 partidas, e **sem as partidas do próprio oponente**: o deck
+   provável nunca é a lista de quem está do outro lado.
+2. Senão, o deck do meta (`data/decks/meta`) com o mesmo Líder; senão, um deck pronto (ou do All Blue) com ele.
+3. Sem nenhum, nada muda: o modelo fixo da seção 3.
+
+**O que o bot deduz** (`handModel`, uma vez por decisão, na visão): do deck provável saem as cartas desse oponente que
+o bot já viu (campo, lixo, Vida aberta, cartas da mão reveladas). Cada carta escondida da mão é uma carta sorteada do
+que sobra, com uma vantagem para as que têm Counter (`guessHold`, 1,45 de razão de chances: quem joga guarda os
+Counters e gasta as outras; com os 64% de cartas com Counter dos decks prontos, isso dá os 72% do modelo fixo). O
+Evento [Counter] conta pelo +poder só se o DON!! ativo dele paga o custo. O resultado é a chance de uma carta
+escondida cobrir 0, 1, 2, 3 ou 4 mil, e os [Rush] que ainda podem estar lá.
+
+**Onde entra:**
+
+- **Ataque** (`oppCounterChance` em `planner.ts`, no lugar de `counterAbility` quando há deck provável): as cartas
+  reveladas da mão contam pelo Counter delas, e as escondidas pela distribuição. Contra um deck sem Counter, o ataque
+  fatal de 6000 contra 5000 com 5 cartas na mão passa a valer a tentativa; contra um deck cheio de +2000, o bot
+  nocauteia o Personagem virado.
+- **Defesa** (`rushFromHand` em `incomingHits`): na ameaça do próximo ataque dele, um [Rush] que cabe no DON!! entra
+  como mais um atacante quando a chance de ele ter ao menos um na mão passa de `guessRush` (0,5); entra o mais provável
+  (um [Rush] revelado conta com certeza). Com 1 de Vida e o oponente com quatro [Rush] por 20 cartas, o bot deixa o
+  [Blocker] em pé em vez de usá-lo num K.O. — o ataque fatal do turno seguinte (Líder + [Rush]) é o que o `lethalPlan`
+  pune.
+
+| Conceito | Onde está | Teste |
+|---|---|---|
+| Deck provável sem as partidas do oponente | `stats/handguess.ts`: `expectedCopies`, `HandGuesses` | `handguess.test.ts` (servidor) |
+| O que já saiu sai do deck provável; Evento [Counter] só com DON!! | `handguess.ts`: `handModel` | `tira do deck provável o que o bot já viu…` |
+| Não lê a mão real | `handModel` só lê a visão | `não lê a mão real: trocar as cartas escondidas…` |
+| Counter pelo deck do Líder dele | `planner.ts`: `oppCounterChance` | `contra um deck sem Counter vai no ataque fatal…`, `as cartas reveladas da mão contam…` |
+| [Rush] provável na ameaça | `evaluate.ts`: `rushFromHand` | `o [Rush] provável entra na ameaça…`, `…com ele, fica em pé para bloquear` |
+
+**Medida** (`packages/engine/scripts/duel-handguess.ts`: nível `hard`, decks prontos sorteados, assentos trocados, o
+deck provável de cada lado é o deck pronto do Líder adversário):
+
+MEDIDA_AQUI

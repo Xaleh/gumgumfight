@@ -13,6 +13,7 @@
 
 import { randomInt } from 'node:crypto';
 import {
+  type DeckGuess,
   type DeckProfile,
   isBotLevel,
   buildCardDef,
@@ -96,6 +97,8 @@ interface Deps {
   notifier?: Notifier;
   /** Bot do Time: o perfil do deck do bot, pelo id do deck (`team/profiles.ts`). */
   botProfile?: (deckId: string | null, leader: string | null) => DeckProfile | undefined;
+  /** O deck provável do Líder do oponente do bot (`stats/handguess.ts`). */
+  botHandGuess?: (leader: string | null, ownerHash: string | null) => DeckGuess | null;
 }
 
 /**
@@ -279,6 +282,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     log: (msg) => app.log.warn(msg),
     onRoomEvent: (room, event) => roomNotice(deps.notifier ?? noNotifier, room, event),
     botProfile: deps.botProfile,
+    botHandGuess: deps.botHandGuess,
   });
   const botRooms = deps.botRooms ?? true;
   lobby.restore(

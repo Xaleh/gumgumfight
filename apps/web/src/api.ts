@@ -8,6 +8,7 @@ import {
   type CardDef,
   type ChallengeSpec,
   type DeckList,
+  type DeckGuess,
   type DeckProfile,
   type FormatId,
   formatLabel,
@@ -989,6 +990,8 @@ export const api = {
     /** Salva o guia (markdown) e/ou o perfil (JSON; o servidor confere); null volta ao arquivo. Só admin. */
     saveProfile: (id: string, patch: { guide?: string | null; profile?: unknown }) =>
       send<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>('PUT', `/api/bot/profiles/${encodeURIComponent(id)}`, patch),
+    /** O deck provável de um Líder (D2): o bot do navegador deduz a mão do oponente por ele. */
+    handGuess: (leader: string) => get<{ guess: DeckGuess | null }>(`/api/bot/hand-guess?leader=${encodeURIComponent(leader)}`),
     /** O agente fora da partida está ligado neste servidor. */
     agent: () => get<{ enabled: boolean }>('/api/bot/agent'),
     /** Agente: o guia vira um rascunho de perfil com as justificativas (não salva). Só admin. */

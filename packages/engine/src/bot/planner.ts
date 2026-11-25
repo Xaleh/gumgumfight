@@ -22,10 +22,11 @@
 // quando o deck tem perfil (`profile.ts`), com os pesos e o conhecimento do deck na avaliação.
 
 import { legalActions } from '../actions';
-import { applyAction, cardDef, getPower, locate, opponent } from '../engine';
+import { applyAction, cardDef, counterValue, getPower, locate, opponent, playCost } from '../engine';
 import type { Action, GameState, Pending, PlayerId } from '../types';
 import { HIDDEN_CARD } from '../view';
 import { DEFAULT_WEIGHTS, evaluate, evaluateTerms, handCardValue, hasDiscardOutlet, type Weights } from './evaluate';
+import { counterChance, counterEventPowerOf, type DeckGuess, handModel } from './handguess';
 import { type DeckProfile, keepHand, opponentLeader, profileWeights } from './profile';
 import { chooseBotAction as simpleBot } from './simple';
 
@@ -52,6 +53,11 @@ export interface PlannerOptions {
   onDecision?: (info: string, depth: number) => void;
   /** Perfil do próprio deck (Bot do Time): os pesos saem dele em `chooseBotAction`; o mulligan o lê aqui. */
   profile?: DeckProfile;
+  /**
+   * O deck provável do Líder adversário (`handguess.ts`): em `chooseBotAction` vira a mão provável dele
+   * (`weights.oppHand`), que o risco de Counter e a ameaça do próximo ataque leem. Só vale se o Líder bate.
+   */
+  handGuess?: DeckGuess;
   /** Painel do treinador: recebe a explicação de cada decisão de verdade (a linha ou a resposta escolhida, a nota e os termos). */
   explain?: (e: BotExplanation) => void;
 }
@@ -131,9 +137,14 @@ interface Sim {
 /** Ação do bot no nível pedido (padrão `hard`). */
 export function chooseBotAction(state: GameState, player: PlayerId, level: BotLevel = 'hard', over?: Partial<PlannerOptions>): Action {
   if (level === 'easy') return simpleBot(state, player);
+  const oppLeader = opponentLeader(state, player);
+  let weights = over?.weights ?? DEFAULT_WEIGHTS;
   // Com o perfil do deck, os pesos saem dele (arquétipo, ajustes do guia e o confronto com o Líder adversário).
-  const profiled = over?.profile ? { ...over, weights: profileWeights(over.profile, opponentLeader(state, player), over.weights ?? DEFAULT_WEIGHTS) } : over;
-  return planAction(state, player, plannerOptions(level, profiled));
+  if (over?.profile) weights = profileWeights(over.profile, oppLeader, weights);
+  // Com o deck provável do Líder adversário, a mão provável dele, deduzida só do que o bot vê.
+  const model = over?.handGuess && over.handGuess.leader === oppLeader ? handModel(state, player, over.handGuess, weights.guessHold) : undefined;
+  if (model) weights = { ...weights, oppHand: model };
+  return planAction(state, player, plannerOptions(level, { ...over, weights }));
 }
 
 export function planAction(full: GameState, player: PlayerId, opts: PlannerOptions): Action {
@@ -388,6 +399,26 @@ export function counterAbility(hand: number, need: number, w: Weights = DEFAULT_
 }
 
 /**
+ * Chance de o oponente somar `need` de Counter com a mão de `state`, sem as `less` cartas escondidas mais novas
+ * (as que os acertos seguintes da linha lhe dariam). Com a mão provável (`weights.oppHand`), as cartas reveladas
+ * contam pelo Counter delas (Evento [Counter] só se o DON!! ativo paga) e as escondidas pela distribuição do deck
+ * provável; sem ela, toda carta é igual (`counterAbility`).
+ */
+function oppCounterChance(state: GameState, opp: PlayerId, less: number, need: number, w: Weights): number {
+  const ps = state.players[opp];
+  if (!w.oppHand) return counterAbility(ps.hand.length - less, need, w);
+  const known: number[] = [];
+  let hidden = 0;
+  for (const uid of ps.hand) {
+    const def = cardDef(state, uid);
+    if (def.id === HIDDEN_CARD) hidden++;
+    else if (def.category === 'event') known.push(playCost(state, uid) <= ps.donActive ? Math.floor(counterEventPowerOf(def) / 1000) : 0);
+    else known.push(Math.floor(counterValue(state, uid) / 1000));
+  }
+  return counterChance(known, Math.max(0, hidden - less), need, w.oppHand.counter);
+}
+
+/**
  * Vontade do oponente de gastar Counter para salvar o alvo. Um ataque fatal ao Líder ele defende
  * sempre que pode; nos outros, cresce com o que está em jogo (Vida baixa, Personagem caro) e cai a cada
  * 1000 a mais que ele teria de cobrir (`counterStack`: gastar duas cartas por uma Vida é raro).
@@ -428,9 +459,9 @@ function counterAdjust(before: GameState, after: GameState, me: PlayerId, action
     // Para sobreviver ele só precisa parar um dos acertos da linha: o mais barato, com a mão que tinha
     // na hora (cada acerto anterior lhe deu uma carta da Vida). Um ataque fatal ele defende sempre que pode.
     p = 0;
-    [...prior, need].forEach((n, i, all) => (p = Math.max(p, counterAbility(hand - (all.length - 1 - i), n, w))));
+    [...prior, need].forEach((n, i, all) => (p = Math.max(p, oppCounterChance(before, opp, all.length - 1 - i, n, w))));
   } else {
-    p = counterAbility(hand, need, w) * counterWill(before, action.target, opp, need, w);
+    p = oppCounterChance(before, opp, 0, need, w) * counterWill(before, action.target, opp, need, w);
   }
   if (p <= 0) return 0;
   // Ataque falhou: a posição de antes (o atacante virado não muda a avaliação no próprio turno) e as

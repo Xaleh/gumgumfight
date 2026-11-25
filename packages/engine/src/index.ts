@@ -39,6 +39,7 @@ export {
   profileWeights,
   validateProfile,
 } from './bot/profile';
+export { counterChance, type DeckGuess, deckGuessFrom, type GuessCard, handModel, type HandModel, validateDeckGuess } from './bot/handguess';
 export {
   automationStatus,
   buildCardDef,

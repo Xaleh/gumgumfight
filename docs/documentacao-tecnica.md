@@ -131,6 +131,7 @@ gumgumfight/
 │   ├── src/bot/evaluate.ts      função de avaliação do bot com busca
 │   ├── src/bot/planner.ts       bot com busca (níveis normal e difícil)
 │   ├── src/bot/analysis.ts      análise da partida: cada decisão do replay contra a melhor jogada do bot
+│   ├── src/bot/handguess.ts     a mão provável do oponente: deck provável do Líder dele − o que já saiu (D2)
 │   ├── scripts/simulate*.ts     simulações bot x bot na linha de comando
 │   └── test/                    46 arquivos de teste + fixtures
 ├── apps/server/                 API Fastify
@@ -157,6 +158,7 @@ gumgumfight/
 │   ├── src/online/              room.ts (uma partida + relógio + mesa atrasada), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE), broadcast.ts (modo transmissão)
 │   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts,
 │   │                            global.ts e global-routes.ts (meta global: TCG Matchmaking pela OPTCG Logpose API)
+│   │                            handguess.ts (o deck provável de cada Líder para o bot deduzir a mão do oponente, D2)
 │   ├── src/profiles/            perfil público do jogador: store.ts (SQL, regras do replay), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
@@ -499,6 +501,17 @@ termos de `evaluateTerms` que mais mudaram e as alternativas), que o servidor ma
 `coach`) e o navegador guarda (`useGame.coach`). `GameState.knownHand` lembra as cartas da mão reveladas ao oponente
 enquanto ficam lá (a visão as mostra; cada ação tira as que saíram).
 
+**Mão provável do oponente** (`bot/handguess.ts`, roadmap D2, [`docs/bot-tempo.md`, seção 13](bot-tempo.md)): com
+`PlannerOptions.handGuess` (`DeckGuess`: o deck provável do Líder adversário, com o Counter, o Evento [Counter] e o
+[Rush] de cada carta), `chooseBotAction` calcula `handModel` na visão (o deck provável menos as cartas desse oponente
+que o bot vê; `guessHold` favorece as cartas com Counter) e o põe em `weights.oppHand`. O risco de Counter dos ataques
+passa a usar a distribuição (`oppCounterChance`/`counterChance`; as cartas reveladas da mão contam pelo valor) e a
+ameaça do próximo ataque conta o [Rush] provável que cabe no DON!! dele (`rushFromHand` em `incomingHits`). Sem deck
+provável, ou com o de outro Líder, tudo fica como antes. O deck provável vem do servidor (`stats/handguess.ts`,
+`HandGuesses`): as listas das estatísticas do Líder (60 dias, ≥ 3 jogadores e ≥ 20 partidas, **sem as partidas do
+próprio oponente**), senão o deck do meta ou o pronto de mesmo Líder; guardado por 1 h. As salas de bot o passam ao
+bot (`botHandGuess` nas dependências da sala); o navegador o busca em `GET /api/bot/hand-guess` ao começar o treino.
+
 **Análise da partida** (`bot/analysis.ts`, roadmap B1, [`docs/plano-analise-partida.md`](plano-analise-partida.md)):
 `analyzeReplay(initial, actions)` refaz um replay **terminado** (senão `AnalysisError('notFinished')`) e, em cada decisão
 com escolha de verdade (`isDecision`), chama `reviewDecision`, que monta a visão de quem decide (`viewFor` com
@@ -670,7 +683,9 @@ deck), `status` (estados das cartas), `errors` (erros do servidor), `labels`, `s
 
 Roda **inteira no navegador** (`useGame.ts`): `createGame`, `applyAction`, `chooseBotAction` (no Web Worker do bot,
 que pensa enquanto as cartas voam; a jogada sai depois do atraso ou quando a conta termina) com atrasos de 500–2000 ms
-para parecer humano, undo com até 400 estados, replay `.json`. No fim, `POST /api/matches` envia `{mode, format,
+para parecer humano, undo com até 400 estados, replay `.json`. Ao começar (fora do `easy`), o menu busca o deck provável
+do Líder de quem joga (`GET /api/bot/hand-guess`, `GameSetup.botHandGuess`) e o entrega ao worker: o bot deduz a mão da
+pessoa por ele (seção 4, "Bot"); sem rede, joga com o modelo fixo. No fim, `POST /api/matches` envia `{mode, format,
 seed, firstPlayer, chooseFirst, deckIds, decks, actions}`; o servidor refaz e grava (seção 9).
 
 Com login, a opção **Transmitir esta partida** troca o navegador pelo servidor: `POST /api/online/bot {deckId,
@@ -2004,6 +2019,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/bot/profiles` · `/api/bot/profiles/:id` | Decks do meta (estado do guia e do perfil); um deck com o perfil e o guia (`?leader=`: num deck de jogador, o do deck do meta de mesmo Líder) | Time |
 | PUT | `/api/bot/profiles/:id` | Salva o guia e/ou o perfil (conferido) no banco (`{ guide?, profile? }`; null volta ao arquivo) | Admin |
 | GET | `/api/bot/agent` | O agente fora da partida está ligado | Time |
+| GET | `/api/bot/hand-guess?leader=` | O deck provável do Líder (`{ guess: DeckGuess \| null }`: as cópias esperadas e o Counter, o Evento [Counter] e o [Rush] de cada carta), sem as partidas de quem pede; o bot do navegador deduz a mão do oponente por ele | Público |
 | POST | `/api/bot/profiles/:id/generate` · `/api/bot/matches/:id/review` | Agente: guia → rascunho do perfil; partida do bot x guia → discrepâncias | Admin |
 | POST | `/api/bot/feedback` | Marcações de jogadas (`marks[]`: posição, passo, esperado, comentário; a visão do bot é refeita do replay), a nota (1–5) e o relatório (`report`, markdown) de uma partida contra o bot; devolve `reportId` | Time |
 | GET | `/api/bot/reports?used=0\|1` | Relatórios das partidas | Time |

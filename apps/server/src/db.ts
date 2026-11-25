@@ -1653,6 +1653,17 @@ export function listDecks(db: DB): StoredDeck[] {
   ).map(toDeck);
 }
 
+/** Um deck da casa com o Líder: o do meta antes, depois um pronto, por último um do All Blue (o deck provável do bot, D2). */
+export function builtinDeckForLeader(db: DB, leader: string): StoredDeck | null {
+  const row = db
+    .prepare(
+      `SELECT ${DECK_COLS} FROM decks WHERE kind = 'builtin' AND leader = ?
+       ORDER BY CASE deck_group WHEN 'meta' THEN 0 WHEN 'allblue' THEN 2 ELSE 1 END, id LIMIT 1`,
+    )
+    .get(leader) as unknown as DeckRow | undefined;
+  return row ? toDeck(row) : null;
+}
+
 export function getDeck(db: DB, id: string): StoredDeck | null {
   const row = db.prepare(`SELECT ${DECK_COLS} FROM decks WHERE id = ?`).get(id) as unknown as DeckRow | undefined;
   return row ? toDeck(row) : null;

@@ -792,6 +792,24 @@ jogada que ele acha:
 Fases seguintes (análise guardada no servidor, precisão em "Minhas partidas", prévia da jogada sugerida na mesa):
 [`docs/plano-analise-partida.md`](docs/plano-analise-partida.md).
 
+## O bot deduz a sua mão
+
+O bot nunca vê a sua mão, mas sabe o seu Líder. Nos níveis normal, difícil e Time, ele parte do **deck provável** desse
+Líder, como um jogador que conhece o meta: as listas que as pessoas jogam com ele nas estatísticas dos últimos 60 dias
+(com partidas de pelo menos 3 jogadores, e **sem as suas partidas**: nunca é a sua lista), senão o deck do meta ou o
+deck pronto do mesmo Líder. Do deck provável ele tira o que você já mostrou (campo, lixo, Vida aberta, cartas
+reveladas) e estima o que sobra na sua mão:
+
+- **Ataque**: a chance de você ter o Counter que para o ataque sai do seu deck, e não de uma média. Contra um deck com
+  pouco Counter, ele arrisca o ataque fatal; contra um cheio de +2000, prefere o K.O. Um Evento [Counter] só conta se o
+  seu DON!! ativo paga, e uma carta revelada conta pelo que ela é.
+- **Defesa**: se o seu deck tem [Rush] que cabe no seu DON!!, ele conta com mais um atacante no seu turno e guarda o
+  [Blocker] ou o Counter quando esse ataque a mais seria fatal.
+
+Funciona no treino no navegador (o menu busca o deck provável em `GET /api/bot/hand-guess?leader=`) e nas salas de bot
+do servidor. Sem deck provável para o Líder, o bot joga como antes. Os detalhes e a medida contra a versão anterior estão
+em [`docs/bot-tempo.md`, seção 13](docs/bot-tempo.md).
+
 ## Bot do Time
 
 Um quarto nível do bot, **Time**, que só aparece em "Contra o bot" para quem faz parte do Time (e para admins). É o

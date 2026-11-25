@@ -3,7 +3,7 @@
 // gravação das salas no banco (para sobreviver a reinícios e deploys).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { type BotLevel, type CardData, cardImage, type DeckProfile, type PlayerId, type PlayMode } from '@gumgum/engine';
+import { type BotLevel, type CardData, cardImage, type DeckGuess, type DeckProfile, type PlayerId, type PlayMode } from '@gumgum/engine';
 import { DataVersion } from '../cache';
 import { type ErrorParams, fail } from '../errors';
 import { FORMATS, type FormatId, type PlayFormat } from '../stats/catalog';
@@ -68,6 +68,8 @@ export interface LobbyDeps {
   onRoomEvent?: (room: Room, event: RoomEvent) => void;
   /** Bot do Time: o perfil do deck do bot, pelo id do deck. */
   botProfile?: (deckId: string | null, leader: string | null) => DeckProfile | undefined;
+  /** O deck provável do Líder do oponente do bot (`stats/handguess.ts`), sem as partidas dele. */
+  botHandGuess?: (leader: string | null, ownerHash: string | null) => DeckGuess | null;
 }
 
 /** Partida em andamento na lista "Assistir". */
@@ -251,6 +253,7 @@ export class Lobby {
       botDelayMs: this.deps.botDelayMs,
       onEvent: this.deps.onRoomEvent,
       botProfile: this.deps.botProfile,
+      botHandGuess: this.deps.botHandGuess,
     });
     this.rooms.set(room.id, room);
     if (data.code) this.codes.set(data.code, room.id);

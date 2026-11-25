@@ -39,6 +39,7 @@ import {
   type CardEngineText,
   type BotExplanation,
   type BotLevel,
+  type DeckGuess,
   type DeckProfile,
   chooseBotAction,
   createAliases,
@@ -304,6 +305,11 @@ export interface RoomDeps {
    * não é do meta, o do deck do meta com o mesmo Líder.
    */
   botProfile?: (deckId: string | null, leader: string | null) => DeckProfile | undefined;
+  /**
+   * O deck provável do Líder do oponente do bot (`stats/handguess.ts`): o bot deduz a mão dele pelo que o meta joga
+   * com esse Líder, sem as partidas do próprio oponente e sem nunca ler a lista dele.
+   */
+  botHandGuess?: (leader: string | null, ownerHash: string | null) => DeckGuess | null;
 }
 
 /**
@@ -1081,7 +1087,11 @@ export class Room {
       // joga (a sala tem um mapa só), então a mesa dá o nome de cada carta que ela já vê. Carta que só o bot vê (a mão
       // dele) fica "desconhecida" até aparecer; os uids de verdade nunca saem da sala.
       const explain = coached ? (e: BotExplanation) => this.emitCoach({ index: this.data.actions.length, seat, ...e }) : undefined;
-      const real = actionFromView(state, aliases, chooseBotAction(view, seat, level, profile || explain ? { ...(profile ? { profile } : {}), ...(explain ? { explain } : {}) } : undefined));
+      // A mão provável do oponente: o deck que o Líder dele costuma jogar (nunca a lista dele).
+      const opp = this.data.seats[seat === 0 ? 1 : 0];
+      const handGuess = level !== 'easy' ? (this.deps.botHandGuess?.(opp?.deck.leader ?? null, opp?.ownerHash ?? null) ?? undefined) : undefined;
+      const over = profile || explain || handGuess ? { ...(profile ? { profile } : {}), ...(explain ? { explain } : {}), ...(handGuess ? { handGuess } : {}) } : undefined;
+      const real = actionFromView(state, aliases, chooseBotAction(view, seat, level, over));
       if (typeof real === 'string') throw new Error(real);
       this.commit(real);
     } catch (e) {

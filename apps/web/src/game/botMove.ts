@@ -8,6 +8,7 @@ import {
   type BotLevel,
   chooseBotAction,
   chooseSimpleBotAction,
+  type DeckGuess,
   type DeckProfile,
   type GameState,
   identityAliases,
@@ -23,6 +24,8 @@ export interface BotRequest {
   profile?: DeckProfile;
   /** Bot do Time: devolve as explicações da jogada (painel do treinador). */
   explain?: boolean;
+  /** O deck provável do Líder do oponente do bot (`/api/bot/hand-guess`): a mão provável dele sai daqui. */
+  handGuess?: DeckGuess;
 }
 
 export interface BotMove {
@@ -36,18 +39,20 @@ export interface BotMove {
  * Se a tradução de volta falhar (não deveria), o bot heurístico decide pelo estado completo para a
  * partida não travar.
  */
-export function computeBotMove({ state, player, level, profile, explain }: BotRequest): BotMove {
+export function computeBotMove({ state, player, level, profile, explain, handGuess }: BotRequest): BotMove {
   const aliases = identityAliases(state);
   const toReal = (a: Action): Action => {
     const r = actionFromView(state, aliases, a);
     return typeof r === 'string' ? a : r;
   };
   const explanations: BotExplanation[] = [];
+  const team = level === 'team';
   const over =
-    level === 'team' && (profile || explain)
+    (team && (profile || explain)) || (handGuess && level !== 'easy')
       ? {
-          ...(profile ? { profile } : {}),
-          ...(explain
+          ...(team && profile ? { profile } : {}),
+          ...(handGuess ? { handGuess } : {}),
+          ...(team && explain
             ? {
                 explain: (e: BotExplanation) =>
                   explanations.push({ ...e, actions: e.actions.map(toReal), alternatives: e.alternatives.map((alt) => ({ ...alt, actions: alt.actions.map(toReal) })) }),

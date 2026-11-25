@@ -567,7 +567,11 @@ export function Menu({
       // com o mesmo Líder).
       const oppLeader = decks.find((d) => d.id === opp)?.leader;
       const botProfile = botLevel === 'team' ? ((await api.bot.profile(opp, oppLeader).catch(() => null))?.profile ?? undefined) : undefined;
-      onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(botProfile ? { botProfile } : {}), ...(notice ? { notice } : {}) });
+      // O deck provável do Líder de quem joga (o que o meta joga com ele, sem as partidas da própria pessoa): o bot
+      // deduz a mão do oponente por aqui. Sem rede ou sem deck provável, o bot joga com o modelo fixo.
+      const myLeader = decks.find((d) => d.id === mine)?.leader;
+      const botHandGuess = botLevel !== 'easy' && myLeader ? ((await api.bot.handGuess(myLeader).catch(() => null))?.guess ?? undefined) : undefined;
+      onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(botProfile ? { botProfile } : {}), ...(botHandGuess ? { botHandGuess } : {}), ...(notice ? { notice } : {}) });
     } catch (e) {
       fail(e);
       setLoading(false);
