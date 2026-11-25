@@ -11,3 +11,6 @@ release/
 
 # worktrees temporários dos agentes
 .claude/worktrees/
+
+# gerado pelo servidor em dev (diferenças das fontes de cartas)
+apps/server/var/
