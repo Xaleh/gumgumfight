@@ -13,16 +13,19 @@ import {
   runChallenge,
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type AdminDailyChallenge, ApiError, api, type DeckSummary } from '../api';
+import { type AdminDailyChallenge, type AdminDailyQueue, ApiError, api, type DeckSummary } from '../api';
 import {
   addCard,
   attackOptions,
   DON_TOTAL,
   donUsed,
+  boardKey,
+  draftFromSpec,
   draftProblems,
   type EditorDraft,
   emptyDraft,
   type FieldDraft,
+  forecastDays,
   MAX_CHARACTERS,
   removeCard,
   setDeck,
@@ -35,6 +38,7 @@ import {
   ZONES,
 } from '../game/dailyEditor';
 import { type MessageKey, useT } from '../i18n';
+import { useSettings } from '../settings';
 import { LessonTable, type TableGame } from './GameScreen';
 import { Icon } from './Icons';
 
@@ -58,69 +62,247 @@ const PROBLEM: Record<ReturnType<typeof draftProblems>[number], MessageKey> = {
 
 // ------------------------------------------------------------------ lista
 
-/** A lista da aba (o editor abre fora da página da Administração: a gravação usa a mesa em tela cheia). */
-export function DailyAdminPanel({ onNew }: { onNew: () => void }) {
+/** O que o editor abre: um desafio novo, um existente para editar (`id`) ou uma cópia (sem `id`). */
+export interface EditorStart {
+  id: string | null;
+  spec: Omit<ChallengeSpec, 'id'>;
+  solution: Action[] | null;
+  wrong: Action[] | null;
+  note: string;
+}
+
+const fmtDay = (day: string, locale: string) =>
+  new Date(`${day}T12:00:00Z`).toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+
+/**
+ * A aba: datas fixas, a fila (com ↑↓ entre os que ainda não saíram e o dia previsto de cada um) e os dias já
+ * publicados com os números. O editor abre fora da página da Administração (a gravação usa a mesa em tela cheia).
+ */
+export function DailyAdminPanel({ onOpen }: { onOpen: (start: EditorStart | null) => void }) {
   const t = useT();
-  const [list, setList] = useState<AdminDailyChallenge[] | null>(null);
+  const { locale } = useSettings();
+  const [data, setData] = useState<AdminDailyQueue | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [pinDay, setPinDay] = useState<Record<string, string>>({});
   useEffect(() => {
     let stop = false;
     api.admin.daily
       .challenges()
-      .then((r) => !stop && (setList(r.challenges), setError(null)))
+      .then((r) => !stop && (setData(r), setError(null)))
       .catch((e: unknown) => !stop && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       stop = true;
     };
   }, [attempt]);
 
-  const remove = async (c: AdminDailyChallenge) => {
-    if (!window.confirm(t('daily.admin.removeConfirm'))) return;
+  const run = async (f: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
     try {
-      await api.admin.daily.remove(c.id);
+      await f();
       setAttempt((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
     }
   };
-  const sorted = [...(list ?? [])].sort((a, b) => a.next - b.next);
+  const open = (c: AdminDailyChallenge, copy: boolean) =>
+    run(async () => {
+      const d = await api.admin.daily.challenge(c.id);
+      onOpen({ id: copy ? null : d.id, spec: d.spec, solution: d.solution, wrong: d.wrong, note: copy ? '' : (d.note ?? '') });
+    });
+
+  const byId = new Map((data?.challenges ?? []).map((c) => [c.id, c]));
+  const today = data?.today ?? '';
+  const todayPublished = Boolean(data?.published.some((p) => p.day === today));
+  const queue = (data?.queue ?? []).map((id) => byId.get(id)).filter((c): c is AdminDailyChallenge => Boolean(c));
+  const fresh = queue.filter((c) => c.days.length === 0).map((c) => c.id);
+  const forecast = data ? forecastDays(todayPublished ? nextDayOf(today) : today, queue.length, data.pinned.map((p) => p.day)) : [];
+  const move = (id: string, delta: -1 | 1) => {
+    const i = fresh.indexOf(id);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= fresh.length) return;
+    const order = [...fresh];
+    [order[i], order[j]] = [order[j], order[i]];
+    void run(() => api.admin.daily.order(order));
+  };
+
+  const info = (c: AdminDailyChallenge) => (
+    <div className="daily-admin-main">
+      <strong>{c.leaders.map((l) => l.name).join(' × ')}</strong>
+      <span className="muted small">
+        {t(GOAL[c.goal])} · {t(LEVEL[c.level] ?? LEVEL[1])} · {c.source === 'catalog' ? `${t('daily.admin.fromCatalog')} (${c.id})` : t('daily.admin.fromAdmin')}
+        {c.days.length ? ` · ${t('daily.admin.days', { days: c.days.slice(-3).join(', '), n: c.days.length })}` : ` · ${t('daily.admin.notYet')}`}
+      </span>
+      {c.note && <span className="small">{c.note}</span>}
+    </div>
+  );
+  const actions = (c: AdminDailyChallenge) => {
+    const editable = c.source === 'admin' && c.days.length === 0;
+    return (
+      <div className="daily-admin-actions">
+        {editable && (
+          <button type="button" className="btn small" disabled={busy} onClick={() => void open(c, false)}>
+            {t('daily.admin.edit')}
+          </button>
+        )}
+        <button type="button" className="btn small" disabled={busy} onClick={() => void open(c, true)}>
+          {t('daily.admin.duplicate')}
+        </button>
+        {editable && (
+          <button
+            type="button"
+            className="btn small"
+            disabled={busy}
+            aria-label={t('daily.admin.remove')}
+            onClick={() => window.confirm(t('daily.admin.removeConfirm')) && void run(() => api.admin.daily.remove(c.id))}
+          >
+            <Icon name="trash" size={14} />
+          </button>
+        )}
+      </div>
+    );
+  };
+  const pinForm = (c: AdminDailyChallenge) => (
+    <form
+      className="daily-admin-pin"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const day = pinDay[c.id];
+        if (day) void run(() => api.admin.daily.pin(c.id, day));
+      }}
+    >
+      <input
+        type="date"
+        min={today}
+        value={pinDay[c.id] ?? ''}
+        aria-label={t('daily.admin.pinDay')}
+        onChange={(e) => setPinDay((p) => ({ ...p, [c.id]: e.target.value }))}
+      />
+      <button type="submit" className="btn small" disabled={busy || !pinDay[c.id]}>
+        {t('daily.admin.pin')}
+      </button>
+    </form>
+  );
+
   return (
     <section className="daily-admin">
       <p className="muted small">{t('daily.admin.hint')}</p>
       <div className="btn-row">
-        <button type="button" className="btn primary" onClick={onNew}>
+        <button type="button" className="btn primary" onClick={() => onOpen(null)}>
           <Icon name="plus" size={16} />
           {t('daily.admin.new')}
         </button>
       </div>
       {error && <div className="error">{error}</div>}
-      {list === null && !error && <p className="muted">{t('common.loading')}</p>}
-      <ol className="daily-admin-list">
-        {sorted.map((c) => (
-          <li key={c.id} className="daily-admin-item">
-            <span className="daily-admin-pos" title={t('daily.admin.queuePos')}>
-              {c.next + 1}
-            </span>
-            <div className="daily-admin-main">
-              <strong>{c.leaders.map((l) => l.name).join(' × ')}</strong>
-              <span className="muted small">
-                {t(GOAL[c.goal])} · {t(LEVEL[c.level] ?? LEVEL[1])} · {c.source === 'catalog' ? t('daily.admin.fromCatalog') : t('daily.admin.fromAdmin')}
-                {c.days.length ? ` · ${t('daily.admin.days', { days: c.days.slice(-3).join(', '), n: c.days.length })}` : ` · ${t('daily.admin.notYet')}`}
-              </span>
-              {c.note && <span className="small">{c.note}</span>}
+      {data === null && !error && <p className="muted">{t('common.loading')}</p>}
+
+      {data && data.pinned.length > 0 && (
+        <>
+          <h3 className="daily-admin-title">{t('daily.admin.pinnedTitle')}</h3>
+          <ol className="daily-admin-list">
+            {data.pinned.map((p) => {
+              const c = byId.get(p.challengeId);
+              if (!c) return null;
+              return (
+                <li key={p.day} className="daily-admin-item">
+                  <span className="daily-admin-date">{fmtDay(p.day, locale)}</span>
+                  {info(c)}
+                  <div className="daily-admin-actions">
+                    <button type="button" className="btn small" disabled={busy} onClick={() => void run(() => api.admin.daily.pin(c.id, null))}>
+                      {t('daily.admin.unpin')}
+                    </button>
+                  </div>
+                  {actions(c)}
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
+
+      {data && (
+        <>
+          <h3 className="daily-admin-title">{t('daily.admin.queueTitle')}</h3>
+          <p className="muted small">{t('daily.admin.queueHint')}</p>
+          <ol className="daily-admin-list">
+            {queue.map((c, k) => {
+              const i = fresh.indexOf(c.id);
+              return (
+                <li key={c.id} className="daily-admin-item">
+                  <span className="daily-admin-pos" title={t('daily.admin.queuePos')}>
+                    {k + 1}
+                  </span>
+                  <div className="daily-admin-col">
+                    <span className="daily-admin-date small">{t('daily.admin.forecast', { day: fmtDay(forecast[k], locale) })}</span>
+                    {info(c)}
+                  </div>
+                  {i >= 0 && (
+                    <div className="daily-admin-move">
+                      <button type="button" className="btn small" disabled={busy || i === 0} aria-label={t('daily.admin.up')} onClick={() => move(c.id, -1)}>
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn small"
+                        disabled={busy || i === fresh.length - 1}
+                        aria-label={t('daily.admin.down')}
+                        onClick={() => move(c.id, 1)}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  )}
+                  {pinForm(c)}
+                  {actions(c)}
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
+
+      {data && data.published.length > 0 && (
+        <>
+          <h3 className="daily-admin-title">{t('daily.admin.publishedTitle')}</h3>
+          <div className="daily-admin-table" role="table" aria-label={t('daily.admin.publishedTitle')}>
+            <div className="daily-admin-row head" role="row">
+              <span role="columnheader">{t('daily.admin.col.day')}</span>
+              <span role="columnheader">{t('daily.admin.col.challenge')}</span>
+              <span role="columnheader">{t('daily.admin.col.opened')}</span>
+              <span role="columnheader">{t('daily.admin.col.tried')}</span>
+              <span role="columnheader">{t('daily.admin.col.solved')}</span>
+              <span role="columnheader">{t('daily.admin.col.avg')}</span>
             </div>
-            {c.source === 'admin' && c.days.length === 0 && (
-              <button type="button" className="btn small" onClick={() => void remove(c)} aria-label={t('daily.admin.remove')}>
-                <Icon name="trash" size={14} />
-              </button>
-            )}
-          </li>
-        ))}
-      </ol>
+            {data.published.map((p) => {
+              const c = byId.get(p.challenge_id);
+              return (
+                <div key={p.day} className="daily-admin-row" role="row">
+                  <span role="cell">
+                    #{p.number} · {fmtDay(p.day, locale)}
+                  </span>
+                  <span role="cell">{c ? c.leaders.map((l) => l.name).join(' × ') : p.challenge_id}</span>
+                  <span role="cell">{p.opened}</span>
+                  <span role="cell">{p.players}</span>
+                  <span role="cell">
+                    {p.solvers}
+                    {p.players > 0 ? ` (${Math.round((p.solvers / p.players) * 100)}%)` : ''}
+                  </span>
+                  <span role="cell">{p.avgAttempts ?? '—'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </section>
   );
 }
+
+const nextDayOf = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
 // ------------------------------------------------------------------ editor
 
@@ -148,12 +330,12 @@ function useDeckData(id: string | null): DeckData | null {
 
 type Recording = { solution: Action[] | null; wrong: Action[] | null };
 
-export function DailyEditor({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+export function DailyEditor({ start, onClose, onSaved }: { start: EditorStart | null; onClose: () => void; onSaved: () => void }) {
   const t = useT();
-  const [draft, setDraft] = useState<EditorDraft>(() => emptyDraft());
+  const [draft, setDraft] = useState<EditorDraft>(() => (start ? draftFromSpec(start.spec, start.note) : emptyDraft()));
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [stage, setStage] = useState<'board' | 'record'>('board');
-  const [rec, setRec] = useState<Recording>({ solution: null, wrong: null });
+  const [rec, setRec] = useState<Recording>({ solution: start?.solution ?? null, wrong: start?.wrong ?? null });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [manual, setManual] = useState<string | null>(null);
@@ -167,10 +349,10 @@ export function DailyEditor({ onClose, onSaved }: { onClose: () => void; onSaved
   const mine = useDeckData(draft.sides[0].deckId);
   const theirs = useDeckData(draft.sides[1].deckId);
 
-  // Mudou a mesa: a gravação deixa de valer.
+  // Mudou a mesa (ou o que o oponente faz): a gravação deixa de valer. Dificuldade, nota e mão revelada não mexem nela.
   const change = (next: EditorDraft) => {
+    if (boardKey(next) !== boardKey(draft)) setRec({ solution: null, wrong: null });
     setDraft(next);
-    setRec({ solution: null, wrong: null });
     setSaveError(null);
     setManual(null);
   };
@@ -196,7 +378,9 @@ export function DailyEditor({ onClose, onSaved }: { onClose: () => void; onSaved
     setSaving(true);
     setSaveError(null);
     try {
-      await api.admin.daily.save({ spec, solution: rec.solution, wrong: rec.wrong, note: draft.note || undefined, ...(allowManual ? { allowManual: true } : {}) });
+      const body = { spec, solution: rec.solution, wrong: rec.wrong, note: draft.note || undefined, ...(allowManual ? { allowManual: true } : {}) };
+      if (start?.id) await api.admin.daily.update(start.id, body);
+      else await api.admin.daily.save(body);
       onSaved();
     } catch (e) {
       if (e instanceof ApiError && e.data.errorCode === 'challengeManualCards') {
@@ -259,7 +443,7 @@ export function DailyEditor({ onClose, onSaved }: { onClose: () => void; onSaved
         <button className="btn small" onClick={onClose}>
           {t('common.back')}
         </button>
-        <h2>{t('daily.admin.new')}</h2>
+        <h2>{start?.id ? t('daily.admin.editTitle') : start ? t('daily.admin.duplicateTitle') : t('daily.admin.new')}</h2>
       </header>
       <section className="coverage-body daily-editor">
 

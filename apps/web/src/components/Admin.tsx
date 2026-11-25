@@ -4,7 +4,7 @@ import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, useT } from '../i18n';
 import { PaymentsPanel, SponsorsPanel, SupporterEditor } from './AdminSupport';
-import { DailyAdminPanel, DailyEditor } from './DailyEditor';
+import { DailyAdminPanel, DailyEditor, type EditorStart } from './DailyEditor';
 import { DeckCleanupPanel } from './DeckCleanup';
 import { ReportsPanel } from './Reports';
 import { TeamBotPanel } from './TeamBot';
@@ -25,7 +25,7 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
   const { user, refresh } = useAuth();
   const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'daily' | 'payments' | 'sponsors' | 'decks' | 'team'>('users');
   /** Editor de desafios do dia aberto (ocupa a tela inteira: a gravação joga na mesa). */
-  const [dailyEditor, setDailyEditor] = useState(false);
+  const [dailyEditor, setDailyEditor] = useState<{ start: EditorStart | null } | null>(null);
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
     }
   };
 
-  if (dailyEditor) return <DailyEditor onClose={() => setDailyEditor(false)} onSaved={() => setDailyEditor(false)} />;
+  if (dailyEditor) return <DailyEditor start={dailyEditor.start} onClose={() => setDailyEditor(null)} onSaved={() => setDailyEditor(null)} />;
 
   return (
     <div className="coverage admin">
@@ -114,7 +114,7 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
         {tab === 'team' && <TeamBotPanel onReplay={onReplay} admin />}
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
         {tab === 'tutorial' && <TutorialFunnelPanel />}
-        {tab === 'daily' && <DailyAdminPanel onNew={() => setDailyEditor(true)} />}
+        {tab === 'daily' && <DailyAdminPanel onOpen={(start) => setDailyEditor({ start })} />}
         {tab === 'payments' && <PaymentsPanel />}
         {tab === 'sponsors' && <SponsorsPanel />}
         {tab === 'decks' && <DeckCleanupPanel />}

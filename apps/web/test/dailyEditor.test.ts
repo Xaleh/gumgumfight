@@ -77,3 +77,31 @@ describe('editor de desafios: rascunho', () => {
     expect(d.attacks).toEqual([{ attacker: 'leader', target: 'ST01-006' }]);
   });
 });
+
+describe('editor de desafios: editar, duplicar e prever a fila', () => {
+  it('o rascunho de um desafio salvo volta ao mesmo desafio (todos os do catálogo)', async () => {
+    const { DAILY_CATALOG } = await import('../../server/src/daily/catalog');
+    const { draftFromSpec, specOf } = await import('../src/game/dailyEditor');
+    for (const c of DAILY_CATALOG) {
+      const { id: _id, solution: _s, wrong: _w, ...spec } = c;
+      expect(specOf(draftFromSpec(spec, 'nota')), c.id).toEqual({ ...spec, level: spec.level ?? 1 });
+    }
+  });
+
+  it('previsão dos dias da fila pula as datas fixas', async () => {
+    const { forecastDays } = await import('../src/game/dailyEditor');
+    expect(forecastDays('2026-12-30', 4, ['2026-12-31', '2027-01-02'])).toEqual(['2026-12-30', '2027-01-01', '2027-01-03', '2027-01-04']);
+  });
+});
+
+describe('editor de desafios: quando a gravação deixa de valer', () => {
+  it('dificuldade, nota e mão revelada não mexem na mesa; turno, cartas e semente mexem', async () => {
+    const { addCard, boardKey, emptyDraft, setDeck } = await import('../src/game/dailyEditor');
+    const d = setDeck(setDeck(emptyDraft(5), 0, 'st01-luffy'), 1, 'st03-crocodile');
+    const k = boardKey(d);
+    expect(boardKey({ ...d, level: 3, note: 'x', revealHand: false })).toBe(k);
+    expect(boardKey({ ...d, turn: 8 })).not.toBe(k);
+    expect(boardKey({ ...d, seed: 6 })).not.toBe(k);
+    expect(boardKey(addCard(d, 0, 'hand', 'ST01-013'))).not.toBe(k);
+  });
+});

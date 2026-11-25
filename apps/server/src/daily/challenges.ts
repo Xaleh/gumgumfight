@@ -252,10 +252,64 @@ export function saveChallenge(db: DB, v: Verified, note: string | null, userId: 
   return id;
 }
 
+const isPublished = (db: DB, id: string) => Boolean(db.prepare('SELECT 1 FROM daily_schedule WHERE challenge_id = ?').get(id));
+
+/** Troca um desafio da Administração que ainda não saiu (mantém id, data de criação, posição e data fixa). */
+export function updateChallenge(db: DB, id: string, v: Verified, note: string | null): 'updated' | 'notFound' | 'published' {
+  if (!db.prepare('SELECT 1 FROM daily_challenges WHERE id = ?').get(id)) return 'notFound';
+  if (isPublished(db, id)) return 'published';
+  db.prepare('UPDATE daily_challenges SET spec = ?, solution = ?, wrong = ?, note = ? WHERE id = ?').run(
+    JSON.stringify(v.spec),
+    JSON.stringify(v.solution),
+    v.wrong ? JSON.stringify(v.wrong) : null,
+    note,
+    id,
+  );
+  return 'updated';
+}
+
 /** Apaga um desafio da Administração que ainda não saiu. */
 export function deleteChallenge(db: DB, id: string): 'deleted' | 'notFound' | 'published' {
   if (!db.prepare('SELECT 1 FROM daily_challenges WHERE id = ?').get(id)) return 'notFound';
-  if (db.prepare('SELECT 1 FROM daily_schedule WHERE challenge_id = ?').get(id)) return 'published';
+  if (isPublished(db, id)) return 'published';
   db.prepare('DELETE FROM daily_challenges WHERE id = ?').run(id);
+  db.prepare('DELETE FROM daily_queue WHERE challenge_id = ?').run(id);
   return 'deleted';
+}
+
+export interface ChallengeDetail {
+  id: string;
+  source: DailyChallenge['source'];
+  /** O desafio como o editor monta (sem as listas congeladas). */
+  spec: Omit<ChallengeSpec, 'id'>;
+  /** Solução e linha errada gravadas (ações); null nos do catálogo, escritos por número de carta. */
+  solution: Action[] | null;
+  wrong: Action[] | null;
+  note: string | null;
+  published: boolean;
+}
+
+/** Um desafio inteiro, para editar ou duplicar no editor (só a Administração lê). */
+export function challengeDetail(db: DB, id: string): ChallengeDetail | null {
+  const strip = ({ id: _i, lists: _l, source: _s, note: _n, createdBy: _b, createdAt: _a, ...spec }: DailyChallenge) => spec;
+  const r = db.prepare('SELECT spec, solution, wrong, note FROM daily_challenges WHERE id = ?').get(id) as
+    | { spec: string; solution: string; wrong: string | null; note: string | null }
+    | undefined;
+  if (r) {
+    const c = fromRow({ id, spec: r.spec, note: r.note, created_by: null, created_at: '' });
+    if (!c) return null;
+    return {
+      id,
+      source: 'admin',
+      spec: strip(c),
+      solution: JSON.parse(r.solution) as Action[],
+      wrong: r.wrong ? (JSON.parse(r.wrong) as Action[]) : null,
+      note: r.note,
+      published: isPublished(db, id),
+    };
+  }
+  const c = DAILY_CATALOG.find((x) => x.id === id);
+  if (!c) return null;
+  const { solution: _s, wrong: _w, ...rest } = c;
+  return { id, source: 'catalog', spec: strip({ ...rest, source: 'catalog' }), solution: null, wrong: null, note: null, published: isPublished(db, id) };
 }
