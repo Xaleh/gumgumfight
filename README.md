@@ -1237,6 +1237,15 @@ regras do desafio, e marque a tentativa como solução (e, se quiser, uma que fa
 servidor monta a mesa de novo com as cartas dele, confere que a solução resolve e que a linha errada falha, e só então
 põe o desafio na fila. As listas dos decks ficam congeladas no desafio (editar o deck depois não muda nada). Carta com
 efeito ⚙ na mesa pede uma confirmação, porque o efeito não roda sozinho. Um desafio que ainda não saiu pode ser apagado.
+
+**Arrumar a fila (mesma aba):** **Datas fixas** mostra os desafios marcados para um dia ("este no dia do torneio");
+**Próximos na fila** mostra a ordem dos dias seguintes com o dia previsto de cada um (pulando as datas fixas), com
+↑↓ para mudar a ordem dos que ainda não saíram e um campo de data para fixar o dia. Uma data fixa pode ser solta, e
+uma que passou sem ninguém abrir o desafio deixa de valer (ele volta para a fila). **Editar** abre no editor um desafio
+montado aqui que ainda não saiu (mudar só a dificuldade, a nota ou a mão revelada mantém a solução gravada; mexer na
+mesa pede gravar de novo); **Duplicar** abre a cópia de qualquer desafio, inclusive dos do catálogo, como ponto de
+partida de outro. **Já saíram** traz, por dia, quantos abriram a mesa do desafio, quantos tentaram, quantos resolveram
+e a média de tentativas de quem resolveu.
 O catálogo em código continua aceitando desafios novos com a solução escrita (o teste `daily.test.ts` joga a solução e
 a linha errada contra o servidor), mas só com cartas que existem no repositório.
 

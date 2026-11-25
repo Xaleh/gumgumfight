@@ -19,19 +19,63 @@ export interface Published<T extends Queued> {
 
 type ScheduleRow = { day: string; challenge_id: string; number: number };
 
+export const nextDay = (day: string) => shiftDay(day, 1);
+
+/** Data fixa e posição manual de cada desafio (`daily_queue`). */
+export function queueMeta(db: DB): Map<string, { position: number | null; pinnedDay: string | null }> {
+  const rows = db.prepare('SELECT challenge_id, position, pinned_day FROM daily_queue').all() as Array<{
+    challenge_id: string;
+    position: number | null;
+    pinned_day: string | null;
+  }>;
+  return new Map(rows.map((r) => [r.challenge_id, { position: r.position, pinnedDay: r.pinned_day }]));
+}
+
+/** Datas fixas ainda por vir (a partir de `fromDay`, sem o dia já publicado): dia → desafio. */
+function activePins(db: DB, fromDay: string): Map<string, string> {
+  const rows = db
+    .prepare(
+      `SELECT q.challenge_id, q.pinned_day FROM daily_queue q
+       WHERE q.pinned_day IS NOT NULL AND q.pinned_day >= ?
+         AND NOT EXISTS (SELECT 1 FROM daily_schedule s WHERE s.day = q.pinned_day)`,
+    )
+    .all(fromDay) as Array<{ challenge_id: string; pinned_day: string }>;
+  return new Map(rows.map((r) => [r.pinned_day, r.challenge_id]));
+}
+
 /**
- * Ordem da fila: primeiro os desafios ainda não publicados (na ordem da lista: o catálogo e depois os da
- * Administração), depois os já publicados, do que saiu há mais tempo para o mais recente.
+ * Ordem da fila a partir de `fromDay`: primeiro os desafios ainda não publicados (na ordem manual da Administração;
+ * sem ela, na ordem da lista: o catálogo e depois os da Administração), depois os já publicados, do que saiu há mais
+ * tempo para o mais recente. Desafio com data fixa por vir fica fora: ele sai no dia dele.
  */
-export function queueOrder<T extends Queued>(db: DB, catalog: T[]): T[] {
+export function queueOrder<T extends Queued>(db: DB, catalog: T[], fromDay = '0000-00-00'): T[] {
   const last = new Map(
     (db.prepare('SELECT challenge_id, MAX(day) AS day FROM daily_schedule GROUP BY challenge_id').all() as Array<{ challenge_id: string; day: string }>).map(
       (r) => [r.challenge_id, r.day],
     ),
   );
-  const fresh = catalog.filter((c) => !last.has(c.id));
-  const used = catalog.filter((c) => last.has(c.id)).sort((a, b) => last.get(a.id)!.localeCompare(last.get(b.id)!));
+  const pinned = new Set(activePins(db, fromDay).values());
+  const meta = queueMeta(db);
+  const pos = (c: T, i: number) => [meta.get(c.id)?.position ?? Number.MAX_SAFE_INTEGER, i] as const;
+  const open = catalog.map((c, i) => ({ c, i })).filter(({ c }) => !pinned.has(c.id));
+  const fresh = open
+    .filter(({ c }) => !last.has(c.id))
+    .sort((a, b) => {
+      const [pa, ia] = pos(a.c, a.i);
+      const [pb, ib] = pos(b.c, b.i);
+      return pa - pb || ia - ib;
+    })
+    .map(({ c }) => c);
+  const used = open
+    .filter(({ c }) => last.has(c.id))
+    .map(({ c }) => c)
+    .sort((a, b) => last.get(a.id)!.localeCompare(last.get(b.id)!));
   return [...fresh, ...used];
+}
+
+/** Desafios com data fixa por vir, na ordem das datas. */
+export function pinnedQueue(db: DB, fromDay: string): Array<{ day: string; challengeId: string }> {
+  return [...activePins(db, fromDay).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, challengeId]) => ({ day, challengeId }));
 }
 
 /** O desafio publicado no dia (null = nenhum). */
@@ -41,15 +85,52 @@ export function publishedOn<T extends Queued>(db: DB, day: string, catalog: T[])
   return r && challenge ? { day: r.day, number: r.number, challenge } : null;
 }
 
-/** Publica o desafio do dia, se ainda não foi publicado: o próximo da fila. Depois de publicado, o dia não muda. */
+/**
+ * Publica o desafio do dia, se ainda não foi publicado: o que tem a data fixa deste dia ou, sem ele, o próximo da
+ * fila. Depois de publicado, o dia não muda.
+ */
 export function publish<T extends Queued>(db: DB, day: string, catalog: T[]): Published<T> {
   const existing = publishedOn(db, day, catalog);
   if (existing) return existing;
-  const next = queueOrder(db, catalog)[0];
+  const pinnedId = activePins(db, day).get(day);
+  const next = (pinnedId && catalog.find((c) => c.id === pinnedId)) || queueOrder(db, catalog, day)[0];
   if (!next) throw new Error('catálogo do desafio do dia vazio');
   const number = ((db.prepare('SELECT MAX(number) AS n FROM daily_schedule').get() as { n: number | null }).n ?? 0) + 1;
   db.prepare('INSERT OR IGNORE INTO daily_schedule (day, challenge_id, number) VALUES (?, ?, ?)').run(day, next.id, number);
   return publishedOn(db, day, catalog)!;
+}
+
+/** Ordem manual: os ids na ordem pedida (os outros ficam sem posição, depois deles). */
+export function setQueueOrder(db: DB, ids: string[]) {
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE daily_queue SET position = NULL').run();
+    const put = db.prepare(
+      'INSERT INTO daily_queue (challenge_id, position) VALUES (?, ?) ON CONFLICT(challenge_id) DO UPDATE SET position = excluded.position',
+    );
+    ids.forEach((id, i) => put.run(id, i));
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+/**
+ * Fixa (ou solta, com `day` null) a data de um desafio. Só vale para um dia ainda não publicado, de hoje em diante, e
+ * um desafio por dia.
+ */
+export function pinChallenge(db: DB, id: string, day: string | null, today: string): 'ok' | 'past' | 'published' | 'taken' {
+  if (day !== null) {
+    if (day < today) return 'past';
+    if (db.prepare('SELECT 1 FROM daily_schedule WHERE day = ?').get(day)) return 'published';
+    const other = db.prepare('SELECT challenge_id FROM daily_queue WHERE pinned_day = ?').get(day) as { challenge_id: string } | undefined;
+    if (other && other.challenge_id !== id) return 'taken';
+  }
+  db.prepare(
+    'INSERT INTO daily_queue (challenge_id, pinned_day) VALUES (?, ?) ON CONFLICT(challenge_id) DO UPDATE SET pinned_day = excluded.pinned_day',
+  ).run(id, day);
+  return 'ok';
 }
 
 export function recentSchedule(db: DB, limit: number): ScheduleRow[] {
@@ -68,6 +149,11 @@ export function resultOf(db: DB, owner: string, day: string): DailyResult {
     | { attempts: number; solved_at: string | null }
     | undefined;
   return { attempts: r?.attempts ?? 0, solved: Boolean(r?.solved_at) };
+}
+
+/** Quem abriu a mesa do desafio do dia (sem tentativa ainda): entra nos números do dia como "abriu". */
+export function recordOpen(db: DB, owner: string, day: string) {
+  db.prepare('INSERT OR IGNORE INTO daily_results (owner_hash, day, attempts) VALUES (?, ?, 0)').run(owner, day);
 }
 
 /** Conta uma tentativa terminada. Depois de resolver, o resultado do dia não muda mais. */
@@ -121,11 +207,24 @@ export function historyOf(db: DB, owner: string | null, today: string, n: number
   return rows.map((r) => ({ day: r.day, number: r.number, attempts: r.attempts ?? 0, solved: Boolean(r.solved_at) }));
 }
 
-/** Quantos donos tentaram e quantos resolveram no dia (para a Administração e o resultado). */
-export function dayStats(db: DB, day: string) {
-  const r = db.prepare('SELECT COUNT(*) AS players, SUM(solved_at IS NOT NULL) AS solvers FROM daily_results WHERE day = ?').get(day) as {
-    players: number;
-    solvers: number | null;
-  };
-  return { players: r.players, solvers: r.solvers ?? 0 };
+export interface DayStats {
+  /** Donos que abriram a mesa do desafio. */
+  opened: number;
+  /** Donos com pelo menos uma tentativa terminada. */
+  players: number;
+  solvers: number;
+  /** Média de tentativas de quem resolveu (null = ninguém resolveu). */
+  avgAttempts: number | null;
+}
+
+/** Números do dia: quantos abriram, tentaram e resolveram, e a média de tentativas de quem resolveu. */
+export function dayStats(db: DB, day: string): DayStats {
+  const r = db
+    .prepare(
+      `SELECT COUNT(*) AS opened, SUM(attempts > 0) AS players, SUM(solved_at IS NOT NULL) AS solvers,
+              AVG(CASE WHEN solved_at IS NOT NULL THEN attempts END) AS avg
+       FROM daily_results WHERE day = ?`,
+    )
+    .get(day) as { opened: number; players: number | null; solvers: number | null; avg: number | null };
+  return { opened: r.opened, players: r.players ?? 0, solvers: r.solvers ?? 0, avgAttempts: r.avg === null ? null : Math.round(r.avg * 10) / 10 };
 }

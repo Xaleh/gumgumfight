@@ -297,7 +297,11 @@ Administração (tabela `daily_challenges`). O editor (`DailyEditor.tsx`) monta 
 (`game/dailyEditor.ts`), joga na mesa com `runChallenge` (o oponente responde como no servidor) e manda a solução e a
 linha errada como ações com os uids reais; `verifyChallenge` congela as listas dos dois decks, recusa cartas ⚙ na mesa
 sem `allowManual`, monta a mesa com as cartas do servidor e exige que a solução resolva e a linha errada falhe. As
-soluções nunca saem do servidor. A visão vai com apelidos de carta (HMAC com o segredo `daily` e o dia), e as jogadas voltam
+soluções nunca saem do servidor.
+
+A ordem da fila (`store.ts`, `queueOrder`): primeiro os que ainda não saíram, na ordem manual (`daily_queue.position`)
+e, sem ela, na da lista; depois os que já saíram, do mais antigo para o mais recente. Os que têm data fixa por vir ficam
+fora: `publish` usa o desafio fixado no dia, se houver, e senão o primeiro da fila. A visão vai com apelidos de carta (HMAC com o segredo `daily` e o dia), e as jogadas voltam
 traduzidas por `actionFromView`; com `revealHand`, a mão inicial do oponente entra como cartas visíveis (`extra`). A
 cada pedido o servidor refaz a tentativa inteira a partir da mesa montada (guardada na memória por 10 minutos).
 
@@ -810,7 +814,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (41)
+### Tabelas (42)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -837,8 +841,9 @@ baixadas quando tocam) + `public/`.
 | `friendships` | `(user_low, user_high)` (`user_low < user_high`) | Um par de contas: `requested_by` (quem pediu), `status` (`pending`/`accepted`), `created_at`, `accepted_at`. Recusar, cancelar ou desfazer apaga a linha. Índice por `user_high` | `/api/friends/*` |
 | `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`), segredo do link do replay (`replay_link`) e dos apelidos de carta do Desafio do dia (`daily`) | servidor |
 | `daily_schedule` | `day` (AAAA-MM-DD, horário de Brasília) | Desafio do dia publicado: `challenge_id` (id em `daily/catalog.ts`), `number` (único: o "#N"), `published_at`. Fixo depois de publicado | `GET /api/daily` (publica o próximo da fila na primeira consulta do dia) |
-| `daily_results` | `(owner_hash, day)` | Resultado de cada dono (`user:<id>` ou navegador) no dia: `attempts` (tentativas terminadas), `solved_at` (null = ainda não resolveu), `updated_at`. Índice por dia. A sequência de dias seguidos sai daqui | `POST /api/daily/play` |
+| `daily_results` | `(owner_hash, day)` | Resultado de cada dono (`user:<id>` ou navegador) no dia, a partir de quando abriu a mesa do desafio (linha com 0 tentativas; o cartão da home não conta): `attempts` (tentativas terminadas), `solved_at` (null = ainda não resolveu), `updated_at`. Índice por dia. A sequência de dias seguidos sai daqui | `POST /api/daily/play` |
 | `daily_challenges` | `id` (`a-` + 10 hex) | Desafio montado na Administração: `spec` (JSON `ChallengeSpec` com as listas dos dois decks congeladas), `solution` e `wrong` (JSON: ações com os uids reais da mesa montada), `note`, `created_by`, `created_at`. Entra na fila depois do catálogo, na ordem de criação | `POST /api/admin/daily/challenges` (depois de conferido); `DELETE` enquanto não saiu |
+| `daily_queue` | `challenge_id` | Fila arrumada na Administração (catálogo e banco): `position` (ordem manual dos que ainda não saíram; NULL = depois deles, na ordem padrão) e `pinned_day` (único: o dia em que o desafio sai; uma data que passou sem publicação deixa de valer) | `PUT /api/admin/daily/queue`, `PUT /api/admin/daily/challenges/:id/pin` |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
 | `tournament_players` | `(tournament_id, user_id)` | `name`, `deck_id`, **`deck` (JSON `DeckList` congelado)**, `seed`, `dropped` | inscrição, início, drop |
 | `tournament_virtuals` | `(tournament_id, id)` | Sala do Tempo: `name`, `leader`, `deck_id`, `skill`, `seed` dos jogadores virtuais (`id` = `v:17`, usado em `tournament_matches`) | início da Sala do Tempo |
@@ -2049,8 +2054,12 @@ Quem chama, na coluna da direita:
 | GET | `/api/daily[?brief=1]` | Desafio do dia: número, enunciado (objetivo, nível, roteiro de ataques, mão revelada), a mesa como o jogador a vê (sem `brief`), quantos resolveram, e o resultado, a sequência e os últimos 7 dias de quem pede. Publica o dia na primeira consulta | Pública (com o código do navegador, o resultado de quem pede) |
 | POST | `/api/daily/play` | Tentativa (`{ day, actions }`, as jogadas sobre a visão): o servidor refaz o desafio, joga pelo oponente e devolve `status` (`playing/solved/failed`), a nova visão, o resultado e a sequência. Vale hoje e ontem; grava a tentativa quando ela termina | Navegador |
 | GET | `/api/admin/daily` | A fila: dias publicados (com quantos jogaram e resolveram) e os próximos do catálogo | Admin |
-| GET | `/api/admin/daily/challenges` | Todos os desafios (catálogo e Administração, sem as soluções), com a posição na fila, os Líderes e os dias em que saíram | Admin |
+| GET | `/api/admin/daily/challenges` | Todos os desafios (catálogo e Administração, sem as soluções), com a posição na fila, a data fixa, os Líderes e os dias em que saíram; a fila automática, as datas fixas por vir e os últimos 30 dias publicados com os números (abriram, tentaram, resolveram, média de tentativas) | Admin |
 | POST | `/api/admin/daily/challenges` | Salva um desafio do editor (`{ spec, solution, wrong?, note?, allowManual? }`) depois de conferir (`challengeInvalid`, `challengeDeck`, `challengeBoard`, `challengeManualCards`, `challengeNotSolved`, `challengeWrongSolves`) | Admin |
+| GET | `/api/admin/daily/challenges/:id` | Um desafio inteiro, para editar ou duplicar: o `spec` (sem as listas congeladas) e, nos da Administração, a solução e a linha errada gravadas | Admin |
+| PUT | `/api/admin/daily/challenges/:id` | Troca um desafio da Administração que ainda não saiu (mesmo corpo e mesma conferência do POST; 409 `challengePublished`) | Admin |
+| PUT | `/api/admin/daily/challenges/:id/pin` | Fixa (`{ day }`) ou solta (`{ day: null }`) o dia em que o desafio sai; recusa dia passado (`pinPast`), já publicado (`pinPublished`) ou com outro desafio (`pinTaken`) | Admin |
+| PUT | `/api/admin/daily/queue` | Ordem manual dos que ainda não saíram (`{ order: ids }`); devolve a fila | Admin |
 | DELETE | `/api/admin/daily/challenges/:id` | Apaga um desafio da Administração que ainda não saiu (409 `challengePublished`) | Admin |
 | GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |
 | GET | `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=\|deck=` | Totais, Líderes e matchups; tendência semanal; cartas de um Líder. Ranqueada e torneios só com o plano (salvo `mine=1`) | Pública; Token (`stats:read`) |

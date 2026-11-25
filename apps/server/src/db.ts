@@ -952,6 +952,14 @@ function migrateDaily(db: DB) {
       created_by TEXT,                          -- users.id
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- Fila arrumada na Administração (catálogo e desafios do banco): a ordem manual dos que ainda não saíram e a data
+    -- fixa de um desafio (um por dia). Sem linha aqui, vale a ordem padrão.
+    CREATE TABLE IF NOT EXISTS daily_queue (
+      challenge_id TEXT PRIMARY KEY,
+      position     INTEGER,                     -- ordem manual (NULL = depois dos ordenados, na ordem padrão)
+      pinned_day   TEXT UNIQUE                  -- AAAA-MM-DD: sai neste dia (NULL = sem data)
+    );
   `);
 }
 

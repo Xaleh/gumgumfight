@@ -171,6 +171,57 @@ export function specOf(d: EditorDraft): Omit<ChallengeSpec, 'id'> | null {
   };
 }
 
+const fromCard = (c: string | ScenarioCard): FieldDraft =>
+  typeof c === 'string' ? field(c) : { id: c.id, rested: Boolean(c.rested), fresh: Boolean(c.fresh), don: c.don ?? 0 };
+
+function sideFrom(s: ScenarioSide, deckId: string): SideDraft {
+  return {
+    deckId,
+    hand: [...(s.hand ?? [])],
+    characters: (s.characters ?? []).map(fromCard),
+    stage: s.stage ? fromCard(s.stage) : null,
+    leader: { rested: Boolean(s.leader?.rested), don: s.leader?.don ?? 0 },
+    lifeCount: typeof s.life === 'number' ? s.life : Array.isArray(s.life) ? 0 : 5,
+    life: Array.isArray(s.life) ? [...s.life] : [],
+    deckTop: [...(s.deckTop ?? [])],
+    trash: [...(s.trash ?? [])],
+    donActive: s.donActive ?? 0,
+    donRested: s.donRested ?? 0,
+  };
+}
+
+/** O rascunho de um desafio já salvo (para editar ou duplicar): o caminho inverso de `specOf`. */
+export function draftFromSpec(spec: Omit<ChallengeSpec, 'id'>, note = ''): EditorDraft {
+  return {
+    goal: spec.goal,
+    level: spec.level ?? 1,
+    turn: spec.scenario.turn,
+    seed: spec.seed,
+    revealHand: spec.goal === 'lethal' && Boolean(spec.revealHand),
+    note,
+    sides: [sideFrom(spec.scenario.sides[0], spec.decks[0]), sideFrom(spec.scenario.sides[1], spec.decks[1])],
+    attacks: (spec.attacks ?? []).map((a) => ({ ...a })),
+  };
+}
+
+/** Dias previstos para a fila: a partir de `start`, um por dia, pulando os dias com data fixa. */
+export function forecastDays(start: string, count: number, pinnedDays: Iterable<string>): string[] {
+  const pinned = new Set(pinnedDays);
+  const out: string[] = [];
+  let d = start;
+  const next = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  while (out.length < count) {
+    if (!pinned.has(d)) out.push(d);
+    d = next(d);
+  }
+  return out;
+}
+
+/** O que muda a partida gravada (mesa, decks, semente, objetivo, roteiro): mudou, a solução gravada deixa de valer. */
+export function boardKey(d: EditorDraft): string {
+  return JSON.stringify([d.goal, d.turn, d.seed, d.sides, d.goal === 'survive' ? d.attacks : []]);
+}
+
 /** O que ainda impede de ir para a mesa (chaves do dicionário), antes de o motor montar. */
 export function draftProblems(d: EditorDraft): Array<'decks' | 'don0' | 'don1' | 'attacks'> {
   const out: Array<'decks' | 'don0' | 'don1' | 'attacks'> = [];

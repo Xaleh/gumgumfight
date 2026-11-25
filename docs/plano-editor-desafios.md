@@ -27,12 +27,20 @@ navegador de quem joga; a mesa de quem joga continua sendo só a visão dele (`v
   admin joga na mesa (com o oponente respondendo pelas regras do desafio) e marca a tentativa como solução ou como
   linha errada.
 
-### Fase 2 — Fila com datas e números
+### Fase 2 — Fila com datas e números ✅
 
-- Datas fixas ("este desafio no dia do torneio") e reordenar a fila arrastando.
-- Por dia publicado: quantos abriram, tentaram e resolveram, e a média de tentativas.
-- Editar um desafio que ainda não saiu; despublicar o de amanhã.
-- Duplicar um desafio como ponto de partida de outro.
+- Tabela `daily_queue`: a ordem manual dos que ainda não saíram e a data fixa de um desafio (um por dia; vale para os
+  do catálogo também). `publish` usa o desafio fixado no dia; os fixados ficam fora da fila automática. Uma data que
+  passou sem ninguém abrir o desafio deixa de valer.
+- Na aba: **Datas fixas** (soltar), **Próximos na fila** com o dia previsto de cada um, ↑↓ entre os que ainda não
+  saíram (botões em vez de arrastar: funcionam no celular e no teclado) e o campo para fixar a data; **Já saíram**
+  com abriram, tentaram, resolveram e a média de tentativas de quem resolveu. "Abriu" é quem abriu a mesa do desafio
+  (a consulta sem `brief`), gravado em `daily_results` com 0 tentativas.
+- **Editar** um desafio da Administração que ainda não saiu (conferido de novo; mudar só dificuldade, nota ou mão
+  revelada mantém a solução gravada) e **Duplicar** qualquer desafio, inclusive os do catálogo (sem a solução, que lá é
+  escrita por número de carta), como ponto de partida.
+- "Despublicar o de amanhã" virou soltar a data fixa: o dia só é publicado quando alguém o abre, então o de amanhã é
+  sempre o primeiro da fila ou o fixado, e os dois se mudam pela fila.
 
 ### Fase 3 — Defensor configurável
 

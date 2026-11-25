@@ -101,7 +101,7 @@ describe('desafio do dia: tentativas e sequência', () => {
     await playLine(app, g.day, g.view, c.wrong);
     const after = (await today(app)).json();
     expect(after.result).toEqual({ attempts: 3, solved: true });
-    expect(after.stats).toEqual({ players: 1, solvers: 1 });
+    expect(after.stats).toEqual({ opened: 1, players: 1, solvers: 1, avgAttempts: 3 });
     // Tentativa ainda em andamento não conta.
     const other = browser('b');
     await play(app, g.day, resolveMove(g.view, c.solution[0]), other);
@@ -301,5 +301,136 @@ describe('desafio do dia: editor da Administração', () => {
     }
     expect((await admin(app, db, 'GET', '/api/admin/daily/challenges')).json().challenges.at(-1)).toMatchObject({ id: b, days: ['2026-10-18'] });
     expect((await admin(app, db, 'DELETE', `/api/admin/daily/challenges/${b}`)).statusCode).toBe(409);
+  });
+});
+
+// ------------------------------------------------------------------ fila arrumada na Administração (fase 2)
+
+const ids = DAILY_CATALOG.map((c) => c.id);
+const put = (app: App, db: DB, url: string, payload: object) => app.inject({ method: 'PUT', url, headers: login(db, 'admin').headers, payload });
+/** Publica os dias `from`..`to` (inclusive) e devolve o id do desafio de cada um. */
+async function publishDays(app: App, clock: { t: number }, from: number, to: number) {
+  const out: string[] = [];
+  for (let d = from; d <= to; d++) {
+    clock.t = T0 + d * DAY_MS;
+    out.push((await today(app, browser(`dia-${d}`))).json().challenge.id);
+  }
+  return out;
+}
+
+describe('desafio do dia: fila com datas fixas e ordem manual', () => {
+  it('a data fixa tira o desafio da fila e ele sai no dia marcado', async () => {
+    const { db, app, clock } = setup();
+    expect(await publishDays(app, clock, 0, 0)).toEqual([ids[0]]);
+    // 12/10 é hoje; fixa o 4º do catálogo em 14/10.
+    const pin = await put(app, db, `/api/admin/daily/challenges/${ids[3]}/pin`, { day: '2026-10-14' });
+    expect(pin.statusCode).toBe(200);
+    const list = (await admin(app, db, 'GET', '/api/admin/daily/challenges')).json();
+    expect(list.pinned).toEqual([{ day: '2026-10-14', challengeId: ids[3] }]);
+    expect(list.queue.slice(0, 2)).toEqual([ids[1], ids[2]]);
+    expect(list.challenges.find((c: { id: string }) => c.id === ids[3])).toMatchObject({ pinnedDay: '2026-10-14', next: -1 });
+    expect(await publishDays(app, clock, 1, 4)).toEqual([ids[1], ids[3], ids[2], ids[4]]);
+  });
+
+  it('recusa data passada, dia já publicado, dia ocupado, data inválida e desafio desconhecido; e solta a data', async () => {
+    const { db, app, clock } = setup();
+    await publishDays(app, clock, 0, 0);
+    const code = async (id: string, day: unknown) => {
+      const r = await put(app, db, `/api/admin/daily/challenges/${id}/pin`, { day });
+      return [r.statusCode, r.json().errorCode];
+    };
+    expect(await code(ids[1], '2026-10-11')).toEqual([400, 'pinPast']);
+    expect(await code(ids[1], '2026-10-12')).toEqual([409, 'pinPublished']);
+    expect(await code(ids[1], '13/10/2026')).toEqual([400, 'badDay']);
+    expect(await code('nao-existe', '2026-10-20')).toEqual([404, 'challengeNotFound']);
+    expect((await put(app, db, `/api/admin/daily/challenges/${ids[1]}/pin`, { day: '2026-10-20' })).statusCode).toBe(200);
+    expect(await code(ids[2], '2026-10-20')).toEqual([409, 'pinTaken']);
+    // Soltar a data devolve o desafio à fila.
+    expect((await put(app, db, `/api/admin/daily/challenges/${ids[1]}/pin`, { day: null })).statusCode).toBe(200);
+    expect((await admin(app, db, 'GET', '/api/admin/daily/challenges')).json()).toMatchObject({ pinned: [], queue: expect.arrayContaining([ids[1]]) });
+    expect(await publishDays(app, clock, 1, 1)).toEqual([ids[1]]);
+  });
+
+  it('data fixa que passou sem ninguém abrir deixa de valer', async () => {
+    const { db, app, clock } = setup();
+    await publishDays(app, clock, 0, 0);
+    await put(app, db, `/api/admin/daily/challenges/${ids[5]}/pin`, { day: '2026-10-13' });
+    // Ninguém abriu em 13/10; em 14/10 o desafio volta para a fila no lugar dele.
+    clock.t = T0 + 2 * DAY_MS;
+    expect((await admin(app, db, 'GET', '/api/admin/daily/challenges')).json().pinned).toEqual([]);
+    expect(await publishDays(app, clock, 2, 6)).toEqual([ids[1], ids[2], ids[3], ids[4], ids[5]]);
+  });
+
+  it('a ordem manual muda quem sai primeiro; ordem inválida é recusada', async () => {
+    const { db, app, clock } = setup();
+    const r = await put(app, db, '/api/admin/daily/queue', { order: [ids[5], ids[4]] });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().queue.slice(0, 3)).toEqual([ids[5], ids[4], ids[0]]);
+    expect((await put(app, db, '/api/admin/daily/queue', { order: [ids[0], ids[0]] })).statusCode).toBe(400);
+    expect((await put(app, db, '/api/admin/daily/queue', { order: ['nao-existe'] })).statusCode).toBe(400);
+    expect((await put(app, db, '/api/admin/daily/queue', { order: 'x' })).statusCode).toBe(400);
+    expect(await publishDays(app, clock, 0, 2)).toEqual([ids[5], ids[4], ids[0]]);
+  });
+
+  it('só admin mexe na fila', async () => {
+    const { db, app } = setup();
+    const player = login(db, 'player').headers;
+    expect((await app.inject({ method: 'PUT', url: '/api/admin/daily/queue', headers: player, payload: { order: [] } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'PUT', url: `/api/admin/daily/challenges/${ids[0]}/pin`, headers: player, payload: { day: null } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: `/api/admin/daily/challenges/${ids[0]}`, headers: player })).statusCode).toBe(403);
+  });
+});
+
+describe('desafio do dia: números por dia', () => {
+  it('conta quem abriu (o cartão da home não conta), quem tentou, quem resolveu e a média de tentativas', async () => {
+    const { db, app } = setup();
+    const g = (await today(app, browser('n1'))).json();
+    await app.inject({ method: 'GET', url: '/api/daily?brief=1', headers: browser('so-cartao').headers });
+    await today(app, browser('n2'));
+    await today(app, browser('n3'));
+    const c = DAILY_CATALOG[0];
+    await playLine(app, g.day, g.view, c.wrong, browser('n1'));
+    await playLine(app, g.day, g.view, c.solution, browser('n1'));
+    await playLine(app, g.day, g.view, c.solution, browser('n2'));
+    await playLine(app, g.day, g.view, c.wrong, browser('n3'));
+    // Quem consulta agora também abriu.
+    expect((await today(app, browser('n4'))).json().stats).toEqual({ opened: 4, players: 3, solvers: 2, avgAttempts: 1.5 });
+    const pub = (await admin(app, db, 'GET', '/api/admin/daily/challenges')).json().published;
+    expect(pub).toEqual([{ day: g.day, challenge_id: c.id, number: 1, opened: 4, players: 3, solvers: 2, avgAttempts: 1.5 }]);
+  });
+});
+
+describe('desafio do dia: editar e duplicar', () => {
+  it('lê o desafio inteiro, edita enquanto não saiu e recusa depois', async () => {
+    const { db, app, clock } = setup();
+    const c = editorChallenge(db);
+    const id = (await admin(app, db, 'POST', '/api/admin/daily/challenges', { spec: c.spec, solution: c.solution, wrong: c.wrong, note: 'v1' })).json().id;
+    const d = (await admin(app, db, 'GET', `/api/admin/daily/challenges/${id}`)).json();
+    expect(d).toMatchObject({ id, source: 'admin', note: 'v1', published: false, solution: c.solution, wrong: c.wrong });
+    expect(d.spec).toEqual(c.spec);
+    expect(d.spec.lists).toBeUndefined();
+    // Edita: mais difícil e com outra nota; a solução continua valendo.
+    const edit = await put(app, db, `/api/admin/daily/challenges/${id}`, { spec: { ...c.spec, level: 3 }, solution: c.solution, note: 'v2' });
+    expect(edit.statusCode).toBe(200);
+    const after = (await admin(app, db, 'GET', `/api/admin/daily/challenges/${id}`)).json();
+    expect(after).toMatchObject({ note: 'v2', wrong: null, spec: { level: 3 } });
+    // A edição é conferida de novo.
+    expect((await put(app, db, `/api/admin/daily/challenges/${id}`, { spec: c.spec, solution: c.wrong })).json().errorCode).toBe('challengeNotSolved');
+    // Saiu: não edita mais.
+    await put(app, db, `/api/admin/daily/challenges/${id}/pin`, { day: '2026-10-12' });
+    clock.t = T0;
+    expect((await today(app)).json().challenge.id).toBe(id);
+    expect((await put(app, db, `/api/admin/daily/challenges/${id}`, { spec: c.spec, solution: c.solution })).statusCode).toBe(409);
+    expect((await admin(app, db, 'GET', `/api/admin/daily/challenges/${id}`)).json().published).toBe(true);
+  });
+
+  it('do catálogo: lê a mesa (para duplicar), sem solução, e não edita', async () => {
+    const { db, app } = setup();
+    const c = editorChallenge(db);
+    const d = (await admin(app, db, 'GET', `/api/admin/daily/challenges/${ids[0]}`)).json();
+    expect(d).toMatchObject({ source: 'catalog', solution: null, wrong: null });
+    expect(d.spec).toEqual(c.spec);
+    expect((await put(app, db, `/api/admin/daily/challenges/${ids[0]}`, { spec: c.spec, solution: c.solution })).statusCode).toBe(404);
+    expect((await admin(app, db, 'GET', '/api/admin/daily/challenges/nao-existe')).statusCode).toBe(404);
   });
 });

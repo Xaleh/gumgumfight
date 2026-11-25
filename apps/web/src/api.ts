@@ -830,10 +830,16 @@ export const api = {
   admin: {
     /** Editor de desafios do dia: os desafios (catálogo e Administração), salvar um conferido e apagar um que não saiu. */
     daily: {
-      challenges: () => get<{ challenges: AdminDailyChallenge[] }>('/api/admin/daily/challenges'),
-      save: (body: { spec: Omit<ChallengeSpec, 'id'>; solution: Action[]; wrong: Action[] | null; note?: string; allowManual?: boolean }) =>
-        send<{ id: string; next: number }>('POST', '/api/admin/daily/challenges', body),
+      challenges: () => get<AdminDailyQueue>('/api/admin/daily/challenges'),
+      /** Um desafio inteiro (com a solução gravada, nos da Administração), para editar ou duplicar. */
+      challenge: (id: string) => get<AdminDailyDetail>(`/api/admin/daily/challenges/${encodeURIComponent(id)}`),
+      save: (body: AdminDailyBody) => send<{ id: string; next: number }>('POST', '/api/admin/daily/challenges', body),
+      update: (id: string, body: AdminDailyBody) => send<{ id: string }>('PUT', `/api/admin/daily/challenges/${encodeURIComponent(id)}`, body),
       remove: (id: string) => send<void>('DELETE', `/api/admin/daily/challenges/${encodeURIComponent(id)}`),
+      /** Fixa (ou solta, com null) a data em que o desafio sai. */
+      pin: (id: string, day: string | null) => send<{ id: string; day: string | null }>('PUT', `/api/admin/daily/challenges/${encodeURIComponent(id)}/pin`, { day }),
+      /** Ordem manual dos que ainda não saíram. */
+      order: (order: string[]) => send<{ queue: string[] }>('PUT', '/api/admin/daily/queue', { order }),
     },
     tutorial: (days = 30) => get<{ days: number; since: string; lessons: TutorialFunnel[] }>(`/api/admin/tutorial?days=${days}`),
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
@@ -2419,7 +2425,7 @@ export interface DailyToday {
   };
   /** A mesa no começo, como o jogador a vê (sem `brief`). */
   view?: GameState;
-  stats: { players: number; solvers: number };
+  stats: DailyDayStats;
   result: DailyResult;
   streak: DailyStreak;
   history: Array<{ day: string; number: number; attempts: number; solved: boolean }>;
@@ -2434,7 +2440,15 @@ export interface DailyPlay {
   streak: DailyStreak;
 }
 
-/** Desafio na lista do editor (sem a solução). `next`: posição na fila (0 = o próximo a sair). */
+/** Números de um dia do desafio: abriram, tentaram, resolveram e a média de tentativas de quem resolveu. */
+export interface DailyDayStats {
+  opened: number;
+  players: number;
+  solvers: number;
+  avgAttempts: number | null;
+}
+
+/** Desafio na lista do editor (sem a solução). `next`: posição na fila automática (0 = o próximo; -1 = com data fixa). */
 export interface AdminDailyChallenge {
   id: string;
   source: 'catalog' | 'admin';
@@ -2446,4 +2460,34 @@ export interface AdminDailyChallenge {
   createdAt: string | null;
   days: string[];
   next: number;
+  pinnedDay: string | null;
+}
+
+export interface AdminDailyQueue {
+  today: string;
+  /** Fila automática (ids), do próximo a sair em diante. */
+  queue: string[];
+  /** Datas fixas por vir. */
+  pinned: Array<{ day: string; challengeId: string }>;
+  /** Últimos dias publicados, com os números. */
+  published: Array<{ day: string; challenge_id: string; number: number } & DailyDayStats>;
+  challenges: AdminDailyChallenge[];
+}
+
+export interface AdminDailyBody {
+  spec: Omit<ChallengeSpec, 'id'>;
+  solution: Action[];
+  wrong: Action[] | null;
+  note?: string;
+  allowManual?: boolean;
+}
+
+export interface AdminDailyDetail {
+  id: string;
+  source: 'catalog' | 'admin';
+  spec: Omit<ChallengeSpec, 'id'>;
+  solution: Action[] | null;
+  wrong: Action[] | null;
+  note: string | null;
+  published: boolean;
 }
