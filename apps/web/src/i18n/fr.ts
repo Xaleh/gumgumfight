@@ -10,6 +10,7 @@ import chamber from './chamber/fr';
 import profile from './profile/fr';
 import sealed from './sealed/fr';
 import yonko from './yonko/fr';
+import sandbox from './sandbox/fr';
 import friends from './friends/fr';
 import daily from './daily/fr';
 import analysis from './analysis/fr';
@@ -3144,6 +3145,7 @@ export default {
   ...profile,
   ...sealed,
   ...yonko,
+  ...sandbox,
   // ==== amigos e convite direto (i18n/friends) ====
   ...friends,
   ...daily,

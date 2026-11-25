@@ -10,7 +10,7 @@ import { Icon } from './Icons';
 
 const CHAPTER_COLOR: Record<number, string> = { 1: 'red', 2: 'green', 3: 'blue-card', 4: 'purple' };
 
-export function Learn({ onExit, onLesson }: { onExit: () => void; onLesson: (id: string) => void }) {
+export function Learn({ onExit, onLesson, onSandbox }: { onExit: () => void; onLesson: (id: string) => void; onSandbox?: () => void }) {
   const t = useT();
   const lt = useLessonText();
   const { done, next, reset, completedAll } = useTutorialProgress();
@@ -61,6 +61,11 @@ export function Learn({ onExit, onLesson }: { onExit: () => void; onLesson: (id:
               {done.length === 0 && (
                 <button type="button" className="hero-link" onClick={() => onLesson(battle.id)}>
                   {t('tutorial.skipToBattle')}
+                </button>
+              )}
+              {onSandbox && (
+                <button type="button" className="hero-link" onClick={onSandbox}>
+                  {t('sandbox.learnLink')}
                 </button>
               )}
             </div>
