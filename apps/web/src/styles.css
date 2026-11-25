@@ -19588,3 +19588,94 @@ div.dk-tile-main {
     font-size: 28px;
   }
 }
+
+/* ---- Amigos (Friends.tsx): folha, lista com status e faixa de convite ---- */
+.friends-sheet .sheet-body {
+  display: grid;
+  gap: 14px;
+}
+.friends-sheet h4 {
+  margin: 4px 0 8px;
+  font-size: 15px;
+}
+.friends-me {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+}
+.friends-me p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.friends-code {
+  display: grid;
+  flex: 1 1 auto;
+}
+.friend-code {
+  font-size: 22px;
+  letter-spacing: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.friends-add {
+  --mode: var(--accent);
+}
+.friends-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.friends-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.friends-list .btn-row {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.friends-list .btn,
+.friends-list .btn-outline {
+  min-height: 40px;
+}
+.friend-name {
+  flex: 1 1 140px;
+  min-width: 0;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.friend-name small {
+  display: block;
+  font-weight: 700;
+}
+.friend-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.friend-dot.online {
+  background: var(--ok);
+}
+.friend-dot.playing {
+  background: var(--gold);
+}
+.friend-offline .friend-name {
+  opacity: 0.75;
+}
+.home-banner.friend-invite .btn-row {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}

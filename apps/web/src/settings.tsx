@@ -79,6 +79,8 @@ export interface Settings {
   /** Avisos de partidas online (oponente entrou, sua vez) e de torneios (check-in, rodada, oponente na sala). */
   notifyMatches: boolean;
   notifyTournaments: boolean;
+  /** Avisos dos amigos: pedido de amizade, aceite e convite para partida. */
+  notifyFriends: boolean;
   /** Chave pública das notificações no servidor (null = desligadas lá). */
   pushKey: string | null;
 }
@@ -108,6 +110,7 @@ const EDITABLE: Editable[] = [
   'notify',
   'notifyMatches',
   'notifyTournaments',
+  'notifyFriends',
 ];
 
 interface Ctx extends Settings {
@@ -143,6 +146,7 @@ const DEFAULTS: Settings = {
   notify: false,
   notifyMatches: true,
   notifyTournaments: true,
+  notifyFriends: true,
   pushKey: null,
 };
 
@@ -626,7 +630,7 @@ function NotificationRows() {
     setProblem(null);
     try {
       if ((await Notification.requestPermission()) !== 'granted') return setProblem('settings.notificationsDenied');
-      await syncPush(s.pushKey!, { locale: s.locale, matches: s.notifyMatches, tournaments: s.notifyTournaments });
+      await syncPush(s.pushKey!, { locale: s.locale, matches: s.notifyMatches, tournaments: s.notifyTournaments, friends: s.notifyFriends });
       s.update({ notify: true });
     } catch {
       setProblem('settings.notificationsError');
@@ -652,6 +656,9 @@ function NotificationRows() {
           </OptionRow>
           <OptionRow title={t('settings.notifyTournaments')} hint={t('settings.notifyTournamentsHint')}>
             <Switch on={s.notifyTournaments} label={t('settings.notifyTournaments')} onChange={(v) => s.update({ notifyTournaments: v })} />
+          </OptionRow>
+          <OptionRow title={t('settings.notifyFriends')} hint={t('settings.notifyFriendsHint')}>
+            <Switch on={s.notifyFriends} label={t('settings.notifyFriends')} onChange={(v) => s.update({ notifyFriends: v })} />
           </OptionRow>
         </>
       )}

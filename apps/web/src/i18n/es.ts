@@ -9,6 +9,7 @@ import team from './team/es';
 import chamber from './chamber/es';
 import sealed from './sealed/es';
 import yonko from './yonko/es';
+import friends from './friends/es';
 
 export default {
   // ---- general ----
@@ -3110,5 +3111,7 @@ export default {
   ...chamber,
   ...sealed,
   ...yonko,
+  // ==== amigos e convite direto (i18n/friends) ====
+  ...friends,
 } satisfies Messages;
 

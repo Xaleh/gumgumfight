@@ -509,6 +509,40 @@ export class Lobby {
     }
   }
 
+  /**
+   * Status de uma pessoa para os amigos dela (`friends/`): `playing` numa partida em andamento
+   * (contra alguém ou contra o bot), `online` com o menu aberto há menos de PRESENCE_TTL_MS, numa
+   * sala de espera ou na fila, e `offline` fora disso. Só o status: nunca qual sala nem o código.
+   */
+  presenceOf(ownerHash: string): 'online' | 'playing' | 'offline' {
+    const now = this.deps.now();
+    let online = false;
+    for (const room of this.rooms.values()) {
+      if (room.status === 'finished') continue;
+      const seat = room.data.seats.findIndex((s) => !s.bot && s.ownerHash === ownerHash);
+      if (seat < 0) continue;
+      if (room.status === 'playing') return 'playing';
+      online = true;
+    }
+    if (online) return 'online';
+    const at = this.presence.get(ownerHash);
+    if (at !== undefined && now - at < PRESENCE_TTL_MS) return 'online';
+    if (this.queue.some((e) => !e.matched && e.seat.ownerHash === ownerHash && now - e.lastSeen < QUEUE_STALE_MS)) return 'online';
+    return 'offline';
+  }
+
+  /** Sala privada à espera de oponente em que `token` é o lugar de quem criou (o convite de amigo). */
+  ownWaitingRoom(roomId: string, token: unknown): Room | null {
+    const room = this.rooms.get(roomId);
+    if (!room || room.status !== 'waiting' || room.data.queue !== 'private' || !room.data.code) return null;
+    return room.data.seats[0]?.token === token ? room : null;
+  }
+
+  /** A sala do código ainda espera oponente (o convite só vale enquanto isso). */
+  isWaiting(code: string) {
+    return Boolean(this.waitingRoom(code));
+  }
+
   stats(): OnlineStats {
     const now = this.deps.now();
     const people = new Set<string>();

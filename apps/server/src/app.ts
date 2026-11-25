@@ -51,6 +51,7 @@ import { type ApiCard, presentCards } from './present';
 import type { LobbyLimits } from './online/lobby';
 import { registerYonkoRoutes } from './yonko/routes';
 import { registerOnlineRoutes } from './online/routes';
+import { registerFriendRoutes } from './friends/routes';
 import { type PushSender, registerPushRoutes } from './push/routes';
 import { vapidKeys } from './push/store';
 import { deckHash } from './stats/derive';
@@ -468,6 +469,8 @@ export function buildApp(
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
+  // Amigos e convite direto para partida (só com login; o status vem da presença do lobby).
+  registerFriendRoutes(app, { db, user: auth.viewer, lobby, notifier, now: opts.now });
   // Mesas do Yonko (todos contra todos): sala com código, bots nos lugares vagos e partida de 3 ou 4 (yonko/).
   const yonkoTables = registerYonkoRoutes(app, {
     db,

@@ -33,6 +33,7 @@ import { DeckConfirm } from './DeckConfirm';
 import { DeckPicker, RANDOM_DECK } from './DeckPicker';
 import { useFavoriteToggle } from './DeckTile';
 import { LeaderPicker, QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
+import { type FriendLink, FriendInvites, friendsBadge, FriendsSheet, useFriends } from './Friends';
 import { ReplayLoader } from './ReplayLoader';
 import { SupportersList, SupportModal } from './Support';
 import { SponsorsStrip } from './Tournaments';
@@ -294,6 +295,7 @@ export function Menu({
   onDraft,
   onYonko,
   dev = false,
+  friendLink,
 }: {
   onStart: (s: GameSetup) => void;
   onOnline: (s: OnlineSeat) => void;
@@ -324,6 +326,8 @@ export function Menu({
   onYonko: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
+  /** Endereço dos amigos (link para adicionar, aviso de pedido ou de convite): ver Friends.tsx. */
+  friendLink?: FriendLink;
 }) {
   const { user, config, notice: authNotice, error: authError } = useAuth();
   const supportOn = Boolean(config?.support);
@@ -337,6 +341,11 @@ export function Menu({
   const [showTests, setShowTests] = useState(false);
   const [showReplay, setShowReplay] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  /** Folha "Amigos": o código já preenchido (link de amigo) e se veio por um link. */
+  const [showFriends, setShowFriends] = useState<{ code?: string; linked?: boolean } | null>(null);
+  /** Convite de amigo à espera dos decks carregarem para entrar na sala. */
+  const [pendingInvite, setPendingInvite] = useState<string | null>(null);
+  const friends = useFriends(Boolean(user));
   const [deck0, setDeck0] = useState('');
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
@@ -649,6 +658,40 @@ export function Menu({
   /** Confirma o deck antes (se ligado nas configurações) ou entra direto com o equipado. */
   const ask = (kind: StartKind) => (confirmDeck ? setConfirming(kind) : void start(kind, deck0));
 
+  /** Convite de amigo: entra direto na sala com o deck equipado (ou confirma o deck, se ligado nas configurações). */
+  const joinInvite = (room: string) => {
+    setCode(room);
+    setShowFriends(null);
+    if (confirmDeck || !d0?.valid) {
+      if (d0?.valid) setConfirming('join');
+      else privateCard.current?.scrollIntoView({ block: 'center' });
+      return;
+    }
+    void run(async () => onOnline(await api.online.joinRoom(room, deck0)));
+  };
+  /** Por que o botão Convidar está desligado (null: dá para convidar). */
+  const inviteBlocked = playing ? t('menu.playingOnline') : !privateDeck ? t('friends.inviteNeedsDeck') : null;
+  /** Convidar um amigo: sala privada com o deck equipado e as regras da Sala privada, e o aviso para ele. */
+  const inviteFriend = async (friend: { id: string }) => {
+    if (!privateDeck) return;
+    const r = await api.online.createRoom(privateDeck.id, privateMode, false);
+    const seat = { roomId: r.roomId, token: r.token };
+    // A sala já existe: mesmo se o aviso falhar, a pessoa vai para ela (o código continua lá para mandar).
+    await api.friends.invite(friend.id, seat).catch(() => undefined);
+    setShowFriends(null);
+    onOnline(seat);
+  };
+  useEffect(() => {
+    if (!friendLink) return;
+    if (friendLink.open || friendLink.add) setShowFriends({ code: friendLink.add, linked: Boolean(friendLink.add) });
+    if (friendLink.invite) setPendingInvite(friendLink.invite);
+  }, [friendLink?.at]);
+  useEffect(() => {
+    if (!pendingInvite || !decks.length || !deck0) return;
+    setPendingInvite(null);
+    joinInvite(pendingInvite);
+  }, [pendingInvite, decks.length, deck0]);
+
   const queueLive = (kind: QueueKind) =>
     stats ? <Live>{t('menu.queueLive', { n: stats.playing[kind], q: stats.queue[kind][format] })}</Live> : <Live off>{t('menu.counting')}</Live>;
   const openTournaments = (tournaments?.tournaments ?? []).filter((t) => t.status === 'registration').length;
@@ -661,6 +704,12 @@ export function Menu({
     { key: 'learn', label: t('menu.navLearn'), icon: 'learn', onClick: onLearn },
     { key: 'builder', label: t('menu.navDecks'), icon: 'deck', onClick: () => onBuildDecks() },
     { key: 'tournaments', label: t('menu.navTournaments'), icon: 'crown', onClick: () => onTournaments() },
+    {
+      key: 'friends',
+      label: friendsBadge(friends.data) ? t('friends.navCount', { n: friendsBadge(friends.data) }) : t('friends.nav'),
+      icon: 'user',
+      onClick: () => setShowFriends({}),
+    },
     { key: 'watch', label: t('menu.navWatch'), icon: 'eye', onClick: onWatch },
     { key: 'stats', label: t('menu.navStats'), icon: 'chart', onClick: onStats },
   ];
@@ -743,6 +792,13 @@ export function Menu({
             onReady={(ready) =>
               api.tournaments.ready(myEntry.id, myEntry.match!.id, ready).then(() => setMyEntry({ ...myEntry, match: { ...myEntry.match!, ready } }))
             }
+          />
+        )}
+        {!playing && friends.data && friends.data.invites.length > 0 && (
+          <FriendInvites
+            invites={friends.data.invites}
+            onJoin={joinInvite}
+            onDecline={(room) => void api.friends.declineInvite(room).then(friends.refresh, () => undefined)}
           />
         )}
         {playing ? (
@@ -1107,6 +1163,19 @@ export function Menu({
       {queue && <QueueWait queue={queue} onCancel={cancel} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
+      {showFriends && (
+        <FriendsSheet
+          loggedIn={Boolean(user)}
+          data={friends.data}
+          failed={friends.failed}
+          refresh={friends.refresh}
+          initialCode={showFriends.code}
+          linked={showFriends.linked}
+          onInvite={inviteFriend}
+          inviteBlocked={inviteBlocked}
+          onClose={() => setShowFriends(null)}
+        />
+      )}
       {showTests && <TestOptions seed={seed} onSeed={setSeed} onClose={() => setShowTests(false)} />}
       {showReplay && <ReplayLoader load={loadReplay} onStart={onStart} onClose={() => setShowReplay(false)} />}
 

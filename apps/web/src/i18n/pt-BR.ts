@@ -9,6 +9,7 @@ import teamPtBR from './team/pt-BR';
 import chamberPtBR from './chamber/pt-BR';
 import sealedPtBR from './sealed/pt-BR';
 import yonkoPtBR from './yonko/pt-BR';
+import friendsPtBR from './friends/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -3119,6 +3120,8 @@ const ptBR = {
   ...sealedPtBR,
   // ==== Yonko: a sala e a mesa de todos contra todos (i18n/yonko) ====
   ...yonkoPtBR,
+  // ==== amigos e convite direto (i18n/friends) ====
+  ...friendsPtBR,
 } as const;
 
 

@@ -21,6 +21,7 @@ import { Yonko } from './components/Yonko';
 import { YonkoOnline } from './components/YonkoOnline';
 import { LocalYonkoTable } from './components/YonkoTable';
 import { Watch } from './components/Watch';
+import { type FriendLink, friendLinkFrom } from './friendLink';
 import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
 import { isReplayPath } from './embed';
 import { syncTutorialProgress } from './game/tutorial/progress';
@@ -30,7 +31,8 @@ import { usePushSync, useWakeLock } from './pwa';
 import { useSettings } from './settings';
 
 type Screen =
-  | { name: 'menu' }
+  /** `friendLink`: veio de um link de amigo ou de um aviso de pedido ou convite (Friends.tsx). */
+  | { name: 'menu'; friendLink?: FriendLink }
   /** `link`: lista vinda de um deep link (`/?deck=`); `linkInvalid`: havia um link, mas sem lista legível. */
   /** `open`: id de um deck salvo para abrir direto no editor (vindo do seletor de deck). */
   | { name: 'builder'; link?: DeckLink; linkInvalid?: boolean; open?: string; yonko?: boolean; back?: Screen }
@@ -135,7 +137,7 @@ function MainApp() {
   usePushSync({
     serverKey: settings.pushKey,
     enabled: settings.notify,
-    prefs: { locale: settings.locale, matches: settings.notifyMatches, tournaments: settings.notifyTournaments },
+    prefs: { locale: settings.locale, matches: settings.notifyMatches, tournaments: settings.notifyTournaments, friends: settings.notifyFriends },
     userId: user?.id ?? null,
     onRevoked: () => settings.update({ notify: false }),
   });
@@ -156,10 +158,14 @@ function MainApp() {
           })
           .catch(() => undefined);
       } else if (tournament) setScreen({ name: 'tournaments', id: tournament, lobby: url.searchParams.get('lobby') === '1' });
+      // Amigos: link para adicionar, aviso de pedido e convite para a sala de um amigo (no meio de uma partida online, fica nela).
+      const friendLink = friendLinkFrom(url);
+      if (friendLink) setScreen((s) => (s.name === 'online' ? s : { name: 'menu', friendLink }));
     };
     const here = new URL(location.href);
-    if (here.searchParams.has(ROOM_PARAM) || here.searchParams.has(TOURNAMENT_PARAM)) {
+    if (here.searchParams.has(ROOM_PARAM) || here.searchParams.has(TOURNAMENT_PARAM) || friendLinkFrom(new URL(here.href))) {
       open(here.href);
+      friendLinkFrom(here);
       here.searchParams.delete(ROOM_PARAM);
       here.searchParams.delete(TOURNAMENT_PARAM);
       here.searchParams.delete('lobby');
@@ -354,6 +360,7 @@ function MainApp() {
       onDraft={() => setScreen({ name: 'sealed', hub: 'draft' })}
       onYonko={() => setScreen({ name: 'yonko' })}
       dev={dev}
+      friendLink={screen.name === 'menu' ? screen.friendLink : undefined}
     />
   );
 }
