@@ -63,11 +63,18 @@ reduzir as camadas da mesa no celular. Até lá, o CI tenta de novo uma vez.
   bounty de quem venceu sobe (`/api/players/me`).
 - Só no desktop por enquanto: no iPhone a mesa usa outro arranjo, e a queda do WebKit (acima) somaria instabilidade.
 
-### Fase 3 — Torneio: criar e jogar
+### Fase 3 — Torneio: criar e jogar ✅
 
-- Organizador (conta com o perfil de Organizador, criada com `login(page, nome, 'organizer')` da fase 2) cria um torneio suíço pela tela; dois ou quatro
-  jogadores se inscrevem com as próprias contas; o organizador inicia; cada mesa abre como sala online, os jogos terminam
-  (desistência ou partida jogada) e o resultado entra sozinho; a rodada fecha, o torneio termina e a classificação final
-  aparece para todos.
-- Fluxo também no `iphone` para o jogador (inscrição, lobby e a mesa da rodada), se a queda do WebKit estiver resolvida.
+- `e2e/support/tournament.ts`: criar o torneio pela tela (Menu → Torneios → Criar torneio: suíço, Standard, sem data),
+  inscrever-se pelo **link de convite** (`/?torneio=<id>`, o mesmo do "Copiar convite") escolhendo um deck pronto no
+  seletor, e marcar "Estou pronto" para a rodada.
+- `tournament.spec.ts`: o organizador (conta com o perfil de Organizador, `login(page, nome, 'organizer')`) cria o
+  torneio; duas jogadoras se inscrevem com decks diferentes; o organizador começa; as duas marcam "Estou pronto" e o
+  organizador abre a rodada com a mesa pronta; cada uma clica em **Jogar partida**, a sala do torneio abre nas duas, a
+  partida é jogada até uma desistir e o fim de jogo leva de volta ao torneio. O resultado entra sozinho ("Vitória!" e
+  "Derrota." na página das duas, sem o organizador lançar o placar); o organizador encerra a última rodada e cada uma vê
+  a classificação final (1º lugar com 1V 0D e 2º com 0V 1D).
+- `@iphone`: a inscrição pelo convite no celular (o organizador cria, o jogador escolhe o deck e se inscreve, o
+  organizador vê o inscrito). A partida do torneio no iPhone fica de fora enquanto a queda da mesa no WebKit (acima)
+  não for resolvida.
 - Com as três fases, o A1 fica `[x]`.

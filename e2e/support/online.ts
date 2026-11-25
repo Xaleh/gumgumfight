@@ -60,8 +60,8 @@ export async function concede(page: Page) {
   await page.getByRole('button', { name: label('game.concede'), exact: true }).click();
 }
 
-/** A tela de fim de partida com o resultado esperado. */
-export async function expectResult(page: Page, result: 'victory' | 'defeat') {
+/** A tela de fim de partida com o resultado esperado e o botão de saída (no torneio, "Voltar ao torneio"). */
+export async function expectResult(page: Page, result: 'victory' | 'defeat', exit: MessageKey = 'result.exit') {
   await expect(page.getByText(label(result === 'victory' ? 'result.victory' : 'result.defeat'), { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: label('result.exit'), exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: label(exit), exact: true })).toBeVisible();
 }
