@@ -315,3 +315,46 @@ export function deckOfPlayer(state: Pick<GameState, 'cards' | 'players'>, player
   if (!leader) return null;
   return { leader, cards: [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([id, count]) => ({ id, count })) };
 }
+
+/** Uma linha do que mudou entre duas listas: `delta` > 0 entrou, < 0 saiu. */
+export interface DeckChange {
+  id: string;
+  /** Cópias na lista de antes e na de depois. */
+  before: number;
+  after: number;
+  delta: number;
+}
+
+/** O que mudou de uma lista para outra (versões do deck). */
+export interface DeckDiff {
+  /** Líder trocado: o de antes e o de depois (null = mesmo Líder). */
+  leader: { before: string; after: string } | null;
+  /** Cartas com mais cópias (ou novas), por número. */
+  added: DeckChange[];
+  /** Cartas com menos cópias (ou que saíram), por número. */
+  removed: DeckChange[];
+}
+
+/**
+ * Diferença entre duas listas do mesmo deck: o que entrou e o que saiu, somando as linhas repetidas de
+ * uma carta (como o hash da lista faz). Sem a lista de antes (primeira versão), tudo conta como entrada.
+ */
+export function deckListDiff(before: Pick<DeckList, 'leader' | 'cards'> | null, after: Pick<DeckList, 'leader' | 'cards'>): DeckDiff {
+  const count = (cards: DeckList['cards'] | undefined) => {
+    const m = new Map<string, number>();
+    for (const c of cards ?? []) m.set(c.id, (m.get(c.id) ?? 0) + c.count);
+    return m;
+  };
+  const a = count(before?.cards);
+  const b = count(after.cards);
+  const added: DeckChange[] = [];
+  const removed: DeckChange[] = [];
+  for (const id of [...new Set([...a.keys(), ...b.keys()])].sort((x, y) => x.localeCompare(y))) {
+    const was = a.get(id) ?? 0;
+    const now = b.get(id) ?? 0;
+    if (now > was) added.push({ id, before: was, after: now, delta: now - was });
+    else if (now < was) removed.push({ id, before: was, after: now, delta: now - was });
+  }
+  const leader = before && before.leader !== after.leader ? { before: before.leader, after: after.leader } : null;
+  return { leader, added, removed };
+}

@@ -836,7 +836,8 @@ baixadas quando tocam) + `public/`.
 | `broadcasts` | `user_id` | `key` (único: segredo do link do OBS, guardado como está para o streamer copiar de novo), `room_id` (partida na transmissão), opções `delay_s` (0–600), `hands_players`, `hands_own`, `delay_tournaments`, `chat` (0/1), `rev` (sobe a cada troca), `updated_at` | `/api/broadcast/*` |
 | `players` | `id` (`p-` + 12 hex) | `owner_hash` (único: `sha256(navegador)` ou `user:<id>`), `name` (público, "Pirata XXXX"), `bounty` (Beries), `ranked_games` | primeira partida/consulta, ranqueada, `PUT /api/players/me` |
 | `player_profiles` | `player_id` (FK `players`, `ON DELETE CASCADE`) | Perfil público: `visible`, `leaders`, `matches`, `replays` (0/1), `decks` (JSON com até 6 ids de decks do próprio jogador), `updated_at`. Sem linha = os padrões (visível, com Líderes e partidas, sem replays e sem decks) | `PUT /api/players/me/profile` |
-| `deck_lists` | `hash` (16 hex) | `leader`, `cards` (JSON) — lista **exata** e imutável usada numa partida | gravação de partida |
+| `deck_lists` | `hash` (16 hex) | `leader`, `cards` (JSON) — lista **exata** e imutável usada numa partida ou salva como versão de um deck | gravação de partida, `upsertDeck` |
+| `deck_versions` | `(deck_id, hash)` `WITHOUT ROWID` (FK `decks`, `ON DELETE CASCADE`; `hash` → `deck_lists`) | Versões do deck (C2): cada lista que o deck já teve, `seq` (ordem das gravações) e `saved_at` (última vez que a lista passou a ser a do deck). Na criação, a lista atual de cada deck entra como versão | `upsertDeck` (só quando a lista muda: renomear não cria versão) |
 | `matches` | `id` autoincrement | `seed`, `mode`, `deck0`, `deck1`, `winner`, `turns`, `reason`, `format`, `queue`, `first_player`, **`replay` (JSON; nas online, com os `engineTexts` do começo da partida, para refazê-la depois com as mesmas regras)**, `created_at` | gravação de partida |
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`, `listed` (0 = fora das estatísticas: Livre ou spoilers). Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
@@ -878,6 +879,7 @@ users 1──n tournament_players n──1 tournaments 1──n tournament_match
 players (owner_hash = user:<id> | sha256(navegador))
 matches 1──2 match_seats ──n match_cards
 match_seats ──(deck_hash)──> deck_lists
+decks 1──n deck_versions ──(hash)──> deck_lists
 match_seats ──(player_id)──> players 1──1 player_profiles
 decks (owner_hash → players.owner_hash, por convenção, sem FK)
 cards (sem FK; decks e partidas referenciam por id textual)
@@ -1070,6 +1072,17 @@ pelo servidor ao refazer o replay (`stats/derive.ts`), nunca informado pelo nave
 `hash = sha256("LEADER|4xOP01-016|…")[0:16]`. Guarda a lista no momento da partida, porque o deck salvo pode mudar
 depois. `GET /api/stats/cards?deck=<hash>` usa essa chave.
 
+### `deck_versions` — versões do deck (`decks/versions.ts`)
+
+`upsertDeck` chama `recordDeckVersion`: se o hash da lista nova não é o da última versão do deck, grava a lista em
+`deck_lists` e a versão (ou, se a lista já foi do deck antes, sobe o `seq` e o `saved_at` dela). `GET
+/api/decks/:id/versions` junta essas versões com as listas que só aparecem em `match_seats` (`deck_id` do deck,
+`controller = 'human'`, partidas de antes das versões), ordena pela data (`saved_at`, ou a primeira partida) e devolve,
+da mais nova para a mais antiga (até 50, com `total`): `number`, `leader`, `cards`, `savedAt`, `firstPlayedAt`,
+`lastPlayedAt`, `games`, `wins`, `losses`, `draws` (`matches.winner IS NULL`), `winRate`, `current` (hash igual ao da
+lista salva agora) e `diff` (`deckListDiff` do motor contra a versão anterior: Líder trocado, cartas que entraram e
+que saíram, com as cópias de antes e de depois).
+
 ### `players` — perfil e recompensa
 
 Criado na primeira partida ou consulta. `bounty` só muda na ranqueada entre duas contas distintas:
@@ -1152,7 +1165,7 @@ aqui, o desenho:
   cookie; `last_used_at` é gravado no máximo 1×/min por token. O logger do Fastify tem `redact` em
   `req.headers.authorization`.
 - **Rotas liberadas** (`config: { scope }`): `profile` → `/api/auth/me` (resposta reduzida), `/api/players/me`;
-  `decks:read` → `GET /api/decks` (`mine=1` filtra por dono; os decks de quem pede trazem a lista `cards`), `GET /api/decks/:id` (os próprios e os prontos);
+  `decks:read` → `GET /api/decks` (`mine=1` filtra por dono; os decks de quem pede trazem a lista `cards`), `GET /api/decks/:id` e `GET /api/decks/:id/versions` (os próprios e os prontos);
   `decks:write` → `POST/PUT/DELETE /api/decks` (o `PUT` aceita `expectedUpdatedAt`/`If-Unmodified-Since` e responde
   409 `deck_conflict` com a versão atual; o resumo dos decks ganhou `deckHash`); `matches:read` →
   `GET /api/players/me/matches` (`matches.ts`: `match_seats` por `player_id`, `since`, `cursor` = `match_id`, até 100),
@@ -2017,6 +2030,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/decks?mine=1` | Lista decks com validação (os de quem pede trazem `cards`); `mine=1`: só os de quem pede | Pública; Token (`decks:read`) |
 | GET | `/api/decks/:id` | Deck + definições das cartas usadas (com token: só os próprios e os prontos) | Pública; Token (`decks:read`) |
 | POST | `/api/decks` | Cria um deck (`{ name, leader, cards, arts? }`) | Navegador; Token (`decks:write`) |
+| GET | `/api/decks/:id/versions` | Versões do deck: o que entrou e saiu de cada lista e as partidas e a taxa de vitória de cada uma (com token: só os próprios e os prontos) | Pública; Token (`decks:read`) |
 | PUT | `/api/decks/:id` | Atualiza um deck (`expectedUpdatedAt` ou `If-Unmodified-Since`: 409 `deck_conflict` se mudou depois) | Dono; Token (`decks:write`) |
 | PUT | `/api/decks/:id/name` | Só o nome | Dono ou Admin |
 | DELETE | `/api/decks/:id` | Apaga um deck | Dono; Token (`decks:write`) |

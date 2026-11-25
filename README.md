@@ -203,6 +203,12 @@ Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construto
    - a soma de **Counter na mão inicial** (chance de ter ≥ 1000, 2000, 3000 e 4000, e a média).
    Com **Mulligan quando a mão inicial não tem a carta** marcado, a conta supõe que você troca a mão quando ela não tem o
    Personagem ou a carta-chave. Tudo roda no navegador: nada vai para o servidor.
+5. **Versões** (o quinto modo, só em deck salvo) mostra o histórico do deck: cada lista salva é uma versão, com a data,
+   **o que entrou e o que saiu** em relação à anterior (por exemplo, "+2 Nefeltari Vivi (2→4)" e "−2 Usopp (4→2)") e as
+   **partidas e a taxa de vitória** daquela lista (vitórias, derrotas e empates de pessoas; o lado do robô não conta).
+   As partidas caem na versão certa pelo hash da lista exata (`deck_lists`), inclusive as jogadas antes de existirem as
+   versões. Renomear não cria versão; voltar a uma lista antiga leva aquela versão para o topo, com as partidas que ela
+   já tinha. **Restaurar** põe a lista de uma versão no rascunho (com desfazer), e ela só vale depois de salvar.
 
 Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por número e toda carta com ao menos uma
 cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.
@@ -1023,7 +1029,7 @@ ativos por conta), vê o que cada app pode fazer e quando foi usado pela última
 | Scope | Libera |
 |---|---|
 | `profile` | `GET /api/auth/me` (só `{ user: { id, role: 'player' }, player: { id, name, bounty, tier } }`: nunca e-mail, nome ou foto do Google) e `GET /api/players/me` |
-| `decks:read` | `GET /api/decks?mine=1` (os próprios, com a lista `cards` (`{ id, count }`), `size`, `updatedAt`, `deckHash` e a validação por formato), `GET /api/decks/:id` (os próprios e os prontos, com as definições das cartas) |
+| `decks:read` | `GET /api/decks?mine=1` (os próprios, com a lista `cards` (`{ id, count }`), `size`, `updatedAt`, `deckHash` e a validação por formato), `GET /api/decks/:id` (os próprios e os prontos, com as definições das cartas), `GET /api/decks/:id/versions` (as versões do deck, com o que entrou e saiu e as partidas e a taxa de vitória de cada uma) |
 | `decks:write` | `POST /api/decks`, `PUT /api/decks/:id`, `DELETE /api/decks/:id` (só os próprios) |
 | `matches:read` | `GET /api/players/me/matches`, `GET /api/matches/:id`, `GET /api/matches/:id/replay` e `POST /api/matches/:id/replay-link` (só partidas que o usuário jogou) |
 | `stats:read` | `GET /api/stats*` (com `mine=1`, as próprias; sem ele, as consultas públicas de sempre) |
