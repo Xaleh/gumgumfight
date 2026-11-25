@@ -197,7 +197,8 @@ gumgumfight/
 ├── deploy/                      bootstrap-hostinger.sh, setup-vm.sh, remote-deploy.sh, ecosystem.config.cjs, HOSTINGER.md
 ├── e2e/                         testes de ponta a ponta (Playwright): playwright.config.ts, serve.ts (servidor com banco
 │                                temporário), support/ (textos pela chave do pt-BR, fixture de erros e de mais jogadores,
-│                                contas de teste no banco temporário, passos comuns e da fila online), *.spec.ts
+│                                contas de teste no banco temporário, passos comuns, da fila online e do torneio),
+│                                *.spec.ts (bot, boosters, fila online, torneio)
 ├── scripts/build-release.sh     monta release/
 ├── docs/rules/                  base de regras (CR v1.2.1), interações, divergências do motor, mapeamento da DSL
 └── .github/workflows/ci-deploy.yml

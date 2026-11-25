@@ -43,7 +43,7 @@ quando o item fica pronto e o campo **Feito em**, com a data e o link do PR.
 Antes das funções novas: uma rede de testes, visibilidade do que quebra em produção e arquivos menores para trabalhar
 em várias branches ao mesmo tempo.
 
-- [ ] **A1. Testes de ponta a ponta no navegador (Playwright)** 🧱
+- [x] **A1. Testes de ponta a ponta no navegador (Playwright)** 🧱
   Fluxos principais rodando num navegador de verdade: fila → partida → fim; partida contra o bot; criar e jogar um
   torneio; abrir boosters (também com a emulação do Safari do iPhone, onde já houve bug).
   *Pronto quando:* existe `npm run e2e`, os fluxos acima passam e o workflow **CI e deploy** roda os testes.
@@ -51,8 +51,10 @@ em várias branches ao mesmo tempo.
   *Progresso:* fase 1 de 3 (`npm run e2e`, job no CI com Chromium e WebKit, partida contra o bot até o fim e abrir
   boosters, também no iPhone) em 2026-11-25, [PR #236](https://github.com/Xaleh/gumgumfight/pull/236); fase 2 de 3
   (fila online com dois navegadores: casual com a mão do oponente escondida, troca de turno, recarregar e voltar à sala e
-  desistência; ranqueada com contas de teste e bounty) em 2026-11-25, [PR #237](https://github.com/Xaleh/gumgumfight/pull/237).
-  *Feito em:* —
+  desistência; ranqueada com contas de teste e bounty) em 2026-11-25, [PR #237](https://github.com/Xaleh/gumgumfight/pull/237);
+  fase 3 de 3 (torneio do começo ao fim: criar, inscrever pelo convite, jogar a rodada, resultado automático e
+  classificação; inscrição no iPhone) em 2026-11-25, [PR #238](https://github.com/Xaleh/gumgumfight/pull/238).
+  *Feito em:* 2026-11-25, [PR #238](https://github.com/Xaleh/gumgumfight/pull/238)
 
 - [x] **A2. Monitoramento em produção**
   Captura de erros do navegador e do servidor (com página de consulta ou serviço externo gratuito), métricas das

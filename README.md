@@ -1739,10 +1739,12 @@ npm run e2e                                # testes de ponta a ponta no navegado
 banco novo (em `e2e/.tmp/`, apagado a cada execução): partida contra o bot do menu ao fim de jogo (com o **Auto**, cerca
 de 2 minutos), desistir pelo menu da mesa, abrir os boosters do Selado e as partidas online com dois navegadores — na
 **Partida rápida** (fila, a mão do oponente escondida, o turno passando de um para o outro, recarregar a página no meio
-e voltar para a mesma sala, desistência) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe). As
+e voltar para a mesma sala, desistência) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe), e
+um **torneio** do começo ao fim (o organizador cria, os jogadores se inscrevem pelo link de convite, a rodada abre, a
+partida é jogada na sala do torneio, o resultado entra sozinho e o torneio termina com a classificação). As
 contas de teste são criadas direto no banco temporário, com as funções do servidor (`e2e/support/account-cli.ts`): não
 há rota de login de teste. Os testes marcados com `@iphone` rodam também no iPhone 13 com o WebKit, o motor do Safari
-(onde os boosters abertos já saíram do lugar).
+(onde os boosters abertos já saíram do lugar), entre eles a inscrição num torneio pelo celular.
 
 ```bash
 npx playwright install chromium webkit     # uma vez: os navegadores do Playwright
@@ -1753,7 +1755,7 @@ npm run e2e -- --project=iphone            # só o iPhone; -g "boosters" filtra 
 Sem o WebKit instalado, o projeto `iphone` roda no Chromium com a tela e o toque do iPhone (e avisa). A porta padrão é
 3410 (`E2E_PORT` muda). No workflow **CI e deploy**, o job "Testes de ponta a ponta" roda em Chromium e WebKit, guarda o
 relatório e os traces quando falha, e o deploy só sai com ele passando. Os textos dos testes vêm do dicionário pt-BR
-pela chave, e um erro não tratado na página reprova o teste. O que vem na próxima fase (torneio) está em
+pela chave, e um erro não tratado na página reprova o teste. O plano e o que ficou de fora estão em
 [`docs/plano-testes-e2e.md`](docs/plano-testes-e2e.md).
 
 ## API
