@@ -11,6 +11,7 @@ import profile from './profile/fr';
 import sealed from './sealed/fr';
 import yonko from './yonko/fr';
 import sandbox from './sandbox/fr';
+import daily from './daily/fr';
 import analysis from './analysis/fr';
 
 export default {
@@ -2169,6 +2170,35 @@ export default {
   'replay.cueLineTitle': 'Ce que le joueur a cliqué ou choisi dans cette action',
   'replay.stepHint': 'Pas à pas : utilisez ▶| (ou →) pour voir l’action suivante, ou ▶ pour une lecture automatique.',
   'replay.stopsAt': 'Le replay s’arrête à l’action {n} : {message}',
+  // ---- trecho do replay em vídeo/GIF (F2) ----
+  'clip.button': '✂ Extrait',
+  'clip.buttonTitle': 'Exporter un extrait du replay en vidéo verticale ou en GIF',
+  'clip.title': 'Extrait en vidéo ou GIF',
+  'clip.hint': "Allez au début de l'extrait et marquez le début ; puis allez à la fin et marquez la fin.",
+  'clip.markStart': 'Marquer le début ({n})',
+  'clip.markEnd': 'Marquer la fin ({n})',
+  'clip.range': 'Actions {from} à {to} · environ {s} s',
+  'clip.cut': 'Dépasse {s} s (la limite des Reels) : la vidéo s’arrête avant la fin marquée.',
+  'clip.privacy': 'Seul ce que voient les spectateurs sort : les mains, les decks et la Vie face cachée restent cachés.',
+  'clip.video': 'Télécharger la vidéo',
+  'clip.gif': 'Télécharger le GIF',
+  'clip.noVideo': 'Ce navigateur ne peut pas enregistrer de vidéo ; le GIF fonctionne.',
+  'clip.recording': 'Enregistrement de la vidéo… {p}%',
+  'clip.keepOpen': 'La vidéo s’enregistre en temps réel : gardez cet onglet ouvert.',
+  'clip.building': 'Création du GIF… {p}%',
+  'clip.loading': 'Chargement des cartes…',
+  'clip.cancel': 'Annuler',
+  'clip.close': 'Fermer',
+  'clip.error': 'Impossible de créer l’extrait : {message}',
+  'clip.turn': 'Tour {n}',
+  'clip.turnOf': 'Tour de {name}',
+  'clip.attacks': 'Attaque !',
+  'clip.won': '{name} gagne !',
+  'clip.life': 'Vie',
+  'clip.hand': 'Main',
+  'clip.deck': 'Deck',
+  'clip.trash': 'Défausse',
+  'clip.don': 'DON!!',
   // ---- watch replay (file) ----
   'replay.title': 'Voir un replay',
   'replay.embedFailed': 'Impossible d’ouvrir le replay',
@@ -3115,6 +3145,7 @@ export default {
   ...sealed,
   ...yonko,
   ...sandbox,
+  ...daily,
   ...analysis,
 } satisfies Messages;
 

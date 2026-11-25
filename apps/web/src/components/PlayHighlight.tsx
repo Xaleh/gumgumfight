@@ -1,8 +1,9 @@
 // Destaque da carta jogada (tela de transmissão): a carta que acabou de entrar em jogo, ser
 // usada no Counter ou ativar um efeito aparece grande por alguns segundos, do lado de quem a
-// usou, para quem assiste à live ver o que aconteceu sem precisar ler o histórico.
+// usou, para quem assiste à live ver o que aconteceu sem precisar ler o histórico. A regra de
+// qual carta aparece fica no motor (`highlightedCard`): o trecho do replay em vídeo usa a mesma.
 
-import { type Action, cardDef, type GameState, HIDDEN_CARD, type PlayerId } from '@gumgum/engine';
+import { type Action, cardDef, type GameState, HIDDEN_CARD, type HighlightKind, highlightedCard, type PlayerId } from '@gumgum/engine';
 import { useEffect, useRef, useState } from 'react';
 import { type MessageKey, useT } from '../i18n';
 import { CardView } from './CardView';
@@ -10,27 +11,13 @@ import { CardView } from './CardView';
 /** Quanto tempo a carta fica na tela. */
 const HOLD_MS = 2800;
 
-export type PlayKind = 'play' | 'counter' | 'activate';
+export type PlayKind = HighlightKind;
 
 const LABEL: Record<PlayKind, MessageKey> = {
   play: 'broadcast.played',
   counter: 'broadcast.countered',
   activate: 'broadcast.activated',
 };
-
-/** A carta que a ação pôs em evidência (null se a ação não mostra carta, ou se a carta não está à vista). */
-export function playedCard(state: GameState, action: Action): { uid: string; player: PlayerId; kind: PlayKind } | null {
-  const hit =
-    action.type === 'playCard'
-      ? { uid: action.uid, kind: 'play' as const }
-      : action.type === 'counter'
-        ? { uid: action.uid, kind: 'counter' as const }
-        : action.type === 'activate'
-          ? { uid: action.uid, kind: 'activate' as const }
-          : null;
-  if (!hit || !state.cards[hit.uid] || cardDef(state, hit.uid).id === HIDDEN_CARD) return null;
-  return { ...hit, player: action.player };
-}
 
 interface Shown {
   uid: string;
@@ -49,7 +36,7 @@ export function PlayHighlight({ state, lastAction, bottom }: { state: GameState;
   useEffect(() => {
     if (state.actionCount === seen.current) return;
     seen.current = state.actionCount;
-    const hit = lastAction ? playedCard(state, lastAction) : null;
+    const hit = lastAction ? highlightedCard(state, lastAction) : null;
     if (!hit) return;
     const key = state.actionCount;
     clearTimeout(timer.current);

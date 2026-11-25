@@ -8,6 +8,8 @@ import { Coverage } from './components/Coverage';
 import { DeckBuilder } from './components/DeckBuilder';
 import { GameScreen, OnlineGameScreen, WatchGameScreen } from './components/GameScreen';
 import { Learn } from './components/Learn';
+import { DailyChallenge } from './components/DailyChallenge';
+import { DAILY_PARAM } from './game/daily';
 import { Lesson } from './components/Lesson';
 import { Draft } from './components/Draft';
 import { Menu } from './components/Menu';
@@ -51,6 +53,8 @@ type Screen =
   | { name: 'lesson'; id: string }
   /** Sandbox de regras: o editor da mesa (`spec`: a do link ou a que voltou da mesa; `linkInvalid`: link ilegível). */
   | { name: 'sandbox'; spec?: SandboxSpec; linkInvalid?: boolean; from?: 'learn' }
+  /** Desafio do dia (`/?desafio` abre direto). */
+  | { name: 'daily' }
   /**
    * `tournament`: veio da página de um torneio (e volta para ela; `lobby`: para o lobby dele);
    * `home`: veio do "Ao vivo agora" do menu.
@@ -128,7 +132,7 @@ function MainApp() {
   }, [screen]);
   // Música do menu em toda tela fora da mesa (a mesa troca para a música da partida ao abrir).
   const inMatch =
-    screen.name === 'game' || screen.name === 'online' || screen.name === 'watch' || screen.name === 'lesson' || screen.name === 'yonko-game' || screen.name === 'yonko-online';
+    screen.name === 'game' || screen.name === 'online' || screen.name === 'watch' || screen.name === 'lesson' || screen.name === 'daily' || screen.name === 'yonko-game' || screen.name === 'yonko-online';
   useEffect(() => {
     if (!inMatch) audio.music('menu');
   }, [inMatch]);
@@ -181,6 +185,12 @@ function MainApp() {
       here.searchParams.delete('yonko');
       history.replaceState(null, '', here.toString());
     }
+    // Desafio do dia (`/?desafio`, o link do resultado compartilhado).
+    if (here.searchParams.has(DAILY_PARAM)) {
+      setScreen({ name: 'daily' });
+      here.searchParams.delete(DAILY_PARAM);
+      history.replaceState(null, '', here.toString());
+    }
     // Perfil público (`/?perfil=<id>`): abre a página do jogador.
     if (here.searchParams.has(PROFILE_PARAM)) {
       const profile = parseProfileParam(here.searchParams);
@@ -220,6 +230,7 @@ function MainApp() {
       />
     );
   }
+  if (screen.name === 'daily') return <DailyChallenge onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'learn') {
     return (
       <Learn
@@ -403,6 +414,7 @@ function MainApp() {
       onBuildDecks={(id) => setScreen({ name: 'builder', ...(id ? { open: id } : {}) })}
       onLearn={() => setScreen({ name: 'learn' })}
       onSandbox={() => setScreen({ name: 'sandbox' })}
+      onDaily={() => setScreen({ name: 'daily' })}
       onCoverage={dev ? () => setScreen({ name: 'coverage' }) : undefined}
       onStats={() => setScreen({ name: 'stats' })}
       onOnline={(seat) => setScreen({ name: 'online', seat })}

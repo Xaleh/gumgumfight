@@ -1189,6 +1189,26 @@ As regras ficam no motor (`packages/engine/src/sandbox.ts`): validação (`sandb
 (`sandboxConfig`), a mesa (`createSandbox`, sobre o `createScenario` do tutorial) e a leitura do link
 (`parseSandboxSpec`).
 
+## Desafio do dia
+
+Um cenário novo por dia (vira à meia-noite de Brasília), em **Desafio do dia** no menu, no cartão da home ou pelo
+link `/?desafio`. Há dois tipos: **Ache o letal neste turno** (derrote o oponente antes de passar a vez) e **Sobreviva a
+este turno** (o oponente ataca numa ordem dada; escolha o que bloquear e quais Counters usar). O oponente segue regras
+fixas, ditas no enunciado: bloqueia e usa o Counter dos Personagens da mão só quando isso segura um ataque ao Líder dele
+e nunca ativa [Trigger]. No "sobreviva", ele ataca na ordem do roteiro. Em alguns desafios a mão dele faz parte do
+enunciado e fica aberta na mesa.
+
+O navegador recebe só a visão do jogador; cada jogada vai ao servidor, que refaz a tentativa, joga pelo oponente e
+confere o objetivo. Não precisa de login: o resultado fica com a conta ou com o navegador. Cada tentativa terminada
+conta, e depois de resolver o resultado do dia não muda (dá para jogar de novo). A tela mostra a **sequência de dias
+seguidos**, o recorde e os últimos dias. **Compartilhar** gera um texto com o número do desafio, as tentativas, a
+sequência e os quadradinhos dos últimos dias (✅/⬛), sem nada das jogadas.
+
+Os desafios ficam em `apps/server/src/daily/catalog.ts`, na ordem da fila: cada dia publicado recebe o próximo ainda
+não usado e, depois de usar todos, recomeça pelo publicado há mais tempo. Para incluir um, acrescente no fim da lista o
+cenário (`ScenarioSpec`, como nas lições), o objetivo, a solução e uma linha errada; o teste `daily.test.ts` joga as
+duas contra o servidor. A Administração vê a fila em `GET /api/admin/daily`.
+
 ## Como jogar
 
 - **Mulligan:** no início, mantenha ou troque a mão (uma vez).
@@ -1228,6 +1248,17 @@ As regras ficam no motor (`packages/engine/src/sandbox.ts`): validação (`sandb
   replay" (nas configurações, ao abrir o replay ou no botão 👆 da barra).
   Replays antigos continuam abrindo (são convertidos para a versão atual); os que não trazem as listas precisam
   que os decks ainda existam.
+- **Trecho em vídeo ou GIF** ("jogada da semana" para Reels): no replay, **✂ Trecho** na barra abre o painel. Vá até
+  onde o trecho começa e toque em **Marcar início**; depois, até onde termina, e em **Marcar fim** (o trecho fica
+  marcado em amarelo na barra, com a duração). **Baixar vídeo** grava o vídeo vertical 1080 × 1920 (MP4 onde o
+  navegador grava, como o Safari e o Chrome recente; WebM no Firefox) em tempo real, então a aba precisa ficar aberta;
+  **Baixar GIF** sai em 360 × 640, em poucos segundos. Cada ação vira um quadro: a mesa vista por quem assiste
+  (Líder, Personagens, Stage, poder, DON!!, Vida, mão e deck em quantidade, topo do descarte), a seta do ataque e a
+  carta jogada, o Counter e o efeito ativado ampliados no meio, como o destaque da tela de transmissão; a carta em
+  destaque fica mais tempo na tela. **Nada escondido sai:** os quadros vêm do motor (`clipFrames`, em
+  `packages/engine/src/clip.ts`) com a visão de espectador, sem revelar nada nem no fim de jogo (o `.json` do replay
+  tem as duas mãos e os dois decks; o vídeo não). Ações que não mudam nada à vista não geram quadro, e o trecho para
+  em 90 s (o limite dos Reels). Não aparece no replay embutido em apps parceiros nem no tutorial.
 - Em **Opções de teste** (no menu, só para o perfil Dev), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
   reproduz a mesma partida.
 
@@ -1572,7 +1603,7 @@ Mozilla, Microsoft ou Apple). As chaves nascem sozinhas no banco; não há nada 
 ## Testes
 
 ```bash
-npm test                                   # regras, tradução, importador, API, 200 partidas bot x bot e as lições do tutorial
+npm test                                   # regras, tradução, importador, API, 200 partidas bot x bot, as lições do tutorial e os desafios do dia
 npm run simulate -w @gumgum/engine -- 500  # estatísticas de N partidas bot x bot
 npm run typecheck
 ```
@@ -1597,6 +1628,7 @@ pode chamar sem login nem token:
 | GET · POST | `/api/yonko/active` · `/api/yonko/tables` · `/api/yonko/tables/join` · `/api/yonko/tables/:id/…` | Mesas online do Yonko: as suas (com o token), criar, entrar pelo código, o canal `events` (SSE) e os pedidos da mesa (`deck`, `ready`, `rules`, `bot`, `clear`, `start`, `action`, `reopen`, `leave`), todos com o token do lugar |
 | GET | `/api/tournaments` · `/api/tournaments/:id` | Torneios e o detalhe de um torneio (o que quem pede pode fazer vem na resposta) |
 | GET | `/api/sponsors` · `/api/support` · `/api/support/supporters` | Lojas parceiras, apoio ao projeto e lista pública de apoiadores |
+| GET · POST | `/api/daily[?brief=1]` · `/api/daily/play` | Desafio do dia: enunciado, mesa (visão do jogador), resultado e sequência; e a tentativa (as jogadas), conferida no servidor (com o código do navegador) |
 
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked, tournament), `opponent` (bot,
 human), `by` (human = padrão, bot = simulações bot x bot de versões antigas), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,

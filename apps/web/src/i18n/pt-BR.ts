@@ -11,6 +11,7 @@ import profilePtBR from './profile/pt-BR';
 import sealedPtBR from './sealed/pt-BR';
 import yonkoPtBR from './yonko/pt-BR';
 import sandboxPtBR from './sandbox/pt-BR';
+import dailyPtBR from './daily/pt-BR';
 import analysisPtBR from './analysis/pt-BR';
 
 const ptBR = {
@@ -2170,6 +2171,35 @@ const ptBR = {
   'replay.cueLineTitle': 'O que o jogador clicou ou escolheu nesta ação',
   'replay.stepHint': 'Passo a passo: use ▶| (ou →) para ver a próxima ação, ou ▶ para rodar sozinho.',
   'replay.stopsAt': 'O replay para na ação {n}: {message}',
+  // ---- trecho do replay em vídeo/GIF (F2) ----
+  'clip.button': '✂ Trecho',
+  'clip.buttonTitle': 'Exportar um trecho do replay em vídeo vertical ou GIF',
+  'clip.title': 'Trecho em vídeo ou GIF',
+  'clip.hint': 'Vá até onde o trecho começa e marque o início; depois, até onde termina, e marque o fim.',
+  'clip.markStart': 'Marcar início ({n})',
+  'clip.markEnd': 'Marcar fim ({n})',
+  'clip.range': 'Ações {from} a {to} · cerca de {s} s',
+  'clip.cut': 'Passa de {s} s (o limite dos Reels): o vídeo para antes do fim marcado.',
+  'clip.privacy': 'Só sai o que quem assiste vê: as mãos, os decks e a Vida virada ficam escondidos.',
+  'clip.video': 'Baixar vídeo',
+  'clip.gif': 'Baixar GIF',
+  'clip.noVideo': 'Este navegador não grava vídeo; o GIF funciona.',
+  'clip.recording': 'Gravando o vídeo… {p}%',
+  'clip.keepOpen': 'O vídeo grava em tempo real: deixe esta aba aberta.',
+  'clip.building': 'Montando o GIF… {p}%',
+  'clip.loading': 'Carregando as cartas…',
+  'clip.cancel': 'Cancelar',
+  'clip.close': 'Fechar',
+  'clip.error': 'Não deu para gerar o trecho: {message}',
+  'clip.turn': 'Turno {n}',
+  'clip.turnOf': 'Vez de {name}',
+  'clip.attacks': 'Ataque!',
+  'clip.won': '{name} venceu!',
+  'clip.life': 'Vida',
+  'clip.hand': 'Mão',
+  'clip.deck': 'Deck',
+  'clip.trash': 'Descarte',
+  'clip.don': 'DON!!',
   // ---- assistir replay (arquivo) ----
   'replay.title': 'Assistir replay',
   'replay.embedFailed': 'Não deu para abrir o replay',
@@ -3126,6 +3156,7 @@ const ptBR = {
   ...yonkoPtBR,
   // ==== Sandbox de regras: editor da mesa livre (i18n/sandbox) ====
   ...sandboxPtBR,
+  ...dailyPtBR,
   // ==== Análise da partida: revisão do replay terminado (i18n/analysis) ====
   ...analysisPtBR,
 } as const;

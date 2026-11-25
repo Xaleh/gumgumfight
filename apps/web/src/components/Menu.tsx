@@ -28,6 +28,7 @@ import { LiveNow, MetaBlock, TournamentBanner, TournamentsBlock, usePoll } from 
 import { Icon, type IconName } from './Icons';
 import { InstallBanner } from './Install';
 import { LearnBanner } from './LearnBanner';
+import { DailyBanner } from './DailyChallenge';
 import { LeaderArt } from './LeaderArt';
 import { DeckConfirm } from './DeckConfirm';
 import { DeckPicker, RANDOM_DECK } from './DeckPicker';
@@ -282,6 +283,7 @@ export function Menu({
   onBuildDecks,
   onLearn,
   onSandbox,
+  onDaily,
   onCoverage,
   onStats,
   onOnline,
@@ -304,6 +306,8 @@ export function Menu({
   onLearn: () => void;
   /** Sandbox de regras (mesa livre para testar cartas). */
   onSandbox: () => void;
+  /** Desafio do dia. */
+  onDaily: () => void;
   /** Cobertura das cartas (só para Dev). */
   onCoverage?: () => void;
   onStats: () => void;
@@ -662,6 +666,7 @@ export function Menu({
   const nav: NavItem[] = [
     { key: 'play', label: t('menu.navPlay'), icon: 'swords', current: true, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
     { key: 'learn', label: t('menu.navLearn'), icon: 'learn', onClick: onLearn },
+    { key: 'daily', label: t('daily.nav'), icon: 'star', onClick: onDaily },
     { key: 'builder', label: t('menu.navDecks'), icon: 'deck', onClick: () => onBuildDecks() },
     { key: 'tournaments', label: t('menu.navTournaments'), icon: 'crown', onClick: () => onTournaments() },
     { key: 'watch', label: t('menu.navWatch'), icon: 'eye', onClick: onWatch },
@@ -784,6 +789,7 @@ export function Menu({
         )}
 
         <LearnBanner onLearn={onLearn} />
+        <DailyBanner onOpen={onDaily} />
         <InstallBanner />
 
         <section className="deck-strip" aria-label={t('menu.equippedDeck')}>
