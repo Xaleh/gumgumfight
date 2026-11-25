@@ -14,3 +14,7 @@ release/
 
 # gerado pelo servidor em dev (diferenças das fontes de cartas)
 apps/server/var/
+
+# testes de ponta a ponta (Playwright): banco temporário e relatório
+e2e/.tmp/
+playwright-report/

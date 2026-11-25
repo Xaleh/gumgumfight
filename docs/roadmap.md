@@ -47,6 +47,9 @@ em várias branches ao mesmo tempo.
   Fluxos principais rodando num navegador de verdade: fila → partida → fim; partida contra o bot; criar e jogar um
   torneio; abrir boosters (também com a emulação do Safari do iPhone, onde já houve bug).
   *Pronto quando:* existe `npm run e2e`, os fluxos acima passam e o workflow **CI e deploy** roda os testes.
+  *Plano:* [`plano-testes-e2e.md`](plano-testes-e2e.md) (3 fases).
+  *Progresso:* fase 1 de 3 (`npm run e2e`, job no CI com Chromium e WebKit, partida contra o bot até o fim e abrir
+  boosters, também no iPhone) em 2026-11-25, [PR #236](https://github.com/Xaleh/gumgumfight/pull/236).
   *Feito em:* —
 
 - [x] **A2. Monitoramento em produção**
