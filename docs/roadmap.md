@@ -49,11 +49,11 @@ em várias branches ao mesmo tempo.
   *Pronto quando:* existe `npm run e2e`, os fluxos acima passam e o workflow **CI e deploy** roda os testes.
   *Feito em:* —
 
-- [ ] **A2. Monitoramento em produção**
+- [x] **A2. Monitoramento em produção**
   Captura de erros do navegador e do servidor (com página de consulta ou serviço externo gratuito), métricas das
   conexões SSE (abertas, quedas, reconexões) e alerta quando o site cai.
   *Pronto quando:* um erro forçado no navegador e no servidor aparece no painel, e uma queda simulada gera alerta.
-  *Feito em:* —
+  *Feito em:* 2026-11-25, [PR #235](https://github.com/Xaleh/gumgumfight/pull/235)
 
 - [ ] **A3. Dividir o `engine.ts` e o `GameScreen.tsx`** 🧱
   `packages/engine/src/engine.ts` (~7 mil linhas) em módulos por fase do turno; `apps/web/src/components/GameScreen.tsx`
