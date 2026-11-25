@@ -2,8 +2,10 @@ import type { Action, GameState } from '@gumgum/engine';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ClipPanel, type ClipRange, type ClipSource } from './ClipPanel';
 import type { ReplayCue } from '../game/replayCue';
+import { useReplayAnalysis } from '../game/useReplayAnalysis';
+import { analysisMarks, ReplayAnalysis } from './ReplayAnalysis';
 import { REPLAY_SPEEDS } from '../game/useGame';
-import { useT } from '../i18n';
+import { type MessageKey, useT } from '../i18n';
 import { useSettings } from '../settings';
 
 /** Posição no replay e como mudá-la (de `useGame`). */
@@ -21,8 +23,9 @@ export interface ReplayControls {
   next?: Action;
   /** Modo automático: quando (`performance.now()`) `next` será aplicada; null se nada está agendado. */
   dueAt: () => number | null;
-  /** O começo da partida e o roteiro inteiro (para o trecho em vídeo/GIF). */
-  source?: () => { initial: GameState; actions: readonly Action[] };
+  /** O estado inicial e o roteiro inteiro (a análise da partida refaz tudo desde o começo). */
+  initial: GameState;
+  script: readonly Action[];
 }
 
 const svg = (children: ReactNode) => (
@@ -104,6 +107,13 @@ export function ReplayBar({
   };
   const lo = range ? (range.to === null ? range.from : Math.min(range.from, range.to)) : 0;
   const hi = range ? (range.to === null ? range.from : Math.max(range.from, range.to)) : 0;
+  // Análise da partida (roadmap B1): pedida aqui, com os marcadores na linha do tempo.
+  const analysis = useReplayAnalysis(replay.initial, replay.script);
+  const marks = analysisMarks(analysis.state);
+  const jump = (n: number) => {
+    setPaused(() => true);
+    seek(n);
+  };
 
   /** Passo a passo: avançar ou voltar uma ação pausa o automático. */
   const step = (d: number) => {
@@ -168,21 +178,36 @@ export function ReplayBar({
 
   return (
     <div className="replay-bar" role="toolbar" aria-label={t('replay.toolbarLabel')}>
-      <div className="replay-seek-wrap">
-      {range && total > 0 && (
-        <span className="replay-clip-range" aria-hidden="true" style={{ left: `${(lo / total) * 100}%`, width: `max(4px, ${((hi - lo) / total) * 100}%)` }} />
-      )}
-      <input
-        className="replay-seek"
-        type="range"
-        min={0}
-        max={total}
-        value={pos}
-        onChange={(e) => seek(Number(e.target.value))}
-        aria-label={t('replay.seekLabel')}
-        aria-valuetext={t('replay.actionOf', { pos, total })}
-        style={{ ['--fill' as string]: `${total ? (pos / total) * 100 : 0}%` }}
-      />
+      <div className="replay-track">
+        {range && total > 0 && (
+          <span className="replay-clip-range" aria-hidden="true" style={{ left: `calc(9px + (100% - 18px) * ${lo / total})`, width: `max(4px, calc((100% - 18px) * ${(hi - lo) / total}))` }} />
+        )}
+        <input
+          className="replay-seek"
+          type="range"
+          min={0}
+          max={total}
+          value={pos}
+          onChange={(e) => seek(Number(e.target.value))}
+          aria-label={t('replay.seekLabel')}
+          aria-valuetext={t('replay.actionOf', { pos, total })}
+          style={{ ['--fill' as string]: `${total ? (pos / total) * 100 : 0}%` }}
+        />
+        {marks.length > 0 && (
+          <div className="replay-marks" aria-label={t('analysis.marksLabel')}>
+            {marks.map((m) => (
+              <button
+                key={m.index}
+                type="button"
+                className={`replay-mark sev-${m.severity}${m.index === pos ? ' on' : ''}`}
+                style={{ left: `${total ? (m.index / total) * 100 : 0}%` }}
+                onClick={() => jump(m.index)}
+                title={t('analysis.markAt', { turn: m.turn, name: state.players[m.player].name, severity: t(`analysis.severity.${m.severity}` as MessageKey) })}
+                aria-label={t('analysis.markAt', { turn: m.turn, name: state.players[m.player].name, severity: t(`analysis.severity.${m.severity}` as MessageKey) })}
+              />
+            ))}
+          </div>
+        )}
       </div>
       <div className="replay-row">
         <div className="replay-info">
@@ -255,6 +280,7 @@ export function ReplayBar({
           {cue.sub && <em> — {cue.sub}</em>}
         </p>
       )}
+      <ReplayAnalysis analysis={analysis.state} state={state} pos={pos} seek={jump} onStart={analysis.start} onCancel={analysis.cancel} />
       {clip && range && <ClipPanel source={clip} pos={pos} range={range} setRange={setRange} onClose={() => setRange(null)} />}
       {!playing && !atEnd && !range && <p className="replay-hint">{t('replay.stepHint')}</p>}
     </div>

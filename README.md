@@ -2,7 +2,7 @@
 
 Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](https://duels.ink/) (Lorcana).
 
-> **Status:** partidas contra um bot, replays, **multiplayer online** (salas privadas, fila casual e
+> **Status:** partidas contra um bot, replays com **análise da partida**, **multiplayer online** (salas privadas, fila casual e
 > ranqueada) e **torneios** (suíço com top cut e eliminação simples, com melhor de 3 e de 5). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
 > com textos em português (tradução automática) ou inglês e imagens opcionais. Interface em **seis idiomas**
 > (🇧🇷 português do Brasil, 🇬🇧 inglês, 🇪🇸 espanhol, 🇯🇵 japonês, 🇫🇷 francês e 🇩🇪 alemão), escolhidos pela bandeira.
@@ -194,6 +194,15 @@ Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construto
    o texto do efeito; no toque, segure o dedo na carta para abri-la ampliada.
 3. O painel à direita mostra o total, a curva de custo, os Counters e os problemas do deck. **Salvar** grava
    no banco. Decks incompletos ficam salvos como rascunho e aparecem desabilitados no menu.
+4. **Mão de teste** (o quarto modo do painel do deck, ao lado de Lista, Grade e Curva) sorteia a mão inicial do deck como
+   ele está: **Nova mão**, **Mulligan** (devolve a mão, embaralha e compra 5 de novo, uma vez só) e **Comprar** (a compra
+   de cada turno). Abaixo ficam as **chances exatas**, calculadas no motor (`packages/engine/src/handtest.ts`, distribuição
+   hipergeométrica, sem sorteio), jogando em 1º ou em 2º (quem começa não compra no turno 1):
+   - ter um **Personagem do custo escolhido** na mão até cada um dos turnos 1 a 5;
+   - ter a **carta-chave** escolhida do deck até cada um dos turnos 1 a 5;
+   - a soma de **Counter na mão inicial** (chance de ter ≥ 1000, 2000, 3000 e 4000, e a média).
+   Com **Mulligan quando a mão inicial não tem a carta** marcado, a conta supõe que você troca a mão quando ela não tem o
+   Personagem ou a carta-chave. Tudo roda no navegador: nada vai para o servidor.
 
 Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por número e toda carta com ao menos uma
 cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.
@@ -549,6 +558,30 @@ fora das estatísticas (`match_seats.listed = 0`) e do meta dos torneios.
 - O jogador é a conta Google ou, sem login, o navegador (o mesmo código de dono dos decks). O nome do cartaz de
   "WANTED" é o nome público e pode ser trocado na tela de estatísticas (o nome da conta Google não aparece para os outros).
 
+### Perfil público
+
+Cada jogador tem uma página pública aberta por link, **`/?perfil=<id>`** (o botão **👤 Meu perfil público**, embaixo do
+cartaz das Estatísticas, abre a sua e **🔗 Copiar link** copia o endereço). A página mostra:
+
+- o cartaz **WANTED** com o nome público, a recompensa, o tier, as partidas ranqueadas e desde quando a pessoa joga;
+- os **Líderes mais jogados** (partidas e taxa de vitória) e o total de partidas e vitórias;
+- as **10 partidas mais recentes**: o Líder de cada lado, o resultado, a fila, o formato, a data e, na ranqueada, quanto a
+  recompensa subiu ou desceu, com o botão **▶ Replay** quando o replay é público;
+- os **decks** que o jogador escolheu mostrar (até 6), com as partidas e a taxa de vitória de cada um e o botão
+  **Abrir no construtor**, que abre uma cópia sem salvar nada.
+
+O dono escolhe o que aparece no painel **O que aparece no seu perfil**, que só ele vê na própria página, e a mudança
+vale na hora:
+
+- **Perfil visível**: desligado, o link responde como se o perfil não existisse (só o dono ainda vê a página).
+- **Líderes mais jogados** e **Partidas recentes**: cada seção pode ser escondida.
+- **Replays das partidas** (desligado no começo): o replay mostra a mão e o deck dos dois lados. Contra o bot, basta o
+  dono liberar. Contra outra pessoa, o replay só abre se ela também liberar os replays dela num perfil visível.
+- **Decks no perfil**: só os decks do próprio jogador.
+
+O que nunca aparece: o nome e o perfil do oponente (só o Líder dele e se era bot ou pessoa) e as partidas de torneios que
+ainda não terminaram (as listas de um torneio só se abrem no fim).
+
 ### Meta global (TCG Matchmaking)
 
 Com `GLOBAL_STATS_API_KEY` configurada, a tela de Estatísticas ganha o escopo **🌍 Global**: as filas ranqueadas do
@@ -713,6 +746,31 @@ Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas
 - A tela **Cobertura das cartas** (o endpoint `GET /api/coverage` continua público).
 - **Opções de teste** no menu (seed do embaralhamento). Baixar e assistir a um replay é para todos (um jogador pode
   mandar o replay a um Dev ao relatar um problema).
+
+## Análise da partida
+
+Revisão depois do jogo, como a do chess.com. Em qualquer **replay terminado**, o botão **Analisar a partida** (na barra do
+replay) faz o bot rever cada decisão de cada jogador que tinha escolha de verdade e comparar a jogada feita com a melhor
+jogada que ele acha:
+
+- **Só o que o jogador sabia**: cada decisão é avaliada sobre a visão de quem decidiu (`viewFor`), a mesma com que o bot
+  joga. A mão e o deck do oponente ficam escondidos; do próprio deck, só a composição. Por isso a análise só roda em
+  replay terminado: numa partida em andamento, a jogada sugerida contaria o que há na mão de quem joga.
+- **Marcadores na linha do tempo**: a jogada que perdeu valor na avaliação do bot vira um marcador colorido na barra
+  de busca, com a gravidade (**?!** imprecisão a partir de −1.500, **?** erro a partir de −4.000, **??** erro grave a
+  partir de −10.000; 1.000 ≈ +1000 de poder num ataque). Um toque leva a mesa à decisão e abre o cartão com o tipo
+  ("aqui havia letal", "Counter desperdiçado", "faltou bloquear", "atacar o Líder era melhor que o Personagem",
+  "encerrou o turno com jogada melhor por fazer"…), o que foi jogado e a **jogada sugerida** (a linha do turno).
+  ‹ e › pulam entre os marcadores.
+- **Resumo**: a precisão de cada jogador (média das decisões; a melhor jogada vale 100%) e a contagem de erros graves,
+  erros, imprecisões e letais perdidos, com a lista dos marcadores.
+- A conta (uma ou duas buscas do bot por decisão) roda num Web Worker, com o progresso na barra e os marcadores
+  aparecendo enquanto ela anda; dá para cancelar. Leva de alguns segundos a cerca de um minuto, conforme o tamanho da
+  partida e o aparelho. Como a busca do bot tem um teto de tempo, aparelhos diferentes podem dar números um pouco
+  diferentes.
+
+Fases seguintes (análise guardada no servidor, precisão em "Minhas partidas", prévia da jogada sugerida na mesa):
+[`docs/plano-analise-partida.md`](docs/plano-analise-partida.md).
 
 ## Bot do Time
 

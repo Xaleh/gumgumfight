@@ -256,8 +256,6 @@ export function useGame(setup: GameSetup) {
     };
   }, [state, paused, hold, speed, setup, dispatch, seek, auto, human]);
   const dueAt = useCallback(() => dueRef.current, []);
-  /** Replay: o começo da partida e o roteiro inteiro (o trecho em vídeo/GIF sai daqui). */
-  const source = useCallback(() => ({ initial: startRef.current!, actions: cursorRef.current?.actions ?? [] }), []);
 
   const exportReplay = useCallback((): ReplayFile => {
     const first = startRef.current!;
@@ -294,8 +292,9 @@ export function useGame(setup: GameSetup) {
         // A próxima ação do roteiro: a mesa mostra o clique/seleção do jogador antes de aplicá-la.
         next: cursor.pos < cursor.end ? cursor.actions[cursor.pos] : undefined,
         dueAt,
-        // Trecho em vídeo/GIF: o começo da partida e o roteiro inteiro.
-        source,
+        // A análise da partida e o trecho em vídeo/GIF refazem o roteiro inteiro a partir do começo.
+        initial: startRef.current!,
+        script: cursor.actions,
       }
     : undefined;
 

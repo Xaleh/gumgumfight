@@ -56,6 +56,7 @@ import { vapidKeys } from './push/store';
 import { deckHash } from './stats/derive';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
+import { registerProfileRoutes } from './profiles/routes';
 import { type Complete, sdkCompleter } from './team/agent';
 import { MetaProfiles } from './team/profiles';
 import { ChamberPresets } from './tournaments/chamber';
@@ -435,6 +436,7 @@ export function buildApp(
     fetchImpl: opts.fetchImpl,
   });
   registerPartnerMatchRoutes(app, { db, user: auth.viewer });
+  registerProfileRoutes(app, { db, viewerHash, present });
   registerTokenRoutes(app, { db, user: auth.viewer });
   const sendIndex = existsSync(WEB_DIST) ? (reply: FastifyReply) => reply.sendFile('index.html') : undefined;
   registerOAuthRoutes(app, { db, user: auth.viewer, now: opts.now, sendIndex });

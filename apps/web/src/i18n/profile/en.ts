@@ -1,0 +1,45 @@
+// Public player profile texts (English).
+
+import type profilePtBR from './pt-BR';
+
+const profile: Record<keyof typeof profilePtBR, string> = {
+  'profile.title': 'Player profile',
+  'profile.open': '👤 My public profile',
+  'profile.loading': 'Loading…',
+  'profile.notFound': "This profile doesn't exist or the player chose not to show it.",
+  'profile.hiddenNotice': "Your profile is hidden: the link doesn't open for others. Only you can see this page.",
+  'profile.rankedGames': '{n|# ranked match|# ranked matches}',
+  'profile.since': 'playing since {date}',
+  'profile.record': '{games} matches, {wins} wins ({pct})',
+  'profile.copyLink': '🔗 Copy link',
+  'profile.copied': '✓ Link copied',
+  'profile.copyPrompt': 'Copy the profile link:',
+  'profile.leadersTitle': 'Most played leaders',
+  'profile.noGames': 'No matches yet.',
+  'profile.leaderLine': '{games|# match|# matches} · {pct} win rate',
+  'profile.matchesTitle': 'Recent matches',
+  'profile.win': 'Win',
+  'profile.loss': 'Loss',
+  'profile.draw': 'Draw',
+  'profile.vsBot': 'vs the bot',
+  'profile.vsPlayer': 'vs a player',
+  'profile.watchReplay': '▶ Replay',
+  'profile.decksTitle': 'Decks',
+  'profile.deckLine': '{games|# match|# matches} · {pct} win rate',
+  'profile.openDeck': 'Open in the builder',
+  'profile.editTitle': 'What your profile shows',
+  'profile.editIntro': 'Choose what others see when they open your link. Changes apply right away.',
+  'profile.optVisible': 'Profile visible',
+  'profile.optVisibleHint': "(when off, the link doesn't open for anyone)",
+  'profile.optLeaders': 'Most played leaders and total wins',
+  'profile.optMatches': 'Recent matches',
+  'profile.optReplays': 'Match replays',
+  'profile.optReplaysHint': '(against another player, only if they also share their replays)',
+  'profile.decksPick': 'Decks on the profile (up to {max})',
+  'profile.noDecks': "You don't have saved decks yet.",
+  'errors.profileNotFound': 'Profile not found.',
+  'errors.profileReplayHidden': "This match's replay isn't public.",
+  'errors.profileDecksInvalid': 'Choose up to {max} decks.',
+};
+
+export default profile;

@@ -7,8 +7,10 @@ import recap from './recap/ja';
 import decks from './decks/ja';
 import team from './team/ja';
 import chamber from './chamber/ja';
+import profile from './profile/ja';
 import sealed from './sealed/ja';
 import yonko from './yonko/ja';
+import analysis from './analysis/ja';
 
 export default {
   // ---- 全般 ----
@@ -3135,7 +3137,9 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...profile,
   ...sealed,
   ...yonko,
+  ...analysis,
 } satisfies Messages;
 
