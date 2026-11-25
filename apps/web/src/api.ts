@@ -8,6 +8,7 @@ import {
   type CardData,
   type CardDef,
   type ChallengeSpec,
+  type DeckDiff,
   type DeckList,
   type DeckProfile,
   type FormatId,
@@ -26,6 +27,24 @@ import {
 } from '@gumgum/engine';
 
 export type { FormatId, PlayFormat, PlayMode };
+
+/** Uma versão do deck (`GET /api/decks/:id/versions`): a lista, o que mudou desde a anterior e os números dela. */
+export interface DeckVersion {
+  hash: string;
+  number: number;
+  leader: string;
+  cards: Array<{ id: string; count: number }>;
+  savedAt: string | null;
+  firstPlayedAt: string | null;
+  lastPlayedAt: string | null;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number | null;
+  current: boolean;
+  diff: DeckDiff;
+}
 
 export interface DeckSummary {
   id: string;
@@ -735,6 +754,8 @@ export const api = {
     get<{ deck: DeckList & { kind: DeckSummary['kind']; mine: boolean }; cards: ApiCard[]; summary: DeckSummary }>(
       `/api/decks/${encodeURIComponent(id)}`,
     ),
+  /** Versões do deck, da mais nova para a mais antiga (roadmap C2). */
+  deckVersions: (id: string) => get<{ deckId: string; total: number; versions: DeckVersion[] }>(`/api/decks/${encodeURIComponent(id)}/versions`),
   cards: () => get<ApiCard[]>('/api/cards'),
   coverage: () => get<{ total: CoverageRow; sets: CoverageRow[] }>('/api/coverage'),
   /** Perfil Dev: lacunas do leitor automático (resumo, cartas e as novas com ⚙). */

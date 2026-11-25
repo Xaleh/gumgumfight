@@ -37,6 +37,7 @@ import { DeckLibrary } from './DeckLibrary';
 import { CostCurve, useFavoriteToggle } from './DeckTile';
 import { DeckViewer } from './DeckViewer';
 import { DeckSuggestionsPanel } from './DeckSuggestions';
+import { DeckVersionsPanel } from './DeckVersions';
 import { HandTestPanel } from './HandTest';
 import { Icon } from './Icons';
 
@@ -128,7 +129,7 @@ export function DeckBuilder({
   /** Aviso rápido da última mudança, com "Desfazer". */
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   /** O deck atual em lista, grade ou curva. */
-  const [mode, setMode] = useState<'list' | 'grid' | 'curve' | 'hand' | 'tips'>('list');
+  const [mode, setMode] = useState<'list' | 'grid' | 'curve' | 'hand' | 'tips' | 'versions'>('list');
   /** Tela estreita: catálogo ou deck (abas no pé da tela). */
   const [mobileTab, setMobileTab] = useState<'catalog' | 'deck'>('catalog');
   /** Deck salvo com a mesma lista (aviso antes de criar uma cópia sem mudança). */
@@ -192,6 +193,10 @@ export function DeckBuilder({
   const [limit, setLimit] = useState(PAGE);
 
   const byId = useMemo(() => new Map(allCards.map((c) => [c.id, c])), [allCards]);
+  // Versões só existem para deck salvo: um deck novo (ou a cópia de um pronto) volta para a lista.
+  useEffect(() => {
+    if (mode === 'versions' && !draft.id) setMode('list');
+  }, [mode, draft.id]);
   const leader = draft.leader ? byId.get(draft.leader) : undefined;
   /** Prévia do Importar lista, refeita a cada tecla: o Líder, quantas cartas e as linhas que ficariam de fora. */
   const previewList = useCallback(
@@ -919,9 +924,10 @@ export function DeckBuilder({
           </div>
 
           <div className="seg small dk-modes" role="group" aria-label={t('decks.builder.modeLabel')}>
-            {(['list', 'grid', 'curve', 'hand', 'tips'] as const).map((m) => (
+            {(['list', 'grid', 'curve', 'hand', 'tips', ...(draft.id ? (['versions'] as const) : [])] as const).map((m) => (
               <button key={m} type="button" className={mode === m ? 'on' : ''} aria-pressed={mode === m} onClick={() => setMode(m)}>
-                <Icon name={m === 'list' ? 'list' : m === 'grid' ? 'grid' : m === 'curve' ? 'bars' : m === 'hand' ? 'flask' : 'bulb'} size={14} /> {t(`decks.builder.mode.${m}`)}
+                <Icon name={m === 'list' ? 'list' : m === 'grid' ? 'grid' : m === 'curve' ? 'bars' : m === 'hand' ? 'flask' : m === 'tips' ? 'bulb' : 'history'} size={14} />{' '}
+                {t(`decks.builder.mode.${m}`)}
               </button>
             ))}
           </div>
@@ -951,6 +957,27 @@ export function DeckBuilder({
                 ) : null,
               )}
             </div>
+          )}
+
+          {mode === 'versions' && draft.id && (
+            <DeckVersionsPanel
+              deckId={draft.id}
+              refreshKey={`${draft.id}:${dirty}`}
+              byId={byId}
+              dirty={dirty}
+              onRestore={(v) =>
+                edit(
+                  (d) => {
+                    const cards = new Map<string, number>();
+                    for (const c of v.cards) cards.set(c.id, (cards.get(c.id) ?? 0) + c.count);
+                    return { ...d, leader: v.leader, cards };
+                  },
+                  {
+                    label: t('decks.versions.restored', { n: v.number }),
+                  },
+                )
+              }
+            />
           )}
 
           {mode === 'hand' && <HandTestPanel cards={deckList.cards} byId={byId} shown={shown} onHover={setHovered} onLongPress={setZoom} />}
