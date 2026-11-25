@@ -96,6 +96,17 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   sequência dele e pode compartilhar o resultado sem entregar a resposta.
   *Feito em:* 25/11/2026, [PR #225](https://github.com/Xaleh/gumgumfight/pull/225)
 
+- [ ] **B4.1. Editor de desafios do dia** 🧱
+  Tela na Administração para montar os desafios do dia com os decks atuais (Líderes do OP18, o Xebec do meta), sem
+  escrever código: escolher os decks, montar a mesa área por área, gravar a solução jogando na mesa e publicar na fila.
+  Os desafios passam a ficar no banco, montados e conferidos com as cartas de produção.
+  *Pronto quando:* um admin monta, confere e publica um desafio com cartas atuais pela tela; a fila aceita datas fixas e
+  mostra quem jogou e resolveu; e o defensor pode usar Eventos de Counter e [Trigger] quando o desafio pedir.
+  *Plano:* [`plano-editor-desafios.md`](plano-editor-desafios.md) (3 fases).
+  *Progresso:* fase 1 de 3 (desafios no banco e o editor com a solução gravada jogando) em 2026-11-25,
+  [PR #227](https://github.com/Xaleh/gumgumfight/pull/227).
+  *Feito em:* —
+
 - [x] **B5. Sandbox de regras**
   Mesa livre para montar uma situação (cartas em campo, na mão, DON!!, Vida) e testar a interação de duas cartas, sem
   partida inteira.

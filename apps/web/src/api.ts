@@ -6,6 +6,7 @@ import {
   type BotLevel,
   type CardData,
   type CardDef,
+  type ChallengeSpec,
   type DeckList,
   type DeckProfile,
   type FormatId,
@@ -827,6 +828,13 @@ export const api = {
     event: (lesson: string, event: TutorialEventKind, step = '') => send<void>('POST', '/api/tutorial/events', { lesson, event, step }).catch(() => undefined),
   },
   admin: {
+    /** Editor de desafios do dia: os desafios (catálogo e Administração), salvar um conferido e apagar um que não saiu. */
+    daily: {
+      challenges: () => get<{ challenges: AdminDailyChallenge[] }>('/api/admin/daily/challenges'),
+      save: (body: { spec: Omit<ChallengeSpec, 'id'>; solution: Action[]; wrong: Action[] | null; note?: string; allowManual?: boolean }) =>
+        send<{ id: string; next: number }>('POST', '/api/admin/daily/challenges', body),
+      remove: (id: string) => send<void>('DELETE', `/api/admin/daily/challenges/${encodeURIComponent(id)}`),
+    },
     tutorial: (days = 30) => get<{ days: number; since: string; lessons: TutorialFunnel[] }>(`/api/admin/tutorial?days=${days}`),
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
     setRole: (id: string, role: Role) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { role }),
@@ -2424,4 +2432,18 @@ export interface DailyPlay {
   view: GameState;
   result: DailyResult;
   streak: DailyStreak;
+}
+
+/** Desafio na lista do editor (sem a solução). `next`: posição na fila (0 = o próximo a sair). */
+export interface AdminDailyChallenge {
+  id: string;
+  source: 'catalog' | 'admin';
+  goal: 'lethal' | 'survive';
+  level: 1 | 2 | 3;
+  decks: string[];
+  leaders: Array<{ id: string; name: string }>;
+  note: string | null;
+  createdAt: string | null;
+  days: string[];
+  next: number;
 }

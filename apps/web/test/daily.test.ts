@@ -43,4 +43,10 @@ describe('desafio do dia: compartilhar', () => {
   it('as chaves do desafio existem no dicionário', () => {
     expect(Object.keys(ptBR).filter((k) => k.startsWith('daily.')).length).toBeGreaterThan(30);
   });
+
+  it('nenhum plural dos textos do desafio tem parâmetro dentro (o formatador não lê)', () => {
+    const bad = Object.entries(ptBR).filter(([k, v]) => k.startsWith('daily.') && /\{n\|[^}]*\{/.test(v));
+    expect(bad).toEqual([]);
+    expect(t('daily.admin.days', { n: 2, days: '2026-10-12, 2026-10-19' })).toBe('saiu 2 vezes (2026-10-12, 2026-10-19)');
+  });
 });

@@ -20075,6 +20075,212 @@ div.dk-tile-main {
   }
 }
 
+/* ---- editor de desafios do dia (Administração, DailyEditor.tsx) */
+.daily-admin-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.daily-admin-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.daily-admin-pos {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  background: var(--brand-yellow);
+  color: var(--brown);
+}
+.daily-admin-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.daily-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.daily-editor fieldset {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  min-width: 0;
+}
+.daily-editor legend {
+  font-weight: 900;
+  padding: 0 6px;
+}
+.daily-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.daily-editor label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.daily-editor input[type='number'] {
+  width: 72px;
+}
+.daily-editor select,
+.daily-editor input[type='text'],
+.daily-editor input[type='number'] {
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  max-width: 100%;
+}
+.daily-editor-general {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: flex-end;
+}
+.daily-editor-general label.wide {
+  flex: 1 1 260px;
+}
+.daily-editor-seed {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.daily-editor-seed input[type='number'] {
+  width: 110px;
+}
+.daily-editor-sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 16px;
+}
+.daily-editor-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.daily-editor-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.daily-editor-add select:first-child {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.daily-editor-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.daily-editor-zone-label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.daily-editor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.daily-editor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.daily-editor-chip button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 6px;
+}
+.daily-editor-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--panel2);
+}
+.daily-editor-field strong {
+  flex: 1 1 140px;
+}
+.daily-editor-field label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.daily-editor-field input[type='number'] {
+  width: 56px;
+}
+.daily-editor-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+}
+.daily-editor-attacks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.daily-editor-attack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.daily-editor-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.daily-editor-recorded {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 /* ---- Amigos (Friends.tsx): folha, lista com status e faixa de convite ---- */
 .friends-sheet .sheet-body {
   display: grid;

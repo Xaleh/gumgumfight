@@ -1,7 +1,8 @@
 // Desafio do dia: a fila publicada por data e os resultados de cada dono (conta ou navegador).
 
 import type { DB } from '../db';
-import { type CatalogChallenge, DAILY_CATALOG } from './catalog';
+/** O que a fila precisa de um desafio. */
+type Queued = { id: string };
 
 /** O dia vira à meia-noite de Brasília (UTC−3, sem horário de verão). */
 const DAY_OFFSET_MS = -3 * 3_600_000;
@@ -10,19 +11,19 @@ export const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const shiftDay = (day: string, delta: number) => new Date(Date.parse(`${day}T00:00:00Z`) + delta * 86_400_000).toISOString().slice(0, 10);
 export const previousDay = (day: string) => shiftDay(day, -1);
 
-export interface Published {
+export interface Published<T extends Queued> {
   day: string;
   number: number;
-  challenge: CatalogChallenge;
+  challenge: T;
 }
 
 type ScheduleRow = { day: string; challenge_id: string; number: number };
 
 /**
- * Ordem da fila: primeiro os desafios do catálogo ainda não publicados (na ordem do arquivo), depois os já
- * publicados, do que saiu há mais tempo para o mais recente.
+ * Ordem da fila: primeiro os desafios ainda não publicados (na ordem da lista: o catálogo e depois os da
+ * Administração), depois os já publicados, do que saiu há mais tempo para o mais recente.
  */
-export function queueOrder(db: DB, catalog = DAILY_CATALOG): CatalogChallenge[] {
+export function queueOrder<T extends Queued>(db: DB, catalog: T[]): T[] {
   const last = new Map(
     (db.prepare('SELECT challenge_id, MAX(day) AS day FROM daily_schedule GROUP BY challenge_id').all() as Array<{ challenge_id: string; day: string }>).map(
       (r) => [r.challenge_id, r.day],
@@ -34,14 +35,14 @@ export function queueOrder(db: DB, catalog = DAILY_CATALOG): CatalogChallenge[] 
 }
 
 /** O desafio publicado no dia (null = nenhum). */
-export function publishedOn(db: DB, day: string, catalog = DAILY_CATALOG): Published | null {
+export function publishedOn<T extends Queued>(db: DB, day: string, catalog: T[]): Published<T> | null {
   const r = db.prepare('SELECT day, challenge_id, number FROM daily_schedule WHERE day = ?').get(day) as ScheduleRow | undefined;
   const challenge = r && catalog.find((c) => c.id === r.challenge_id);
   return r && challenge ? { day: r.day, number: r.number, challenge } : null;
 }
 
 /** Publica o desafio do dia, se ainda não foi publicado: o próximo da fila. Depois de publicado, o dia não muda. */
-export function publish(db: DB, day: string, catalog = DAILY_CATALOG): Published {
+export function publish<T extends Queued>(db: DB, day: string, catalog: T[]): Published<T> {
   const existing = publishedOn(db, day, catalog);
   if (existing) return existing;
   const next = queueOrder(db, catalog)[0];

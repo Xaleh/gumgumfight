@@ -919,8 +919,9 @@ function migrateTutorial(db: DB) {
 }
 
 /**
- * Desafio do dia (`daily/`): a fila publicada (um desafio do catálogo por dia, fixo depois de publicado) e o
- * resultado de cada dono (conta `user:<id>` ou navegador) em cada dia, de onde sai a sequência de dias seguidos.
+ * Desafio do dia (`daily/`): a fila publicada (um desafio por dia, fixo depois de publicado), o resultado de cada
+ * dono (conta `user:<id>` ou navegador) em cada dia, de onde sai a sequência de dias seguidos, e os desafios montados
+ * na Administração.
  */
 function migrateDaily(db: DB) {
   db.exec(`
@@ -940,6 +941,17 @@ function migrateDaily(db: DB) {
       PRIMARY KEY (owner_hash, day)
     );
     CREATE INDEX IF NOT EXISTS daily_results_day ON daily_results (day);
+
+    -- Desafios montados na Administração (o catálogo em código é a semente). Entram na fila depois de conferidos.
+    CREATE TABLE IF NOT EXISTS daily_challenges (
+      id         TEXT PRIMARY KEY,              -- 'a-' + 10 hex
+      spec       TEXT NOT NULL,                 -- JSON: ChallengeSpec com as listas dos dois decks congeladas
+      solution   TEXT NOT NULL,                 -- JSON: ações do jogador que resolvem (uids reais da mesa montada)
+      wrong      TEXT,                          -- JSON: ações de uma tentativa que falha (ou NULL)
+      note       TEXT,                          -- nota interna do admin
+      created_by TEXT,                          -- users.id
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 }
 

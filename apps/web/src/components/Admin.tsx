@@ -4,6 +4,7 @@ import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, useT } from '../i18n';
 import { PaymentsPanel, SponsorsPanel, SupporterEditor } from './AdminSupport';
+import { DailyAdminPanel, DailyEditor } from './DailyEditor';
 import { DeckCleanupPanel } from './DeckCleanup';
 import { ReportsPanel } from './Reports';
 import { TeamBotPanel } from './TeamBot';
@@ -22,7 +23,9 @@ const ROLE_HELP: Record<Role, MessageKey> = {
 export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (setup: GameSetup) => void }) {
   const t = useT();
   const { user, refresh } = useAuth();
-  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'payments' | 'sponsors' | 'decks' | 'team'>('users');
+  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'daily' | 'payments' | 'sponsors' | 'decks' | 'team'>('users');
+  /** Editor de desafios do dia aberto (ocupa a tela inteira: a gravação joga na mesa). */
+  const [dailyEditor, setDailyEditor] = useState(false);
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +74,8 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
     }
   };
 
+  if (dailyEditor) return <DailyEditor onClose={() => setDailyEditor(false)} onSaved={() => setDailyEditor(false)} />;
+
   return (
     <div className="coverage admin">
       <header className="builder-header">
@@ -90,6 +95,9 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
           <button className={tab === 'tutorial' ? 'on' : ''} onClick={() => setTab('tutorial')}>
             {t('tutorial.admin.tab')}
           </button>
+          <button className={tab === 'daily' ? 'on' : ''} onClick={() => setTab('daily')}>
+            {t('daily.title')}
+          </button>
           <button className={tab === 'payments' ? 'on' : ''} onClick={() => setTab('payments')}>
             {t('admin.tabPayments')}
           </button>
@@ -106,6 +114,7 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
         {tab === 'team' && <TeamBotPanel onReplay={onReplay} admin />}
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
         {tab === 'tutorial' && <TutorialFunnelPanel />}
+        {tab === 'daily' && <DailyAdminPanel onNew={() => setDailyEditor(true)} />}
         {tab === 'payments' && <PaymentsPanel />}
         {tab === 'sponsors' && <SponsorsPanel />}
         {tab === 'decks' && <DeckCleanupPanel />}
