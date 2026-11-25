@@ -9,11 +9,10 @@
 
 import { defineConfig, devices, webkit } from '@playwright/test';
 import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { PORT, ROOT as root } from './support/paths';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const port = Number(process.env.E2E_PORT ?? 3410);
+const port = Number(PORT);
 const ci = Boolean(process.env.CI);
 
 function hasWebkit() {
