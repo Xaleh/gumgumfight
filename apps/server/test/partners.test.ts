@@ -252,8 +252,11 @@ describe('tokens pessoais e middleware Bearer', () => {
     expect(conflict.json().current.updatedAt).toMatch(/Z$/);
     expect(conflict.body).not.toContain('ownerHash');
     // A mesma data (no formato do SQLite ou em ISO): sem conflito.
-    expect((await a.inject({ method: 'PUT', url: `/api/decks/${deck.id}`, headers: tk.bearer, payload: { ...body, expectedUpdatedAt: deck.updatedAt } })).statusCode).toBe(200);
-    const iso = `${deck.updatedAt.replace(' ', 'T')}Z`;
+    const same = await a.inject({ method: 'PUT', url: `/api/decks/${deck.id}`, headers: tk.bearer, payload: { ...body, expectedUpdatedAt: deck.updatedAt } });
+    expect(same.statusCode).toBe(200);
+    // O PUT acima gravou de novo: a data que vale agora é a que ele devolveu (a do deck criado pode ter ficado
+    // um segundo para trás, e aí o 409 estaria certo).
+    const iso = `${(same.json().updatedAt as string).replace(' ', 'T')}Z`;
     const header = await a.inject({ method: 'PUT', url: `/api/decks/${deck.id}`, headers: { ...tk.bearer, 'if-unmodified-since': iso }, payload: body });
     expect(header.statusCode).toBe(200);
     expect((await a.inject({ method: 'PUT', url: `/api/decks/${deck.id}`, headers: tk.bearer, payload: { ...body, expectedUpdatedAt: 'ontem' } })).statusCode).toBe(400);
