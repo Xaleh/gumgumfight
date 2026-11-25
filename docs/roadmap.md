@@ -71,13 +71,16 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   que o Personagem". O replay ganha os marcadores e um resumo (precisão por jogador, erros graves).
   *Pronto quando:* em qualquer replay terminado dá para pedir a análise, ver os marcadores na linha do tempo e a
   jogada sugerida em cada um. A análise só usa o que o jogador sabia naquele momento.
+  *Plano:* [`plano-analise-partida.md`](plano-analise-partida.md) (3 fases).
+  *Progresso:* fase 1 de 3 (análise no navegador, marcadores e resumo no replay) em 2026-11-25,
+  [PR #224](https://github.com/Xaleh/gumgumfight/pull/224).
   *Feito em:* —
 
-- [ ] **B2. Mão de teste no construtor**
+- [x] **B2. Mão de teste no construtor**
   Sorteia mãos iniciais do deck, simula o mulligan e mostra as chances: ter jogada de custo 2 no turno 2, ter X de
   Counter na mão, comprar a carta-chave até o turno N.
   *Pronto quando:* o construtor tem o botão de mão de teste e um painel de probabilidades calculadas no motor e testadas.
-  *Feito em:* —
+  *Feito em:* 2026-11-25, [PR #220](https://github.com/Xaleh/gumgumfight/pull/220)
 
 - [ ] **B3. Treino de matchup para todos**
   Versão pública do Bot do Time: "treinar contra o Enel do meta", usando os perfis do meta que hoje só o Time usa
@@ -151,10 +154,10 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
 
 ## Fase E — Social e comunidade
 
-- [ ] **E1. Perfil público do jogador**
+- [x] **E1. Perfil público do jogador**
   Página com o cartaz WANTED, bounty, Líderes mais jogados, partidas recentes com replay e decks públicos.
   *Pronto quando:* o perfil abre por link, mostra só o que é público e o jogador escolhe o que aparece.
-  *Feito em:* —
+  *Feito em:* 2026-11-25 — [PR #221](https://github.com/Xaleh/gumgumfight/pull/221)
 
 - [x] **E2. Amigos e convite direto**
   Lista de amigos com quem está online e convite para partida por notificação push (a infraestrutura de push já existe

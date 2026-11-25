@@ -1,0 +1,47 @@
+// 対戦分析のテキスト（日本語）。
+
+import type analysisPtBR from './pt-BR';
+
+const analysis: Record<keyof typeof analysisPtBR, string> = {
+  'analysis.run': '対戦を分析',
+  'analysis.runTitle': 'ボットが各判断を、その時点でプレイヤーが知っていた情報だけで見直し、価値を失ったプレイに印をつけます。',
+  'analysis.running': '分析中… {done}/{total}',
+  'analysis.preparing': '分析を準備中…',
+  'analysis.cancel': 'キャンセル',
+  'analysis.retry': 'もう一度',
+  'analysis.notFinished': '分析できるのは終了したリプレイだけです。',
+  'analysis.invalid': '分析できません：現在のゲームがこのリプレイのアクションを受け付けません。',
+  'analysis.failed': '分析に失敗しました：{message}',
+  'analysis.summary': '分析',
+  'analysis.accuracy': '精度 {n}%',
+  'analysis.noDecisions': '判断なし',
+  'analysis.blunders': '大悪手 {n}',
+  'analysis.mistakes': '悪手 {n}',
+  'analysis.inaccuracies': '疑問手 {n}',
+  'analysis.lethals': 'リーサル見逃し {n}',
+  'analysis.clean': '印のついたプレイはありません。',
+  'analysis.knowledge': '分析は各プレイヤーがその時点で見ていた情報だけを使います。相手の手札とデッキは伏せたままです。',
+  'analysis.marksLabel': '分析の印',
+  'analysis.markAt': 'ターン {turn} · {name}：{severity}',
+  'analysis.prev': '前の印',
+  'analysis.next': '次の印',
+  'analysis.severity.inaccuracy': '疑問手',
+  'analysis.severity.mistake': '悪手',
+  'analysis.severity.blunder': '大悪手',
+  'analysis.tag.lethal': 'ここでリーサルがありました。',
+  'analysis.tag.wastedCounter': 'Counterの無駄遣い：アタックを通してもよかった。',
+  'analysis.tag.missedCounter': 'Counterを使うべきでした。',
+  'analysis.tag.badBlock': 'ブロックは割に合いませんでした。',
+  'analysis.tag.missedBlock': 'ブロックするべきでした。',
+  'analysis.tag.attackLeader': 'キャラよりリーダーへのアタックが良かった。',
+  'analysis.tag.attackCharacter': '{target}へのアタックが良かった。',
+  'analysis.tag.endedEarly': 'より良いプレイを残したままターンを終了しました。',
+  'analysis.tag.trigger': 'ライフカードの選択で価値を失いました。',
+  'analysis.tag.better': 'より良いプレイがありました。',
+  'analysis.played': 'プレイ',
+  'analysis.suggested': '提案',
+  'analysis.loss': '−{n}',
+  'analysis.lossTitle': 'ボットの評価で失った価値（1,000 ≈ アタック時のパワー+1000）',
+};
+
+export default analysis;

@@ -1,0 +1,47 @@
+// Texte der Partieanalyse (Deutsch).
+
+import type analysisPtBR from './pt-BR';
+
+const analysis: Record<keyof typeof analysisPtBR, string> = {
+  'analysis.run': 'Partie analysieren',
+  'analysis.runTitle': 'Der Bot prüft jede Entscheidung mit dem, was der Spieler in dem Moment wusste, und markiert die Züge, die an Wert verloren haben.',
+  'analysis.running': 'Analyse… {done}/{total}',
+  'analysis.preparing': 'Analyse wird vorbereitet…',
+  'analysis.cancel': 'Abbrechen',
+  'analysis.retry': 'Erneut versuchen',
+  'analysis.notFinished': 'Nur ein beendetes Replay kann analysiert werden.',
+  'analysis.invalid': 'Analyse nicht möglich: Das aktuelle Spiel lehnt eine Aktion dieses Replays ab.',
+  'analysis.failed': 'Die Analyse ist fehlgeschlagen: {message}',
+  'analysis.summary': 'Analyse',
+  'analysis.accuracy': 'Genauigkeit {n} %',
+  'analysis.noDecisions': 'keine Entscheidungen',
+  'analysis.blunders': '{n|# grober Fehler|# grobe Fehler}',
+  'analysis.mistakes': '{n|# Fehler|# Fehler}',
+  'analysis.inaccuracies': '{n|# Ungenauigkeit|# Ungenauigkeiten}',
+  'analysis.lethals': '{n|# verpasstes Lethal|# verpasste Lethals}',
+  'analysis.clean': 'Kein Zug markiert.',
+  'analysis.knowledge': 'Die Analyse nutzt nur, was jeder Spieler in dem Moment sah: Hand und Deck des Gegners bleiben verdeckt.',
+  'analysis.marksLabel': 'Markierungen der Analyse',
+  'analysis.markAt': 'Zug {turn} · {name}: {severity}',
+  'analysis.prev': 'Vorherige Markierung',
+  'analysis.next': 'Nächste Markierung',
+  'analysis.severity.inaccuracy': 'Ungenauigkeit',
+  'analysis.severity.mistake': 'Fehler',
+  'analysis.severity.blunder': 'Grober Fehler',
+  'analysis.tag.lethal': 'Hier gab es Lethal.',
+  'analysis.tag.wastedCounter': 'Counter verschwendet: Der Angriff hätte durchgehen können.',
+  'analysis.tag.missedCounter': 'Ein Counter hat gefehlt.',
+  'analysis.tag.badBlock': 'Der Block hat sich nicht gelohnt.',
+  'analysis.tag.missedBlock': 'Ein Block hat gefehlt.',
+  'analysis.tag.attackLeader': 'Den Leader anzugreifen war besser als den Charakter.',
+  'analysis.tag.attackCharacter': '{target} anzugreifen war besser.',
+  'analysis.tag.endedEarly': 'Zug beendet, obwohl ein besserer Zug übrig war.',
+  'analysis.tag.trigger': 'Die Wahl bei der Lebenskarte hat an Wert verloren.',
+  'analysis.tag.better': 'Es gab einen besseren Zug.',
+  'analysis.played': 'Gespielt',
+  'analysis.suggested': 'Vorschlag',
+  'analysis.loss': '−{n}',
+  'analysis.lossTitle': 'Verlorener Wert in der Bewertung des Bots (1.000 ≈ +1000 Stärke bei einem Angriff)',
+};
+
+export default analysis;

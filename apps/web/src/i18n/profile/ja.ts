@@ -1,0 +1,45 @@
+// プレイヤー公開プロフィールのテキスト（日本語）。
+
+import type profilePtBR from './pt-BR';
+
+const profile: Record<keyof typeof profilePtBR, string> = {
+  'profile.title': 'プレイヤープロフィール',
+  'profile.open': '👤 公開プロフィール',
+  'profile.loading': '読み込み中…',
+  'profile.notFound': 'このプロフィールは存在しないか、非公開に設定されています。',
+  'profile.hiddenNotice': 'プロフィールは非公開です。リンクは他の人には開きません。このページはあなただけに表示されています。',
+  'profile.rankedGames': 'ランクマッチ {n} 戦',
+  'profile.since': '{date} からプレイ',
+  'profile.record': '{games} 戦 {wins} 勝（{pct}）',
+  'profile.copyLink': '🔗 リンクをコピー',
+  'profile.copied': '✓ コピーしました',
+  'profile.copyPrompt': 'プロフィールのリンクをコピーしてください:',
+  'profile.leadersTitle': 'よく使うリーダー',
+  'profile.noGames': 'まだ対戦がありません。',
+  'profile.leaderLine': '{games} 戦・勝率 {pct}',
+  'profile.matchesTitle': '最近の対戦',
+  'profile.win': '勝利',
+  'profile.loss': '敗北',
+  'profile.draw': '引き分け',
+  'profile.vsBot': 'vs ボット',
+  'profile.vsPlayer': 'vs プレイヤー',
+  'profile.watchReplay': '▶ リプレイ',
+  'profile.decksTitle': 'デッキ',
+  'profile.deckLine': '{games} 戦・勝率 {pct}',
+  'profile.openDeck': 'デッキビルダーで開く',
+  'profile.editTitle': 'プロフィールに表示する内容',
+  'profile.editIntro': 'リンクを開いた人に何を見せるか選べます。変更はすぐに反映されます。',
+  'profile.optVisible': 'プロフィールを公開',
+  'profile.optVisibleHint': '（オフにすると、リンクは誰にも開きません）',
+  'profile.optLeaders': 'よく使うリーダーと通算勝利数',
+  'profile.optMatches': '最近の対戦',
+  'profile.optReplays': '対戦のリプレイ',
+  'profile.optReplaysHint': '（プレイヤーとの対戦は、相手もリプレイを公開している場合のみ）',
+  'profile.decksPick': 'プロフィールのデッキ（最大 {max} 個）',
+  'profile.noDecks': '保存したデッキがまだありません。',
+  'errors.profileNotFound': 'プロフィールが見つかりません。',
+  'errors.profileReplayHidden': 'この対戦のリプレイは公開されていません。',
+  'errors.profileDecksInvalid': 'デッキは最大 {max} 個まで選べます。',
+};
+
+export default profile;
