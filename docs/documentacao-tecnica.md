@@ -160,6 +160,7 @@ gumgumfight/
 │   ├── src/profiles/            perfil público do jogador: store.ts (SQL, regras do replay), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
+│   ├── src/friends/             store.ts (código de amigo e amizades), routes.ts (lista, pedidos, status online e convite)
 │   └── test/                    9 arquivos de teste + fixtures da optcgapi/optcgleaks
 ├── apps/web/                    React + Vite
 │   ├── src/App.tsx              seleção de tela (useState<Screen>, sem roteador)
@@ -773,7 +774,7 @@ para a da partida. Os arquivos (MP3) ficam em `assets/audio`, com a origem e a l
   `watch` com `keepAwake` ligado; pedida de novo no `visibilitychange` (o navegador solta a trava em segundo plano).
 - **Notificações** (desligadas por padrão). Ligar em Configurações pede `Notification.requestPermission()` (num toque),
   inscreve com `pushManager.subscribe` usando a chave VAPID de `/api/config` e manda a inscrição com o idioma e os
-  tipos escolhidos (`PUT /api/push/subscription`). `usePushSync` (em `App.tsx`) reenvia quando muda o idioma, a conta
+  tipos escolhidos (partidas, torneios e amigos; `PUT /api/push/subscription`). `usePushSync` (em `App.tsx`) reenvia quando muda o idioma, a conta
   ou os tipos; desligar (ou a permissão revogada no navegador) cancela a inscrição aqui e no servidor. No `push`, o
   service worker não mostra o aviso se o app estiver visível (no Safari mostra sempre: o WebKit cancela inscrições que
   recebem push sem notificação, e o servidor já evita esses envios); no clique, foca a janela aberta e manda
@@ -804,7 +805,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (38)
+### Tabelas (40)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -826,7 +827,9 @@ baixadas quando tocam) + `public/`.
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
 | `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício (inclui `engineTexts`, os textos para o motor do começo da partida, para refazer e derivar as estatísticas com as mesmas regras) | lobby (a cada ação) |
 | `yonko_tables` | `id` (mesa) | **`data` (JSON `YonkoTableData`)**: regras, lugares (com os decks), seed de 128 bits e ações de uma mesa do Yonko aberta ou em andamento, para refazê-la após reinício | `YonkoTables` (a cada mudança; apagada quando a mesa fecha) |
-| `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
+| `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments`, `friends` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
+| `friend_codes` | `user_id` | `code` (único: 8 letras do alfabeto das salas, sem 0/O e 1/I), `created_at`. Nasce na primeira vez que a conta abre a lista de amigos | `GET /api/friends` |
+| `friendships` | `(user_low, user_high)` (`user_low < user_high`) | Um par de contas: `requested_by` (quem pediu), `status` (`pending`/`accepted`), `created_at`, `accepted_at`. Recusar, cancelar ou desfazer apaga a linha. Índice por `user_high` | `/api/friends/*` |
 | `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`), segredo do link do replay (`replay_link`) e dos apelidos de carta do Desafio do dia (`daily`) | servidor |
 | `daily_schedule` | `day` (AAAA-MM-DD, horário de Brasília) | Desafio do dia publicado: `challenge_id` (id em `daily/catalog.ts`), `number` (único: o "#N"), `published_at`. Fixo depois de publicado | `GET /api/daily` (publica o próximo da fila na primeira consulta do dia) |
 | `daily_results` | `(owner_hash, day)` | Resultado de cada dono (`user:<id>` ou navegador) no dia: `attempts` (tentativas terminadas), `solved_at` (null = ainda não resolveu), `updated_at`. Índice por dia. A sequência de dias seguidos sai daqui | `POST /api/daily/play` |
@@ -852,6 +855,7 @@ Diagrama das relações principais:
 
 ```
 users 1──n sessions            users 1──n tournaments (organizer_id)
+users 1──1 friend_codes        users n──n users (friendships: user_low, user_high)
 users 1──n api_tokens ──(client_id)──> oauth_clients 1──n oauth_codes
 users 1──n tournament_players n──1 tournaments 1──n tournament_matches ──(match_id)──> matches
 players (owner_hash = user:<id> | sha256(navegador))
@@ -1240,6 +1244,21 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
    humano, no máximo uma vez a cada 30 s por assento (`TURN_NOTICE_MS`). Só recebe quem está longe do app: sem
    conexão com a sala ou com o app fora da tela, informado pelo navegador em `POST /rooms/:id/focus {t, visible}` a cada
    `visibilitychange` e a cada conexão do SSE (o estado fica só em memória).
+
+### Amigos e convite direto (`friends/`)
+
+- Só entre contas Google. Cada conta tem um código de amigo (`friend_codes`) e o link `/?amigo=CÓDIGO`; a amizade
+  é uma linha de `friendships` por par (pedido pendente → aceito). Pedir de volta a quem já pediu aceita na hora.
+- **Status**: `Lobby.presenceOf(user:<id>)` responde `playing` (lugar numa sala em andamento, contra alguém ou o bot),
+  `online` (sinal do menu, que vem de `GET /api/online/stats` ou `GET /api/friends`, nos últimos 30 s; sala de espera;
+  fila) ou `offline`. Só amigos aceitos recebem o status, e nunca a sala nem o código.
+- **Convite**: o navegador cria a sala privada com `POST /api/online/rooms` (deck equipado e regras da Sala privada) e
+  chama `POST /api/friends/:id/invite`. O servidor exige o token do lugar 0 **e** que a conta seja a de quem criou,
+  guarda o convite em memória (até 20 por pessoa, 30 min, só enquanto a sala espera e os dois são amigos) e manda o
+  push da categoria `friends` com `/?convite=CÓDIGO`. Tocar no aviso (ou em **Entrar** na faixa da tela inicial)
+  chama `POST /api/online/rooms/join` com o deck equipado, passando pela confirmação do deck se ela estiver ligada.
+- Pedido de amizade e aceite também geram push (`friends`, `/?amigos=1` abre a folha). Endereços lidos em
+  `apps/web/src/friendLink.ts`; a folha e a faixa em `components/Friends.tsx`.
 
 ### Eventos SSE (servidor → navegador)
 
@@ -1955,7 +1974,7 @@ Quem chama, na coluna da direita:
 | POST | `/api/dev/engine-texts/preview` | `{ cardId, text, trigger }`: o que o leitor faria, sem gravar | Dev |
 | PUT · DELETE | `/api/dev/engine-texts/:id` | Grava (`{ text, trigger }`) / apaga o texto para o motor (recusa carta com script e texto igual ao oficial) | Dev |
 | GET | `/card-img/:origin/*` | Imagens das cartas pelo mesmo domínio (em produção o Nginx atende antes) | Pública |
-| PUT · DELETE | `/api/push/subscription` | Liga (`{ subscription, locale, matches, tournaments }`) / desliga (`{ endpoint }`) as notificações do navegador | Navegador |
+| PUT · DELETE | `/api/push/subscription` | Liga (`{ subscription, locale, matches, tournaments, friends }`) / desliga (`{ endpoint }`) as notificações do navegador | Navegador |
 | GET | `/api/auth/me` | Usuário logado (`{ user }` com `role`; `null` sem sessão). Com token: só `{ id, role: 'player' }` e o perfil público | Pública; Token (`profile`) |
 | POST | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie | Pública |
 | POST | `/api/auth/logout` | Sai (apaga a sessão) | Sessão |
@@ -2032,6 +2051,11 @@ Quem chama, na coluna da direita:
 | POST | `/api/admin/stats/global/sync` | Força uma rodada do sync do meta global | Admin |
 | GET | `/api/online/config` · `/api/online/stats` · `/api/online/leaders?format=` | Configuração do online, contadores do menu e Líderes na fila casual | Pública |
 | GET | `/api/online/active` | Partidas em andamento de quem pede (com o token do assento) | Navegador |
+| GET | `/api/friends` | Meu código de amigo, amigos (nome público, recompensa e status `playing`/`online`/`offline`), pedidos recebidos e enviados e convites para partida ainda válidos. Também me conta como online | Sessão |
+| POST | `/api/friends/requests` | Pede amizade pelo código (`{ code }`); se a outra conta já tinha pedido, vira amizade. 30 pedidos por hora por conta, até 200 amigos | Sessão |
+| POST · DELETE | `/api/friends/:id/accept` · `/api/friends/:id` | Aceita o pedido recebido / recusa, cancela ou desfaz a amizade | Sessão |
+| POST | `/api/friends/:id/invite` | Convida o amigo para a sala privada que acabei de criar (`{ roomId, token }`: lugar de quem criou, sala à espera); push com `/?convite=CÓDIGO`. Um convite a cada 15 s por amigo | Sessão + Assento |
+| DELETE | `/api/friends/invites/:code` | Recusa o convite (some da tela inicial; a sala de quem convidou continua) | Sessão |
 | POST | `/api/online/rooms` · `/api/online/rooms/join` · `/api/online/queue` | Cria uma sala privada; entra numa; entra na fila (`{ deckId, format, queue }`; ranqueada exige login) | Navegador |
 | GET · DELETE | `/api/online/queue/:ticket` | Consulta a fila / sai dela | Quem tem o ticket |
 | POST | `/api/online/bot` | Treino contra o bot transmitido (`{ deckId, botDeckId \| random, format, first? }`) | Sessão |

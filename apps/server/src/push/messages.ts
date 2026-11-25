@@ -38,6 +38,12 @@ const pt = {
   reportFixedTitle: 'Problema corrigido!',
   reportFixedCardBody: 'O problema que você relatou foi resolvido: {card}. Obrigado por ajudar!',
   reportFixedBody: 'O problema que você relatou foi resolvido. Obrigado por ajudar!',
+  friendRequestTitle: 'Pedido de amizade',
+  friendRequestBody: '{name} quer ser seu amigo no GumGum Fight.',
+  friendAcceptedTitle: 'Amizade aceita!',
+  friendAcceptedBody: '{name} aceitou o seu pedido de amizade.',
+  friendInviteTitle: 'Convite para partida',
+  friendInviteBody: '{name} chamou você para uma partida ({format}). Toque para entrar.',
 };
 
 export type PushKey = keyof typeof pt;
@@ -75,6 +81,12 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     reportFixedTitle: 'Bug fixed!',
     reportFixedCardBody: 'The problem you reported has been resolved: {card}. Thanks for helping!',
     reportFixedBody: 'The problem you reported has been resolved. Thanks for helping!',
+    friendRequestTitle: 'Friend request',
+    friendRequestBody: '{name} wants to be your friend on GumGum Fight.',
+    friendAcceptedTitle: 'Friend request accepted!',
+    friendAcceptedBody: '{name} accepted your friend request.',
+    friendInviteTitle: 'Match invite',
+    friendInviteBody: '{name} invited you to a match ({format}). Tap to join.',
   },
   es: {
     matchStartTitle: '¡Partida encontrada!',
@@ -107,6 +119,12 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     reportFixedTitle: '¡Problema corregido!',
     reportFixedCardBody: 'El problema que reportaste fue resuelto: {card}. ¡Gracias por ayudar!',
     reportFixedBody: 'El problema que reportaste fue resuelto. ¡Gracias por ayudar!',
+    friendRequestTitle: 'Solicitud de amistad',
+    friendRequestBody: '{name} quiere ser tu amigo en GumGum Fight.',
+    friendAcceptedTitle: '¡Amistad aceptada!',
+    friendAcceptedBody: '{name} aceptó tu solicitud de amistad.',
+    friendInviteTitle: 'Invitación a partida',
+    friendInviteBody: '{name} te invitó a una partida ({format}). Toca para entrar.',
   },
   ja: {
     matchStartTitle: '対戦相手が見つかりました！',
@@ -139,6 +157,12 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     reportFixedTitle: '不具合を修正しました！',
     reportFixedCardBody: '報告いただいた問題を解決しました：{card}。ご協力ありがとうございます！',
     reportFixedBody: '報告いただいた問題を解決しました。ご協力ありがとうございます！',
+    friendRequestTitle: 'フレンド申請',
+    friendRequestBody: '{name}さんがGumGum Fightでフレンドになりたがっています。',
+    friendAcceptedTitle: 'フレンド申請が承認されました！',
+    friendAcceptedBody: '{name}さんがあなたのフレンド申請を承認しました。',
+    friendInviteTitle: '対戦の招待',
+    friendInviteBody: '{name}さんから対戦の招待が届きました（{format}）。タップして参加しましょう。',
   },
   fr: {
     matchStartTitle: 'Partie trouvée !',
@@ -171,6 +195,12 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     reportFixedTitle: 'Problème corrigé !',
     reportFixedCardBody: 'Le problème que vous avez signalé a été résolu : {card}. Merci de votre aide !',
     reportFixedBody: 'Le problème que vous avez signalé a été résolu. Merci de votre aide !',
+    friendRequestTitle: 'Demande d’ami',
+    friendRequestBody: '{name} veut être votre ami sur GumGum Fight.',
+    friendAcceptedTitle: 'Demande d’ami acceptée !',
+    friendAcceptedBody: '{name} a accepté votre demande d’ami.',
+    friendInviteTitle: 'Invitation à une partie',
+    friendInviteBody: '{name} vous invite à une partie ({format}). Touchez pour rejoindre.',
   },
   de: {
     matchStartTitle: 'Match gefunden!',
@@ -203,6 +233,12 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     reportFixedTitle: 'Problem behoben!',
     reportFixedCardBody: 'Das von dir gemeldete Problem wurde behoben: {card}. Danke für deine Hilfe!',
     reportFixedBody: 'Das von dir gemeldete Problem wurde behoben. Danke für deine Hilfe!',
+    friendRequestTitle: 'Freundschaftsanfrage',
+    friendRequestBody: '{name} möchte auf GumGum Fight dein Freund sein.',
+    friendAcceptedTitle: 'Freundschaft angenommen!',
+    friendAcceptedBody: '{name} hat deine Freundschaftsanfrage angenommen.',
+    friendInviteTitle: 'Einladung zum Match',
+    friendInviteBody: '{name} hat dich zu einem Match eingeladen ({format}). Tippe, um beizutreten.',
   },
 };
 

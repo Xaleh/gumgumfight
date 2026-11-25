@@ -54,7 +54,7 @@ export function ReportModal({
     try {
       if (!settings.pushKey || pushSupport() !== 'ok' || notificationPermission() === 'denied') throw new Error('push');
       if ((await Notification.requestPermission()) !== 'granted') throw new Error('push');
-      await syncPush(settings.pushKey, { locale: settings.locale, matches: settings.notifyMatches, tournaments: settings.notifyTournaments });
+      await syncPush(settings.pushKey, { locale: settings.locale, matches: settings.notifyMatches, tournaments: settings.notifyTournaments, friends: settings.notifyFriends });
       settings.update({ notify: true });
     } catch {
       setPushProblem(true);

@@ -11,6 +11,7 @@ import profilePtBR from './profile/pt-BR';
 import sealedPtBR from './sealed/pt-BR';
 import yonkoPtBR from './yonko/pt-BR';
 import sandboxPtBR from './sandbox/pt-BR';
+import friendsPtBR from './friends/pt-BR';
 import dailyPtBR from './daily/pt-BR';
 import analysisPtBR from './analysis/pt-BR';
 
@@ -3156,6 +3157,8 @@ const ptBR = {
   ...yonkoPtBR,
   // ==== Sandbox de regras: editor da mesa livre (i18n/sandbox) ====
   ...sandboxPtBR,
+  // ==== amigos e convite direto (i18n/friends) ====
+  ...friendsPtBR,
   ...dailyPtBR,
   // ==== Análise da partida: revisão do replay terminado (i18n/analysis) ====
   ...analysisPtBR,
