@@ -196,7 +196,7 @@ Ligado ao kit de Instagram (`marketing/instagram/`).
   transmissão.
   *Pronto quando:* dá para marcar início e fim no replay e baixar o vídeo vertical (e o GIF) sem informação escondida
   da partida.
-  *Feito em:* 2026-11-25, PR_LINK
+  *Feito em:* 2026-11-25, [PR #226](https://github.com/Xaleh/gumgumfight/pull/226)
 
 ## Fase G — Acessibilidade e apoio
 
