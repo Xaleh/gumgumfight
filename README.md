@@ -558,6 +558,30 @@ fora das estatísticas (`match_seats.listed = 0`) e do meta dos torneios.
 - O jogador é a conta Google ou, sem login, o navegador (o mesmo código de dono dos decks). O nome do cartaz de
   "WANTED" é o nome público e pode ser trocado na tela de estatísticas (o nome da conta Google não aparece para os outros).
 
+### Perfil público
+
+Cada jogador tem uma página pública aberta por link, **`/?perfil=<id>`** (o botão **👤 Meu perfil público**, embaixo do
+cartaz das Estatísticas, abre a sua e **🔗 Copiar link** copia o endereço). A página mostra:
+
+- o cartaz **WANTED** com o nome público, a recompensa, o tier, as partidas ranqueadas e desde quando a pessoa joga;
+- os **Líderes mais jogados** (partidas e taxa de vitória) e o total de partidas e vitórias;
+- as **10 partidas mais recentes**: o Líder de cada lado, o resultado, a fila, o formato, a data e, na ranqueada, quanto a
+  recompensa subiu ou desceu, com o botão **▶ Replay** quando o replay é público;
+- os **decks** que o jogador escolheu mostrar (até 6), com as partidas e a taxa de vitória de cada um e o botão
+  **Abrir no construtor**, que abre uma cópia sem salvar nada.
+
+O dono escolhe o que aparece no painel **O que aparece no seu perfil**, que só ele vê na própria página, e a mudança
+vale na hora:
+
+- **Perfil visível**: desligado, o link responde como se o perfil não existisse (só o dono ainda vê a página).
+- **Líderes mais jogados** e **Partidas recentes**: cada seção pode ser escondida.
+- **Replays das partidas** (desligado no começo): o replay mostra a mão e o deck dos dois lados. Contra o bot, basta o
+  dono liberar. Contra outra pessoa, o replay só abre se ela também liberar os replays dela num perfil visível.
+- **Decks no perfil**: só os decks do próprio jogador.
+
+O que nunca aparece: o nome e o perfil do oponente (só o Líder dele e se era bot ou pessoa) e as partidas de torneios que
+ainda não terminaram (as listas de um torneio só se abrem no fim).
+
 ### Meta global (TCG Matchmaking)
 
 Com `GLOBAL_STATS_API_KEY` configurada, a tela de Estatísticas ganha o escopo **🌍 Global**: as filas ranqueadas do

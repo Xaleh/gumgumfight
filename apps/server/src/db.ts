@@ -1079,6 +1079,18 @@ function migrateStats(db: DB) {
       data       TEXT NOT NULL,                 -- JSON (yonko/table.ts: YonkoTableData)
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- Perfil público (profiles/): o que cada jogador mostra na página aberta por link.
+    -- Sem linha = os padrões (visível, com Líderes e partidas, sem replays e sem decks).
+    CREATE TABLE IF NOT EXISTS player_profiles (
+      player_id  TEXT PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+      visible    INTEGER NOT NULL DEFAULT 1,    -- 0 = o link responde 404 (o dono ainda vê)
+      leaders    INTEGER NOT NULL DEFAULT 1,    -- Líderes mais jogados
+      matches    INTEGER NOT NULL DEFAULT 1,    -- partidas recentes
+      replays    INTEGER NOT NULL DEFAULT 0,    -- replays das partidas recentes
+      decks      TEXT NOT NULL DEFAULT '[]',    -- JSON: ids dos decks mostrados (só os do dono, até 6)
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
   const seatCols = (db.prepare('PRAGMA table_info(match_seats)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!seatCols.includes('listed')) {

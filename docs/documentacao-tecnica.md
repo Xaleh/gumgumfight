@@ -156,6 +156,7 @@ gumgumfight/
 │   ├── src/online/              room.ts (uma partida + relógio + mesa atrasada), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE), broadcast.ts (modo transmissão)
 │   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts,
 │   │                            global.ts e global-routes.ts (meta global: TCG Matchmaking pela OPTCG Logpose API)
+│   ├── src/profiles/            perfil público do jogador: store.ts (SQL, regras do replay), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
 │   └── test/                    9 arquivos de teste + fixtures da optcgapi/optcgleaks
@@ -536,10 +537,11 @@ partida, torneio ou nome de jogador) não muda, com TTL de segurança (30 s e 5 
 ### Telas
 
 `App.tsx` mantém `useState<Screen>`: `menu`, `builder`, `coverage` (Dev), `stats`, `admin` (Admin), `watch-list`,
-`watch`, `tournaments`, `game` (contra o bot / replay) e `online`. As telas `online` e `watch` ficam em
+`watch`, `tournaments`, `game` (contra o bot / replay), `online` e `profile` (perfil público, `PublicProfile.tsx`). As telas `online` e `watch` ficam em
 `sessionStorage.gumgum.openMatch` para sobreviver a recarga. Parâmetros de URL, lidos uma vez e removidos com
 `history.replaceState`: `?sala=CÓDIGO` (convite de sala privada), `?partida=<sala>` e `?torneio=<id>` (abertos ao tocar
-numa notificação: a partida online, se ainda estiver em `/api/online/active`, ou a página do torneio).
+numa notificação: a partida online, se ainda estiver em `/api/online/active`, ou a página do torneio) e `?perfil=<id>`
+(perfil público de um jogador; `profileLink.ts` só aceita um id `p-` + 12 hex).
 
 ### Dados no navegador
 
@@ -755,7 +757,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (35)
+### Tabelas (36)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -770,6 +772,7 @@ baixadas quando tocam) + `public/`.
 | `sessions` | `token_hash` | `user_id`, `created_at`, `expires_at` (60 dias) | login/logout |
 | `broadcasts` | `user_id` | `key` (único: segredo do link do OBS, guardado como está para o streamer copiar de novo), `room_id` (partida na transmissão), opções `delay_s` (0–600), `hands_players`, `hands_own`, `delay_tournaments`, `chat` (0/1), `rev` (sobe a cada troca), `updated_at` | `/api/broadcast/*` |
 | `players` | `id` (`p-` + 12 hex) | `owner_hash` (único: `sha256(navegador)` ou `user:<id>`), `name` (público, "Pirata XXXX"), `bounty` (Beries), `ranked_games` | primeira partida/consulta, ranqueada, `PUT /api/players/me` |
+| `player_profiles` | `player_id` (FK `players`, `ON DELETE CASCADE`) | Perfil público: `visible`, `leaders`, `matches`, `replays` (0/1), `decks` (JSON com até 6 ids de decks do próprio jogador), `updated_at`. Sem linha = os padrões (visível, com Líderes e partidas, sem replays e sem decks) | `PUT /api/players/me/profile` |
 | `deck_lists` | `hash` (16 hex) | `leader`, `cards` (JSON) — lista **exata** e imutável usada numa partida | gravação de partida |
 | `matches` | `id` autoincrement | `seed`, `mode`, `deck0`, `deck1`, `winner`, `turns`, `reason`, `format`, `queue`, `first_player`, **`replay` (JSON; nas online, com os `engineTexts` do começo da partida, para refazê-la depois com as mesmas regras)**, `created_at` | gravação de partida |
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`, `listed` (0 = fora das estatísticas: Livre ou spoilers). Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
@@ -805,7 +808,7 @@ users 1──n tournament_players n──1 tournaments 1──n tournament_match
 players (owner_hash = user:<id> | sha256(navegador))
 matches 1──2 match_seats ──n match_cards
 match_seats ──(deck_hash)──> deck_lists
-match_seats ──(player_id)──> players
+match_seats ──(player_id)──> players 1──1 player_profiles
 decks (owner_hash → players.owner_hash, por convenção, sem FK)
 cards (sem FK; decks e partidas referenciam por id textual)
 ```
@@ -1003,6 +1006,22 @@ Criado na primeira partida ou consulta. `bounty` só muda na ranqueada entre dua
 `esperado = 1 / (1 + 10^((deles − meu) / 20000))`, `delta = round(2000 × (resultado − esperado))`, nunca abaixo de 0.
 Tiers (`stats/catalog.ts`): East Blue 0–5.000, Paradise até 20.000, Novo Mundo até 50.000, Supernova até 100.000,
 Shichibukai até 250.000, Yonkou acima. `tier` gravado em `match_seats` é o da hora da partida.
+
+### `player_profiles` — perfil público (`profiles/`)
+
+`GET /api/profiles/:id` (pública) monta a página aberta por `/?perfil=<id>`: o cartaz (`players`: nome, `bounty`,
+tier, `ranked_games`, `created_at`), os Líderes mais jogados e o total (`match_seats` do jogador com `controller =
+'human'`), as 10 partidas mais recentes e os decks escolhidos (`decks` com `kind = 'user'` e o mesmo `owner_hash`,
+com as partidas de cada um). As seções desligadas vêm `null`; o dono recebe também `settings` e `mine: true`.
+
+- **Fora de tudo**: partidas de torneio que ainda não terminou (a mesma condição de `hideLiveTournaments` nas
+  estatísticas). Do oponente sai só `oppLeader` e `oppController`, nunca o nome nem o id.
+- **Perfil escondido** (`visible = 0`) e id malformado ou inexistente respondem o mesmo 404 `profileNotFound`; o dono
+  continua vendo a própria página.
+- **Replay** (`GET /api/profiles/:id/matches/:m/replay`, o mesmo arquivo de `matchReplay`): só com `matches` e
+  `replays` ligados no perfil do dono, numa partida dele que o perfil mostra, e contra um bot, contra o próprio dono ou
+  contra alguém com `visible` e `replays` ligados (o replay traz a mão e o deck do oponente). Fora disso, 403
+  `profileReplayHidden` (o campo `replay` da partida já diz se abre).
 
 ### `live_matches` — partidas online em andamento
 
@@ -1934,6 +1953,9 @@ Quem chama, na coluna da direita:
 | PUT | `/api/reports/:id` | Resolve ou reabre (`{ resolved, note? }`) | Admin; Organizador |
 | GET | `/api/players/me` | Perfil de jogador (nome, recompensa, tier, `apprentice`) | Navegador; Token (`profile`) |
 | PUT | `/api/players/me` | Troca o nome público (`{ name }`) | Navegador |
+| PUT | `/api/players/me/profile` | O que o perfil público mostra (`{ visible?, leaders?, matches?, replays?, decks? }`; `decks`: até 6 ids, só decks de quem pede) | Navegador |
+| GET | `/api/profiles/:id` | Perfil público (cartaz, Líderes, partidas recentes, decks escolhidos; `settings` para o dono). Escondido ou inexistente: 404 | Pública |
+| GET | `/api/profiles/:id/matches/:m/replay` | Replay de uma partida do perfil (dono e, contra pessoa, oponente com os replays liberados) | Pública |
 | GET | `/api/players/me/matches?since=&limit=&cursor=` | Partidas do jogador, mais novas primeiro, paginadas | Sessão; Token (`matches:read`) |
 | GET | `/api/sealed/sets` | Coleções disponíveis no Selado (cartas, Líderes, parte automatizada, vagas e chances do booster) | Pública |
 | GET | `/api/sealed/pools` · POST | Decks selados de quem pede; `{ set }` abre 6 boosters | Navegador |
