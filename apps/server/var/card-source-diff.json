@@ -1,0 +1,44 @@
+{
+ "official:sync": {
+  "generatedAt": "2026-11-25T00:05:21.978Z",
+  "chain": [
+   "optcgapi",
+   "bandai"
+  ],
+  "bySet": {
+   "EB05": {
+    "optcgapi": 61
+   },
+   "OP13": {
+    "optcgapi": 1
+   },
+   "EB03": {
+    "optcgapi": 1
+   },
+   "OP17": {
+    "optcgapi": 2
+   },
+   "ST17": {
+    "optcgapi": 1
+   },
+   "OP15": {
+    "optcgapi": 1
+   },
+   "OP01": {
+    "optcgapi": 1
+   },
+   "OP14": {
+    "optcgapi": 2
+   },
+   "OP11": {
+    "optcgapi": 2
+   },
+   "OP18": {
+    "bandai": 119
+   }
+  },
+  "filled": 0,
+  "diffs": [],
+  "skipped": []
+ }
+}

@@ -194,6 +194,15 @@ Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construto
    o texto do efeito; no toque, segure o dedo na carta para abri-la ampliada.
 3. O painel à direita mostra o total, a curva de custo, os Counters e os problemas do deck. **Salvar** grava
    no banco. Decks incompletos ficam salvos como rascunho e aparecem desabilitados no menu.
+4. **Mão de teste** (o quarto modo do painel do deck, ao lado de Lista, Grade e Curva) sorteia a mão inicial do deck como
+   ele está: **Nova mão**, **Mulligan** (devolve a mão, embaralha e compra 5 de novo, uma vez só) e **Comprar** (a compra
+   de cada turno). Abaixo ficam as **chances exatas**, calculadas no motor (`packages/engine/src/handtest.ts`, distribuição
+   hipergeométrica, sem sorteio), jogando em 1º ou em 2º (quem começa não compra no turno 1):
+   - ter um **Personagem do custo escolhido** na mão até cada um dos turnos 1 a 5;
+   - ter a **carta-chave** escolhida do deck até cada um dos turnos 1 a 5;
+   - a soma de **Counter na mão inicial** (chance de ter ≥ 1000, 2000, 3000 e 4000, e a média).
+   Com **Mulligan quando a mão inicial não tem a carta** marcado, a conta supõe que você troca a mão quando ela não tem o
+   Personagem ou a carta-chave. Tudo roda no navegador: nada vai para o servidor.
 
 Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por número e toda carta com ao menos uma
 cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.

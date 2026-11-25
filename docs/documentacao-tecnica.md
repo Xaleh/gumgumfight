@@ -120,6 +120,7 @@ gumgumfight/
 │   ├── src/rng.ts               mulberry32 (32 bits) e sfc32 (128 bits)
 │   ├── src/replay.ts            REPLAY_VERSION, upgrade de replays antigos
 │   ├── src/deck.ts              validateDeck, parse/format de listas
+│   ├── src/handtest.ts          mão de teste do construtor: sorteio, mulligan e chances exatas (hipergeométrica)
 │   ├── src/formats.ts           Standard / Extra Grand Battle / All Blue, banidas, rotação
 │   ├── src/errata.ts, source-fixes.ts   correções de dados (errata oficial / erros da optcgapi)
 │   ├── src/cards/parser.ts      texto da carta → habilidades (DSL) (3.180 linhas)
