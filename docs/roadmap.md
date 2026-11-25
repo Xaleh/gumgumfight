@@ -151,10 +151,10 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
 
 ## Fase E — Social e comunidade
 
-- [ ] **E1. Perfil público do jogador**
+- [x] **E1. Perfil público do jogador**
   Página com o cartaz WANTED, bounty, Líderes mais jogados, partidas recentes com replay e decks públicos.
   *Pronto quando:* o perfil abre por link, mostra só o que é público e o jogador escolhe o que aparece.
-  *Feito em:* —
+  *Feito em:* 2026-11-25 — [PR #221](https://github.com/Xaleh/gumgumfight/pull/221)
 
 - [ ] **E2. Amigos e convite direto**
   Lista de amigos com quem está online e convite para partida por notificação push (a infraestrutura de push já existe
