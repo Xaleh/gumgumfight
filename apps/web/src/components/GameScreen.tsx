@@ -872,6 +872,10 @@ function Table({
   const acting = actingPlayer(state);
   // Espectador com a visão de um jogador (o streamer que transmite a própria partida): a mão dele embaixo.
   const bottom: PlayerId = human ?? online?.room?.pov ?? 0;
+  // Trecho do replay em vídeo/GIF (F2): não no replay embutido nem no tutorial.
+  const replaySource = replay?.source;
+  const noClip = Boolean(embed) || Boolean(tutorial);
+  const clipSource = useMemo(() => (replaySource && !noClip ? { ...replaySource(), bottom } : undefined), [replaySource, noClip, bottom]);
   const { user } = useAuth();
   /** Painel do treinador: no treino contra o Bot do Time, para quem é do Time. */
   const coachOn = botMatch && isTeam(user) && effectiveBotLevel === 'team' && human !== null && !watching && kind !== 'replay' && !tutorial;
@@ -2346,6 +2350,7 @@ function Table({
           speed={game.speed}
           setSpeed={game.setSpeed}
           cue={cue}
+          clip={clipSource}
         />
       )}
     </div>

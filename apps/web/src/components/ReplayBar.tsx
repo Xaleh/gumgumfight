@@ -1,5 +1,6 @@
 import type { Action, GameState } from '@gumgum/engine';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { ClipPanel, type ClipRange, type ClipSource } from './ClipPanel';
 import type { ReplayCue } from '../game/replayCue';
 import { REPLAY_SPEEDS } from '../game/useGame';
 import { useT } from '../i18n';
@@ -20,6 +21,8 @@ export interface ReplayControls {
   next?: Action;
   /** Modo automático: quando (`performance.now()`) `next` será aplicada; null se nada está agendado. */
   dueAt: () => number | null;
+  /** O começo da partida e o roteiro inteiro (para o trecho em vídeo/GIF). */
+  source?: () => { initial: GameState; actions: readonly Action[] };
 }
 
 const svg = (children: ReactNode) => (
@@ -74,6 +77,7 @@ export function ReplayBar({
   speed,
   setSpeed,
   cue,
+  clip,
 }: {
   replay: ReplayControls;
   state: GameState;
@@ -83,6 +87,8 @@ export function ReplayBar({
   setSpeed: (v: number) => void;
   /** O clique/seleção da próxima ação, por escrito (o mesmo que a mesa mostra). */
   cue?: ReplayCue | null;
+  /** Trecho em vídeo ou GIF (F2): de onde ele sai. Sem ele (replay embutido), o botão não aparece. */
+  clip?: ClipSource;
 }) {
   const t = useT();
   const { pos, total, end, seek } = replay;
@@ -90,6 +96,14 @@ export function ReplayBar({
   // Mostrar ou não o clique/seleção do jogador: a mesma configuração do menu, guardada neste navegador.
   const { replayCues, update } = useSettings();
   const playing = !paused && !atEnd;
+  /** Trecho marcado para o vídeo/GIF (null: painel fechado). */
+  const [range, setRange] = useState<ClipRange | null>(null);
+  const openClip = () => {
+    setPaused(() => true);
+    setRange({ from: pos, to: null });
+  };
+  const lo = range ? (range.to === null ? range.from : Math.min(range.from, range.to)) : 0;
+  const hi = range ? (range.to === null ? range.from : Math.max(range.from, range.to)) : 0;
 
   /** Passo a passo: avançar ou voltar uma ação pausa o automático. */
   const step = (d: number) => {
@@ -154,6 +168,10 @@ export function ReplayBar({
 
   return (
     <div className="replay-bar" role="toolbar" aria-label={t('replay.toolbarLabel')}>
+      <div className="replay-seek-wrap">
+      {range && total > 0 && (
+        <span className="replay-clip-range" aria-hidden="true" style={{ left: `${(lo / total) * 100}%`, width: `max(4px, ${((hi - lo) / total) * 100}%)` }} />
+      )}
       <input
         className="replay-seek"
         type="range"
@@ -165,6 +183,7 @@ export function ReplayBar({
         aria-valuetext={t('replay.actionOf', { pos, total })}
         style={{ ['--fill' as string]: `${total ? (pos / total) * 100 : 0}%` }}
       />
+      </div>
       <div className="replay-row">
         <div className="replay-info">
           <span>
@@ -196,6 +215,17 @@ export function ReplayBar({
           </button>
         </div>
         <div className="replay-right">
+          {clip && (
+            <button
+              type="button"
+              className={['replay-clip-btn', range ? 'on' : ''].join(' ')}
+              aria-pressed={Boolean(range)}
+              onClick={() => (range ? setRange(null) : openClip())}
+              title={t('clip.buttonTitle')}
+            >
+              {t('clip.button')}
+            </button>
+          )}
           <label className="replay-speed" title={t('replay.speedTitle')}>
             <span>{t('replay.speed')}</span>
             <select className="speed" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
@@ -225,7 +255,8 @@ export function ReplayBar({
           {cue.sub && <em> — {cue.sub}</em>}
         </p>
       )}
-      {!playing && !atEnd && <p className="replay-hint">{t('replay.stepHint')}</p>}
+      {clip && range && <ClipPanel source={clip} pos={pos} range={range} setRange={setRange} onClose={() => setRange(null)} />}
+      {!playing && !atEnd && !range && <p className="replay-hint">{t('replay.stepHint')}</p>}
     </div>
   );
 }

@@ -4795,6 +4795,111 @@ button.hint-pill::after,
   }
 }
 
+/* ------------------------------------------------------------------ replay: trecho em vídeo/GIF (F2) */
+
+.replay-seek-wrap {
+  position: relative;
+}
+/* O trecho marcado, por baixo da barra de posição. */
+.replay-clip-range {
+  position: absolute;
+  top: 50%;
+  height: 12px;
+  transform: translateY(-50%);
+  border-radius: 6px;
+  background: rgba(247, 205, 72, 0.55);
+  box-shadow: 0 0 0 2px rgba(247, 205, 72, 0.35);
+  pointer-events: none;
+  z-index: 1;
+}
+.replay-seek-wrap .replay-seek {
+  display: block;
+}
+.replay-clip-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.replay-clip-btn.on {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+.clip-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.clip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.clip-marks,
+.clip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.clip-marks .btn,
+.clip-actions .btn {
+  flex: 1 1 140px;
+  min-height: 40px;
+}
+.clip-range,
+.clip-hint,
+.clip-error {
+  margin: 0;
+  font-size: 13px;
+}
+.clip-range {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.clip-range em {
+  display: block;
+  font-weight: 700;
+  font-style: normal;
+  color: var(--muted);
+}
+.clip-hint {
+  color: var(--muted);
+}
+.clip-error {
+  color: #e5484d;
+  font-weight: 700;
+}
+.clip-busy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.clip-busy progress {
+  flex: 1 1 100%;
+  height: 10px;
+  accent-color: var(--accent);
+}
+@media (max-width: 560px) {
+  .replay-clip-btn {
+    padding: 0 10px;
+  }
+}
+
 /* ------------------------------------------------------------------ replay: clique/seleção do jogador */
 
 /* A frase na barra: "Ação 12 · Luffy: Atacar Zoro com Nami — Etapa de Counter". */

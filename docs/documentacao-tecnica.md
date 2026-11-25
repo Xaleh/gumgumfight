@@ -119,6 +119,7 @@ gumgumfight/
 │   ├── src/view.ts              viewFor (visão por jogador/espectador), apelidos, actionFromView
 │   ├── src/rng.ts               mulberry32 (32 bits) e sfc32 (128 bits)
 │   ├── src/replay.ts            REPLAY_VERSION, upgrade de replays antigos
+│   ├── src/clip.ts              trecho do replay em vídeo/GIF: clipFrames (quadros só com o público), highlightedCard
 │   ├── src/deck.ts              validateDeck, parse/format de listas
 │   ├── src/formats.ts           Standard / Extra Grand Battle / All Blue, banidas, rotação
 │   ├── src/errata.ts, source-fixes.ts   correções de dados (errata oficial / erros da optcgapi)
@@ -166,6 +167,8 @@ gumgumfight/
 │   ├── src/audio.ts             efeitos e música (Web Audio); src/assets/audio/ com os MP3 e CREDITS.md
 │   ├── src/game/useMatchAudio.ts   sons derivados das mudanças de estado da partida
 │   ├── src/game/useGame.ts      partida local (motor + bot no navegador, undo, replay)
+│   ├── src/clip/                trecho do replay (F2): draw.ts (quadro 1080 × 1920 em canvas), gif.ts (GIF sem
+│   │                            dependências), record.ts (MediaRecorder MP4/WebM e GIF), plan.ts (tempos e limite)
 │   ├── src/game/botWorker.ts    Web Worker do bot (botClient.ts pede a jogada; botMove.ts é a conta, também usada sem worker)
 │   ├── src/game/preloadImages.ts   baixa antes, com o navegador ocioso, as imagens das cartas já visíveis
 │   ├── src/hooks/useBoardSize.ts   mede a coluna da mesa (--bw/--bh, data-landscape/data-narrow) no lugar da container query
