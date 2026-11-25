@@ -299,6 +299,9 @@ export function useGame(setup: GameSetup) {
         // A próxima ação do roteiro: a mesa mostra o clique/seleção do jogador antes de aplicá-la.
         next: cursor.pos < cursor.end ? cursor.actions[cursor.pos] : undefined,
         dueAt,
+        // A análise da partida refaz o roteiro inteiro a partir do começo.
+        initial: startRef.current!,
+        script: cursor.actions,
       }
     : undefined;
 

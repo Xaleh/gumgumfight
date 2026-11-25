@@ -723,6 +723,12 @@ export const api = {
   saveMatch: (m: MatchUpload) => send<{ id: number }>('POST', '/api/matches', m).catch(() => undefined),
   player: () => get<PlayerProfile | null>('/api/players/me'),
   rename: (name: string) => send<PlayerProfile>('PUT', '/api/players/me', { name }),
+  /** Perfil público (roadmap E1): a página aberta por `/?perfil=<id>`, o replay de uma partida dele e o que aparece. */
+  profiles: {
+    get: (id: string) => get<PublicProfile>(`/api/profiles/${encodeURIComponent(id)}`),
+    replay: (id: string, matchId: number) => get<Record<string, unknown>>(`/api/profiles/${encodeURIComponent(id)}/matches/${matchId}/replay`),
+    save: (settings: Partial<ProfileSettings>) => send<{ id: string; settings: ProfileSettings }>('PUT', '/api/players/me/profile', settings),
+  },
   statsMeta: () => get<StatsMeta>('/api/stats/meta'),
   stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),
   cardStats: (f: StatsQuery) => get<CardStatsResponse>(`/api/stats/cards?${statsQs(f)}`),
@@ -2070,6 +2076,56 @@ export interface PlayerProfile {
   tier: string;
   /** Concluiu o tutorial: título "Aprendiz da Grand Line" (só em /api/players/me). */
   apprentice?: boolean;
+}
+
+/** O que o jogador mostra no perfil público. */
+export interface ProfileSettings {
+  /** false = o link não abre para os outros. */
+  visible: boolean;
+  leaders: boolean;
+  matches: boolean;
+  /** Replays das partidas recentes (contra pessoas, só se o oponente também libera os dele). */
+  replays: boolean;
+  /** Ids dos decks mostrados (até 6). */
+  decks: string[];
+}
+
+export interface PublicProfileMatch {
+  id: number;
+  playedAt: string;
+  queue: string;
+  format: string;
+  leader: string;
+  oppLeader: string;
+  /** Do oponente só sai se era bot ou pessoa (nunca o nome). */
+  oppController: 'human' | 'bot';
+  won: boolean;
+  draw: boolean;
+  wentFirst: boolean;
+  turns: number | null;
+  /** Variação da recompensa na ranqueada. */
+  bountyDelta: number | null;
+  /** O replay pode ser aberto. */
+  replay: boolean;
+}
+
+/** Perfil público (`GET /api/profiles/:id`); as seções que o jogador escondeu vêm null. */
+export interface PublicProfile {
+  id: string;
+  name: string;
+  bounty: number;
+  tier: string;
+  rankedGames: number;
+  /** Desde quando o jogador existe (ISO). */
+  since: string;
+  record: { games: number; wins: number } | null;
+  leaders: Array<{ leader: string; games: number; wins: number }> | null;
+  matches: PublicProfileMatch[] | null;
+  decks: Array<DeckList & { games: number; wins: number }>;
+  /** Quem pede é o dono (aí vem `settings`). */
+  mine: boolean;
+  settings?: ProfileSettings;
+  cards: Record<string, { name: string; category: string; colors: string[]; imageUrl?: string }>;
 }
 
 /** Progresso do tutorial gravado no servidor (conta ou navegador). */

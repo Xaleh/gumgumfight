@@ -7,9 +7,11 @@ import recap from './recap/de';
 import decks from './decks/de';
 import team from './team/de';
 import chamber from './chamber/de';
+import profile from './profile/de';
 import sealed from './sealed/de';
 import yonko from './yonko/de';
 import sandbox from './sandbox/de';
+import analysis from './analysis/de';
 
 export default {
   // ---- Allgemein ----
@@ -3109,8 +3111,10 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...profile,
   ...sealed,
   ...yonko,
   ...sandbox,
+  ...analysis,
 } satisfies Messages;
 

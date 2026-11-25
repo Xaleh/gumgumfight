@@ -14,6 +14,7 @@ import { Menu } from './components/Menu';
 import { Sandbox } from './components/Sandbox';
 import { Sealed } from './components/Sealed';
 import { OAuthConsent } from './components/OAuthConsent';
+import { PublicProfile } from './components/PublicProfile';
 import { ReplayEmbed } from './components/ReplayEmbed';
 import { Stats } from './components/Stats';
 import { TeamBot } from './components/TeamBot';
@@ -25,6 +26,7 @@ import { Watch } from './components/Watch';
 import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
 import { isReplayPath } from './embed';
 import { parseSandboxLink, SANDBOX_PARAM } from './game/sandboxLink';
+import { PROFILE_PARAM, parseProfileParam } from './profileLink';
 import { syncTutorialProgress } from './game/tutorial/progress';
 import type { GameSetup } from './game/useGame';
 import type { YonkoSetup } from './game/useYonkoGame';
@@ -39,6 +41,8 @@ type Screen =
   | { name: 'builder'; link?: DeckLink; linkInvalid?: boolean; open?: string; yonko?: boolean; back?: Screen }
   | { name: 'coverage' }
   | { name: 'stats' }
+  /** Perfil público de um jogador (`/?perfil=<id>`); `back`: tela para onde "Voltar" leva. */
+  | { name: 'profile'; id: string; back?: Screen }
   | { name: 'admin' }
   | { name: 'team' }
   | { name: 'watch-list' }
@@ -177,6 +181,13 @@ function MainApp() {
       here.searchParams.delete('yonko');
       history.replaceState(null, '', here.toString());
     }
+    // Perfil público (`/?perfil=<id>`): abre a página do jogador.
+    if (here.searchParams.has(PROFILE_PARAM)) {
+      const profile = parseProfileParam(here.searchParams);
+      if (profile) setScreen({ name: 'profile', id: profile });
+      here.searchParams.delete(PROFILE_PARAM);
+      history.replaceState(null, '', here.toString());
+    }
     // Deep link do construtor (`/?deck=<lista>&name=&format=`): abre o construtor preenchido, sem salvar nada.
     if (here.searchParams.has('deck')) {
       const { link, invalid } = parseDeckLink(here.searchParams);
@@ -241,7 +252,26 @@ function MainApp() {
     );
   }
   if (screen.name === 'coverage' && dev) return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
-  if (screen.name === 'stats') return <Stats onExit={() => setScreen({ name: 'menu' })} onOpenDeck={(link) => setScreen({ name: 'builder', link })} />;
+  if (screen.name === 'stats') {
+    return (
+      <Stats
+        onExit={() => setScreen({ name: 'menu' })}
+        onOpenDeck={(link) => setScreen({ name: 'builder', link })}
+        onProfile={(id) => setScreen({ name: 'profile', id, back: { name: 'stats' } })}
+      />
+    );
+  }
+  if (screen.name === 'profile') {
+    return (
+      <PublicProfile
+        key={screen.id}
+        id={screen.id}
+        onExit={() => setScreen(screen.back ?? { name: 'menu' })}
+        onReplay={(setup) => setScreen({ name: 'game', setup, key: Date.now(), back: screen })}
+        onOpenDeck={(link) => setScreen({ name: 'builder', link, back: screen })}
+      />
+    );
+  }
   if (screen.name === 'admin' && isAdmin(role)) {
     return (
       <Admin

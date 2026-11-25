@@ -1,0 +1,45 @@
+// Texte des öffentlichen Spielerprofils (Deutsch).
+
+import type profilePtBR from './pt-BR';
+
+const profile: Record<keyof typeof profilePtBR, string> = {
+  'profile.title': 'Spielerprofil',
+  'profile.open': '👤 Mein öffentliches Profil',
+  'profile.loading': 'Wird geladen…',
+  'profile.notFound': 'Dieses Profil gibt es nicht oder der Spieler zeigt es nicht.',
+  'profile.hiddenNotice': 'Dein Profil ist verborgen: Der Link öffnet sich für andere nicht. Nur du siehst diese Seite.',
+  'profile.rankedGames': '{n|# Ranglistenpartie|# Ranglistenpartien}',
+  'profile.since': 'spielt seit {date}',
+  'profile.record': '{games} Partien, {wins} Siege ({pct})',
+  'profile.copyLink': '🔗 Link kopieren',
+  'profile.copied': '✓ Link kopiert',
+  'profile.copyPrompt': 'Kopiere den Link zum Profil:',
+  'profile.leadersTitle': 'Meistgespielte Leader',
+  'profile.noGames': 'Noch keine Partien.',
+  'profile.leaderLine': '{games|# Partie|# Partien} · {pct} Siegquote',
+  'profile.matchesTitle': 'Letzte Partien',
+  'profile.win': 'Sieg',
+  'profile.loss': 'Niederlage',
+  'profile.draw': 'Unentschieden',
+  'profile.vsBot': 'gegen den Bot',
+  'profile.vsPlayer': 'gegen einen Spieler',
+  'profile.watchReplay': '▶ Replay',
+  'profile.decksTitle': 'Decks',
+  'profile.deckLine': '{games|# Partie|# Partien} · {pct} Siegquote',
+  'profile.openDeck': 'Im Deckbauer öffnen',
+  'profile.editTitle': 'Was dein Profil zeigt',
+  'profile.editIntro': 'Wähle, was andere sehen, wenn sie deinen Link öffnen. Änderungen gelten sofort.',
+  'profile.optVisible': 'Profil sichtbar',
+  'profile.optVisibleHint': '(ausgeschaltet öffnet sich der Link für niemanden)',
+  'profile.optLeaders': 'Meistgespielte Leader und Siege insgesamt',
+  'profile.optMatches': 'Letzte Partien',
+  'profile.optReplays': 'Replays der Partien',
+  'profile.optReplaysHint': '(gegen andere Spieler nur, wenn diese ihre Replays auch freigeben)',
+  'profile.decksPick': 'Decks im Profil (bis zu {max})',
+  'profile.noDecks': 'Du hast noch keine gespeicherten Decks.',
+  'errors.profileNotFound': 'Profil nicht gefunden.',
+  'errors.profileReplayHidden': 'Das Replay dieser Partie ist nicht öffentlich.',
+  'errors.profileDecksInvalid': 'Wähle bis zu {max} Decks.',
+};
+
+export default profile;

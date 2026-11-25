@@ -1,0 +1,47 @@
+// Match analysis texts (English).
+
+import type analysisPtBR from './pt-BR';
+
+const analysis: Record<keyof typeof analysisPtBR, string> = {
+  'analysis.run': 'Analyze the match',
+  'analysis.runTitle': 'The bot reviews each decision with what the player knew at that moment and marks the plays that lost value.',
+  'analysis.running': 'Analyzing… {done}/{total}',
+  'analysis.preparing': 'Preparing the analysis…',
+  'analysis.cancel': 'Cancel',
+  'analysis.retry': 'Try again',
+  'analysis.notFinished': 'Only a finished replay can be analyzed.',
+  'analysis.invalid': 'Could not analyze: the current game rejects an action of this replay.',
+  'analysis.failed': 'The analysis failed: {message}',
+  'analysis.summary': 'Analysis',
+  'analysis.accuracy': 'Accuracy {n}%',
+  'analysis.noDecisions': 'no decisions',
+  'analysis.blunders': '{n|# blunder|# blunders}',
+  'analysis.mistakes': '{n|# mistake|# mistakes}',
+  'analysis.inaccuracies': '{n|# inaccuracy|# inaccuracies}',
+  'analysis.lethals': '{n|# missed lethal|# missed lethals}',
+  'analysis.clean': 'No play was marked.',
+  'analysis.knowledge': "The analysis only uses what each player saw at that moment: the opponent's hand and deck stay hidden.",
+  'analysis.marksLabel': 'Analysis markers',
+  'analysis.markAt': 'Turn {turn} · {name}: {severity}',
+  'analysis.prev': 'Previous marker',
+  'analysis.next': 'Next marker',
+  'analysis.severity.inaccuracy': 'Inaccuracy',
+  'analysis.severity.mistake': 'Mistake',
+  'analysis.severity.blunder': 'Blunder',
+  'analysis.tag.lethal': 'There was lethal here.',
+  'analysis.tag.wastedCounter': 'Wasted Counter: the attack could have gone through.',
+  'analysis.tag.missedCounter': 'A Counter was needed.',
+  'analysis.tag.badBlock': 'The block was not worth it.',
+  'analysis.tag.missedBlock': 'A block was needed.',
+  'analysis.tag.attackLeader': 'Attacking the Leader was better than the Character.',
+  'analysis.tag.attackCharacter': 'Attacking {target} was better.',
+  'analysis.tag.endedEarly': 'Ended the turn with a better play left.',
+  'analysis.tag.trigger': 'The Life card choice lost value.',
+  'analysis.tag.better': 'There was a better play.',
+  'analysis.played': 'Played',
+  'analysis.suggested': 'Suggestion',
+  'analysis.loss': '−{n}',
+  'analysis.lossTitle': "Value lost in the bot's evaluation (1,000 ≈ +1000 power in an attack)",
+};
+
+export default analysis;

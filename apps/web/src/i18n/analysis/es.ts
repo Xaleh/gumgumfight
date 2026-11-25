@@ -1,0 +1,47 @@
+// Textos del análisis de la partida (español).
+
+import type analysisPtBR from './pt-BR';
+
+const analysis: Record<keyof typeof analysisPtBR, string> = {
+  'analysis.run': 'Analizar la partida',
+  'analysis.runTitle': 'El bot revisa cada decisión con lo que el jugador sabía en ese momento y marca las jugadas que perdieron valor.',
+  'analysis.running': 'Analizando… {done}/{total}',
+  'analysis.preparing': 'Preparando el análisis…',
+  'analysis.cancel': 'Cancelar',
+  'analysis.retry': 'Intentar de nuevo',
+  'analysis.notFinished': 'Solo se puede analizar una repetición terminada.',
+  'analysis.invalid': 'No se pudo analizar: el juego actual rechaza una acción de esta repetición.',
+  'analysis.failed': 'El análisis falló: {message}',
+  'analysis.summary': 'Análisis',
+  'analysis.accuracy': 'Precisión {n}%',
+  'analysis.noDecisions': 'sin decisiones',
+  'analysis.blunders': '{n|# error grave|# errores graves}',
+  'analysis.mistakes': '{n|# error|# errores}',
+  'analysis.inaccuracies': '{n|# imprecisión|# imprecisiones}',
+  'analysis.lethals': '{n|# letal perdido|# letales perdidos}',
+  'analysis.clean': 'Ninguna jugada marcada.',
+  'analysis.knowledge': 'El análisis usa solo lo que cada jugador veía en ese momento: la mano y el mazo del rival quedan ocultos.',
+  'analysis.marksLabel': 'Marcadores del análisis',
+  'analysis.markAt': 'Turno {turn} · {name}: {severity}',
+  'analysis.prev': 'Marcador anterior',
+  'analysis.next': 'Siguiente marcador',
+  'analysis.severity.inaccuracy': 'Imprecisión',
+  'analysis.severity.mistake': 'Error',
+  'analysis.severity.blunder': 'Error grave',
+  'analysis.tag.lethal': 'Aquí había letal.',
+  'analysis.tag.wastedCounter': 'Counter desperdiciado: se podía dejar pasar el ataque.',
+  'analysis.tag.missedCounter': 'Faltó usar Counter.',
+  'analysis.tag.badBlock': 'El bloqueo no compensaba.',
+  'analysis.tag.missedBlock': 'Faltó bloquear.',
+  'analysis.tag.attackLeader': 'Atacar al Líder era mejor que al Personaje.',
+  'analysis.tag.attackCharacter': 'Atacar a {target} era mejor.',
+  'analysis.tag.endedEarly': 'Terminó el turno con una jugada mejor por hacer.',
+  'analysis.tag.trigger': 'La elección de la carta de Vida perdió valor.',
+  'analysis.tag.better': 'Había una jugada mejor.',
+  'analysis.played': 'Jugó',
+  'analysis.suggested': 'Sugerencia',
+  'analysis.loss': '−{n}',
+  'analysis.lossTitle': 'Valor perdido en la evaluación del bot (1.000 ≈ +1000 de poder en un ataque)',
+};
+
+export default analysis;
