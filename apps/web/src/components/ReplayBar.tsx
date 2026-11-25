@@ -1,8 +1,10 @@
 import type { Action, GameState } from '@gumgum/engine';
 import { type ReactNode, useEffect, useRef } from 'react';
 import type { ReplayCue } from '../game/replayCue';
+import { useReplayAnalysis } from '../game/useReplayAnalysis';
+import { analysisMarks, ReplayAnalysis } from './ReplayAnalysis';
 import { REPLAY_SPEEDS } from '../game/useGame';
-import { useT } from '../i18n';
+import { type MessageKey, useT } from '../i18n';
 import { useSettings } from '../settings';
 
 /** Posição no replay e como mudá-la (de `useGame`). */
@@ -20,6 +22,9 @@ export interface ReplayControls {
   next?: Action;
   /** Modo automático: quando (`performance.now()`) `next` será aplicada; null se nada está agendado. */
   dueAt: () => number | null;
+  /** O estado inicial e o roteiro inteiro (a análise da partida refaz tudo desde o começo). */
+  initial: GameState;
+  script: readonly Action[];
 }
 
 const svg = (children: ReactNode) => (
@@ -90,6 +95,13 @@ export function ReplayBar({
   // Mostrar ou não o clique/seleção do jogador: a mesma configuração do menu, guardada neste navegador.
   const { replayCues, update } = useSettings();
   const playing = !paused && !atEnd;
+  // Análise da partida (roadmap B1): pedida aqui, com os marcadores na linha do tempo.
+  const analysis = useReplayAnalysis(replay.initial, replay.script);
+  const marks = analysisMarks(analysis.state);
+  const jump = (n: number) => {
+    setPaused(() => true);
+    seek(n);
+  };
 
   /** Passo a passo: avançar ou voltar uma ação pausa o automático. */
   const step = (d: number) => {
@@ -154,17 +166,34 @@ export function ReplayBar({
 
   return (
     <div className="replay-bar" role="toolbar" aria-label={t('replay.toolbarLabel')}>
-      <input
-        className="replay-seek"
-        type="range"
-        min={0}
-        max={total}
-        value={pos}
-        onChange={(e) => seek(Number(e.target.value))}
-        aria-label={t('replay.seekLabel')}
-        aria-valuetext={t('replay.actionOf', { pos, total })}
-        style={{ ['--fill' as string]: `${total ? (pos / total) * 100 : 0}%` }}
-      />
+      <div className="replay-track">
+        <input
+          className="replay-seek"
+          type="range"
+          min={0}
+          max={total}
+          value={pos}
+          onChange={(e) => seek(Number(e.target.value))}
+          aria-label={t('replay.seekLabel')}
+          aria-valuetext={t('replay.actionOf', { pos, total })}
+          style={{ ['--fill' as string]: `${total ? (pos / total) * 100 : 0}%` }}
+        />
+        {marks.length > 0 && (
+          <div className="replay-marks" aria-label={t('analysis.marksLabel')}>
+            {marks.map((m) => (
+              <button
+                key={m.index}
+                type="button"
+                className={`replay-mark sev-${m.severity}${m.index === pos ? ' on' : ''}`}
+                style={{ left: `${total ? (m.index / total) * 100 : 0}%` }}
+                onClick={() => jump(m.index)}
+                title={t('analysis.markAt', { turn: m.turn, name: state.players[m.player].name, severity: t(`analysis.severity.${m.severity}` as MessageKey) })}
+                aria-label={t('analysis.markAt', { turn: m.turn, name: state.players[m.player].name, severity: t(`analysis.severity.${m.severity}` as MessageKey) })}
+              />
+            ))}
+          </div>
+        )}
+      </div>
       <div className="replay-row">
         <div className="replay-info">
           <span>
@@ -225,6 +254,7 @@ export function ReplayBar({
           {cue.sub && <em> — {cue.sub}</em>}
         </p>
       )}
+      <ReplayAnalysis analysis={analysis.state} state={state} pos={pos} seek={jump} onStart={analysis.start} onCancel={analysis.cancel} />
       {!playing && !atEnd && <p className="replay-hint">{t('replay.stepHint')}</p>}
     </div>
   );

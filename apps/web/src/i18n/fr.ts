@@ -9,6 +9,7 @@ import team from './team/fr';
 import chamber from './chamber/fr';
 import sealed from './sealed/fr';
 import yonko from './yonko/fr';
+import analysis from './analysis/fr';
 
 export default {
   // ---- general ----
@@ -3110,5 +3111,6 @@ export default {
   ...chamber,
   ...sealed,
   ...yonko,
+  ...analysis,
 } satisfies Messages;
 

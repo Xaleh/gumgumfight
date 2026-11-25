@@ -751,20 +751,40 @@ export function resetPlanner(): void {
   plans.clear();
 }
 
-function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Action {
-  const start = opts.now();
-  const over = () => opts.now() - start > opts.timeBudgetMs;
+/** Uma linha completa oferecida pela busca do turno: a nota, as decisões do bot e o estado no fim. */
+interface Offer {
+  score: number;
+  trace: Step[];
+  /** O nó foi expandido por inteiro (a linha não foi cortada pela profundidade ou pelo relógio). */
+  complete: boolean;
+  end: GameState;
+}
+
+/**
+ * Busca em feixe sobre o turno a partir de `state` (a fase principal de `player`, sem nada pendente). Devolve a
+ * melhor linha e, com `keepOffers` (o painel do treinador, a análise da partida), todas as linhas oferecidas.
+ * `start`: a linha já começou (`depth` ações, `penalty` e os acertos `hits` até aqui), como na análise de uma
+ * jogada feita.
+ */
+function searchTurn(
+  state: GameState,
+  player: PlayerId,
+  opts: PlannerOptions,
+  keepOffers: boolean,
+  start: { depth: number; penalty: number; hits: number[] } = { depth: 0, penalty: 0, hits: [] },
+): { best: Offer; offers: Offer[] } {
+  const t0 = opts.now();
+  const over = () => opts.now() - t0 > opts.timeBudgetMs;
   const noise = () => opts.random() * NOISE;
   const score = (s: GameState, penalty: number, depth: number) => evaluate(s, player, opts.weights) + penalty - depth * ACTION_COST + noise();
 
-  let beam: Node[] = [{ state, trace: [], depth: 0, penalty: 0, hits: [], score: evaluate(state, player, opts.weights) }];
-  type Offer = { score: number; trace: Step[]; complete: boolean; end: GameState };
+  let beam: Node[] = [{ state, trace: [], depth: start.depth, penalty: start.penalty, hits: start.hits, score: evaluate(state, player, opts.weights) }];
   let best: Offer | null = null;
-  /** As linhas oferecidas (para a explicação: as melhores alternativas); só com o painel do treinador ligado. */
+  /** As linhas oferecidas (para a explicação: as melhores alternativas). */
   const offers: Offer[] = [];
   const offer = (candidate: Offer) => {
     opts.onDecision?.(`oferta (${candidate.score.toFixed(0)}): ${candidate.trace.map((st) => JSON.stringify(st.action)).join(' → ')}`, 1);
-    if (opts.explain) offers.push(candidate);
+    if (keepOffers) offers.push(candidate);
     if (!best || candidate.score > best.score) best = candidate;
   };
 
@@ -836,7 +856,12 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
     }
   }
 
-  const chosen = best!;
+  return { best: best!, offers };
+}
+
+function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Action {
+  const { best, offers } = searchTurn(state, player, opts, Boolean(opts.explain));
+  const chosen = best;
   const steps = chosen.trace;
   opts.onDecision?.(`linha escolhida (${chosen.score.toFixed(0)}): ${steps.map((st) => JSON.stringify(st.action)).join(' → ')}`, 0);
   if (opts.explain) {
@@ -857,4 +882,91 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
   const rest = chosen.complete ? steps.slice(1) : steps.slice(1).filter((st) => st.action.type !== 'endTurn');
   savePlan(state, player, rest);
   return steps[0].action;
+}
+
+// ---------------------------------------------------------------------------
+// Análise da partida: a nota da jogada feita contra a da melhor jogada
+// ---------------------------------------------------------------------------
+
+/** Uma linha (ou resposta) com a nota dela e o estado em que a simulação parou. */
+export interface ScoredLine {
+  actions: Action[];
+  score: number;
+  end: GameState;
+}
+
+/** A melhor jogada que a busca acha numa posição e a jogada feita, na mesma escala (ver `scoreDecision`). */
+export interface DecisionScore {
+  /** `turn`: uma jogada da fase principal; `pending`: a resposta a uma escolha pendente. */
+  kind: 'turn' | 'pending';
+  best: ScoredLine;
+  played: ScoredLine;
+}
+
+/** A mesma ação (a ordem dos alvos só importa nas escolhas ordenadas, que a análise compara como vieram). */
+export function sameAction(a: Action, b: Action): boolean {
+  if (a.type === 'choose' && b.type === 'choose') return a.player === b.player && [...a.uids].sort().join(',') === [...b.uids].sort().join(',');
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Análise da partida (`analysis.ts`): a nota da melhor jogada que a busca acha na posição `view` (a visão de
+ * `player`, montada por quem chama com `viewFor`) e a nota da jogada feita (`played`, nos uids da visão), as duas
+ * na escala da avaliação e com o mesmo sorteio do próprio deck. Na fase principal, a jogada feita vale a melhor
+ * continuação do turno depois dela; numa escolha pendente, a resposta é simulada como as outras candidatas (com a
+ * média dos sorteios nas perguntas pagas e nas opções). null quando a decisão não se analisa (mulligan, quem
+ * começa, modo manual, a vez do oponente) ou quando a jogada feita não é simulável na visão.
+ */
+export function scoreDecision(view0: GameState, player: PlayerId, played: Action, opts: PlannerOptions): DecisionScore | null {
+  const view: GameState = { ...view0, log: [], checkpoint: undefined };
+  const pending = view.pending;
+  if (view.phase === 'gameover' || played.player !== player) return null;
+  if (pending) {
+    if (pending.player !== player || pending.kind === 'chooseFirst' || pending.kind === 'mulligan' || pending.kind === 'manual') return null;
+  } else if (view.phase !== 'main' || view.activePlayer !== player) return null;
+  const o: PlannerOptions = { ...defenseOrPlan(view, player, opts), onDecision: undefined, explain: undefined };
+
+  if (pending) {
+    const candidates = pendingCandidates(view, player, legalActions(view, player), o);
+    if (!candidates.some((c) => sameAction(c, played))) candidates.push(played);
+    const samples = pending.kind === 'confirm' || pending.kind === 'option' ? SAMPLES : 1;
+    const scores: number[][] = candidates.map(() => []);
+    const ends: Array<GameState | null> = candidates.map(() => null);
+    for (let k = 0; k < samples; k++) {
+      const state = determinize(view, player, o.random);
+      candidates.forEach((c, i) => {
+        const r = simulate(state, player, c, o, 2);
+        if (!r) return;
+        scores[i].push(evaluate(r.state, player, o.weights) + r.penalty);
+        ends[i] ??= r.state;
+      });
+      if (state === view) break;
+    }
+    const mean = (i: number) => (scores[i].length ? scores[i].reduce((a, b) => a + b, 0) / scores[i].length : -Infinity);
+    const p = candidates.findIndex((c) => sameAction(c, played));
+    if (!Number.isFinite(mean(p))) return null;
+    let b = p;
+    candidates.forEach((_, i) => {
+      if (mean(i) > mean(b)) b = i;
+    });
+    const line = (i: number): ScoredLine => ({ actions: [candidates[i]], score: Math.round(mean(i)), end: ends[i]! });
+    return { kind: 'pending', best: line(b), played: line(p) };
+  }
+
+  const state = determinize(view, player, o.random);
+  const found = searchTurn(state, player, o, false).best;
+  const best: ScoredLine = { actions: found.trace.map((st) => st.action), score: Math.round(found.score), end: found.end };
+  if (best.actions.length && sameAction(best.actions[0], played)) return { kind: 'turn', best, played: best };
+  const r = simulate(state, player, played, o, 1);
+  if (!r) return null;
+  let line: ScoredLine;
+  if (played.type === 'endTurn' || r.state.phase === 'gameover' || r.state.pending || r.state.activePlayer !== player) {
+    // A jogada encerrou o turno (ou parou numa pergunta que a busca não cobre): vale onde parou, como na busca.
+    line = { actions: r.trace.map((st) => st.action), score: Math.round(evaluate(r.state, player, o.weights) + r.penalty - (played.type === 'endTurn' ? 0 : ACTION_COST)), end: r.state };
+  } else {
+    const rest = searchTurn(r.state, player, o, false, { depth: 1, penalty: r.penalty, hits: r.hits }).best;
+    line = { actions: [...r.trace.map((st) => st.action), ...rest.trace.map((st) => st.action)], score: Math.round(rest.score), end: rest.end };
+  }
+  // A busca da posição cortou a linha que começa com a jogada feita: ela vira a melhor.
+  return { kind: 'turn', best: line.score > best.score ? line : best, played: line };
 }

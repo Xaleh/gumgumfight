@@ -2,7 +2,26 @@ export * from './types';
 export * from './engine';
 export * from './actions';
 export { chooseBotAction as chooseSimpleBotAction } from './bot/simple';
-export { BOT_LEVELS, type BotExplanation, type BotLevel, chooseBotAction, isBotLevel, LEVELS as BOT_LEVEL_OPTIONS, planAction, type PlannerOptions, plannerOptions, resetPlanner } from './bot/planner';
+export { BOT_LEVELS, type BotExplanation, type BotLevel, chooseBotAction, isBotLevel, LEVELS as BOT_LEVEL_OPTIONS, planAction, type PlannerOptions, plannerOptions, resetPlanner, sameAction, scoreDecision, type DecisionScore, type ScoredLine } from './bot/planner';
+export {
+  accuracyOf,
+  ANALYSIS_LIMITS,
+  ANALYSIS_VERSION,
+  AnalysisError,
+  type AnalysisOptions,
+  type AnalysisSeverity,
+  type AnalysisTag,
+  analyzeReplay,
+  decisionIndexes,
+  type DecisionReview,
+  isDecision,
+  LOSS_CAP,
+  type MatchAnalysis,
+  type PlayerAnalysis,
+  reviewDecision,
+  severityOf,
+  summarizeAnalysis,
+} from './bot/analysis';
 export { DEFAULT_WEIGHTS as BOT_WEIGHTS, type EvalTerms, evaluate, evaluateTerms, nextTurnPlay, type Weights as BotWeights } from './bot/evaluate';
 export {
   ARCHETYPE_WEIGHTS,

@@ -71,6 +71,9 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   que o Personagem". O replay ganha os marcadores e um resumo (precisão por jogador, erros graves).
   *Pronto quando:* em qualquer replay terminado dá para pedir a análise, ver os marcadores na linha do tempo e a
   jogada sugerida em cada um. A análise só usa o que o jogador sabia naquele momento.
+  *Plano:* [`plano-analise-partida.md`](plano-analise-partida.md) (3 fases).
+  *Progresso:* fase 1 de 3 (análise no navegador, marcadores e resumo no replay) em 2026-11-25,
+  [PR #224](https://github.com/Xaleh/gumgumfight/pull/224).
   *Feito em:* —
 
 - [ ] **B2. Mão de teste no construtor**
