@@ -103,6 +103,8 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   *Pronto quando:* um admin monta, confere e publica um desafio com cartas atuais pela tela; a fila aceita datas fixas e
   mostra quem jogou e resolveu; e o defensor pode usar Eventos de Counter e [Trigger] quando o desafio pedir.
   *Plano:* [`plano-editor-desafios.md`](plano-editor-desafios.md) (3 fases).
+  *Progresso:* fase 1 de 3 (desafios no banco e o editor com a solução gravada jogando) em 2026-11-25,
+  [PR #227](https://github.com/Xaleh/gumgumfight/pull/227).
   *Feito em:* —
 
 - [ ] **B5. Sandbox de regras**
