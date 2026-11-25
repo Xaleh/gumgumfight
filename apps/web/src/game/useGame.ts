@@ -6,6 +6,7 @@ import {
   type CardEngineText,
   type DeckProfile,
   createGame,
+  createSandbox,
   type DeckList,
   type GameConfig,
   type GameState,
@@ -13,6 +14,7 @@ import {
   type PlayerId,
   REPLAY_VERSION,
   ReplayCursor,
+  type SandboxSpec,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CoachEntry, PlayFormat } from '../api';
@@ -20,7 +22,8 @@ import { t } from '../i18n';
 import { thinkBot } from './botClient';
 import { motionWait } from './motion';
 
-export type GameMode = 'bot' | 'replay';
+/** `sandbox`: mesa livre montada no Sandbox de regras, com a mesma pessoa jogando os dois lados. */
+export type GameMode = 'bot' | 'replay' | 'sandbox';
 
 export interface GameSetup {
   mode: GameMode;
@@ -40,6 +43,8 @@ export interface GameSetup {
   replayStart?: { paused: boolean; speed: number; at?: number };
   /** Aviso mostrado na mesa ao começar (ex.: a transmissão não abriu e o treino roda no navegador). */
   notice?: string;
+  /** Sandbox de regras: a mesa montada (a partida começa dela, não do `createGame`). */
+  sandbox?: SandboxSpec;
 }
 
 export interface ReplayFile {
@@ -109,7 +114,7 @@ export function useGame(setup: GameSetup) {
   /** Replay (automático): quando (`performance.now()`) a próxima ação do roteiro será aplicada; null se nada está agendado. */
   const dueRef = useRef<number | null>(null);
   const [entries, setEntries] = useState<Entry[]>(() => {
-    const initial = createGame(setup.config);
+    const initial = setup.sandbox ? createSandbox(setup.sandbox, setup.config) : createGame(setup.config);
     startRef.current = initial;
     if (setup.mode === 'replay') cursorRef.current = new ReplayCursor(initial, setup.script ?? []);
     return [{ state: initial, action: null }];
@@ -128,7 +133,9 @@ export function useGame(setup: GameSetup) {
   /** Bot do Time: as explicações das jogadas do bot (painel do treinador). */
   const [coach, setCoach] = useState<CoachEntry[]>([]);
 
-  const human: PlayerId | null = setup.mode === 'bot' ? 0 : null;
+  // Sandbox: quem joga é sempre quem tem de agir agora (a mesa vira para esse lado).
+  const sandbox = setup.mode === 'sandbox';
+  const human: PlayerId | null = setup.mode === 'bot' ? 0 : sandbox ? (actingPlayer(state) ?? state.activePlayer) : null;
 
   const dispatch = useCallback((action: Action) => {
     try {
@@ -142,13 +149,13 @@ export function useGame(setup: GameSetup) {
     }
   }, []);
 
-  /** Volta para antes da última ação do jogador humano. */
+  /** Volta para antes da última ação do jogador humano (no sandbox, a última ação, de qualquer lado). */
   const undo = useCallback(() => {
     if (human === null) return;
     setEntries((h) => {
       const copy = [...h];
       let removed = 0;
-      while (copy.length > 1 && copy[copy.length - 1].action?.player !== human) {
+      while (!sandbox && copy.length > 1 && copy[copy.length - 1].action?.player !== human) {
         copy.pop();
         removed++;
       }
@@ -161,9 +168,9 @@ export function useGame(setup: GameSetup) {
       return copy;
     });
     setError(null);
-  }, [human]);
+  }, [human, sandbox]);
 
-  const canUndo = human !== null && entries.some((e) => e.action?.player === human);
+  const canUndo = human !== null && entries.some((e) => e.action && (sandbox || e.action.player === human));
 
   // Replay aberto numa jogada (a caixa de correções do Bot do Time): pula para ela ao começar.
   const startAt = setup.replayStart?.at;

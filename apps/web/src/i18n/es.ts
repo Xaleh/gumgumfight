@@ -9,6 +9,7 @@ import team from './team/es';
 import chamber from './chamber/es';
 import sealed from './sealed/es';
 import yonko from './yonko/es';
+import sandbox from './sandbox/es';
 
 export default {
   // ---- general ----
@@ -3110,5 +3111,6 @@ export default {
   ...chamber,
   ...sealed,
   ...yonko,
+  ...sandbox,
 } satisfies Messages;
 

@@ -251,6 +251,27 @@ deck ao simular efeitos que leem o topo.
 troca cada um por um apelido aleatório (`createAliases`, HMAC-SHA256 com salt da sala). `actionFromView` traduz de
 volta a ação feita sobre a visão.
 
+### Cenários e Sandbox de regras (`scenario.ts`, `sandbox.ts`)
+
+`createScenario(config, spec)` monta uma partida já em andamento: cria a partida normalmente (decks, mulligans) e
+redistribui as cartas do deck de cada jogador entre mão, Personagens, Stage, Vida, lixo e topo do deck, com os DON!!
+somando o deck de DON!! do Líder. Serve às lições do tutorial e ao Sandbox de regras.
+
+O Sandbox usa uma `SandboxSpec` (turno, de quem é a vez e, por lado, o Líder e as áreas do cenário):
+
+- `parseSandboxSpec(raw)` lê a mesa vinda de fora (o JSON do link): só a forma e os limites (`SANDBOX_LIMITS`), e
+  devolve a forma compacta, sem os valores padrão. `null` se não for uma mesa.
+- `sandboxIssues(spec, cards)` lista o que impede a mesa (códigos `turn`, `leader`, `unknownCard`,
+  `leaderOutOfPlace`, `notCharacter`, `notStage`, `tooManyCharacters`, `tooManyCards`, `tooManyDon`, `life`). O texto
+  de cada código fica na interface (`sandbox.issue.*`).
+- `sandboxDeck(side, cards)` monta o deck de 50 de um lado: as cartas citadas e cópias delas em rodízio (sem nenhuma,
+  um Personagem da cor do Líder). Não segue as regras de construção: é só o estoque do `createScenario`.
+- `sandboxConfig(spec, cards, names, seed)` dá a `GameConfig` (os dois lados humanos, só as cartas usadas) e
+  `createSandbox(spec, config)` a mesa na Main Phase do jogador ativo.
+
+A partida do Sandbox roda só no navegador (`useGame` no modo `sandbox`) e não é gravada: não decide resultado nem
+recompensa, e a pessoa vê as duas mãos de propósito (joga os dois lados).
+
 ### Formatos (`formats.ts`)
 
 `standard`, `egb` e `allblue` (`FormatId`: os que têm fila e selo no deck) e `free`, o Livre (`PlayFormat`: só
@@ -525,7 +546,13 @@ partida, torneio ou nome de jogador) não muda, com TTL de segurança (30 s e 5 
 `watch`, `tournaments`, `game` (contra o bot / replay) e `online`. As telas `online` e `watch` ficam em
 `sessionStorage.gumgum.openMatch` para sobreviver a recarga. Parâmetros de URL, lidos uma vez e removidos com
 `history.replaceState`: `?sala=CÓDIGO` (convite de sala privada), `?partida=<sala>` e `?torneio=<id>` (abertos ao tocar
-numa notificação: a partida online, se ainda estiver em `/api/online/active`, ou a página do torneio).
+numa notificação: a partida online, se ainda estiver em `/api/online/active`, ou a página do torneio) e
+`?sandbox=<mesa em base64url>` (abre o Sandbox de regras com a mesa do link; `game/sandboxLink.ts`).
+
+**Sandbox de regras** (`components/Sandbox.tsx`, tela `sandbox`): editor da mesa; "Jogar" abre a tela `game` com
+`GameSetup.mode = 'sandbox'` e `setup.sandbox` (a mesa), e a volta da mesa leva de novo ao editor. No modo `sandbox`
+o `useGame` cria a partida com `createSandbox`, `human` é sempre quem tem de agir (`actingPlayer`), o desfazer volta
+uma ação de qualquer lado, e o `GameScreen` abre as duas mãos e não grava a partida, não oferece replay nem relato.
 
 ### Dados no navegador
 
@@ -538,6 +565,7 @@ numa notificação: a partida online, se ainda estiver em `/api/online/active`, 
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |
 | `localStorage.gumgum.watchHands`, `gumgum.watchChatOff`, `gumgum.statsFilters`, `gumgum.statsMin` | preferências de espectador e estatísticas |
 | `sessionStorage.gumgum.openMatch` | partida/transmissão aberta |
+| `localStorage.gumgum.sandbox` | última mesa montada no Sandbox de regras (`SandboxSpec`) |
 
 Nada de cache de cartas: o construtor baixa `GET /api/cards` inteiro toda vez que abre.
 

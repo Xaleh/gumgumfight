@@ -11,6 +11,7 @@ import { Learn } from './components/Learn';
 import { Lesson } from './components/Lesson';
 import { Draft } from './components/Draft';
 import { Menu } from './components/Menu';
+import { Sandbox } from './components/Sandbox';
 import { Sealed } from './components/Sealed';
 import { OAuthConsent } from './components/OAuthConsent';
 import { ReplayEmbed } from './components/ReplayEmbed';
@@ -23,9 +24,11 @@ import { LocalYonkoTable } from './components/YonkoTable';
 import { Watch } from './components/Watch';
 import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
 import { isReplayPath } from './embed';
+import { parseSandboxLink, SANDBOX_PARAM } from './game/sandboxLink';
 import { syncTutorialProgress } from './game/tutorial/progress';
 import type { GameSetup } from './game/useGame';
 import type { YonkoSetup } from './game/useYonkoGame';
+import type { SandboxSpec } from '@gumgum/engine';
 import { usePushSync, useWakeLock } from './pwa';
 import { useSettings } from './settings';
 
@@ -42,6 +45,8 @@ type Screen =
   /** Tutorial "Aprender a jogar": a lista de lições e uma lição aberta. */
   | { name: 'learn' }
   | { name: 'lesson'; id: string }
+  /** Sandbox de regras: o editor da mesa (`spec`: a do link ou a que voltou da mesa; `linkInvalid`: link ilegível). */
+  | { name: 'sandbox'; spec?: SandboxSpec; linkInvalid?: boolean; from?: 'learn' }
   /**
    * `tournament`: veio da página de um torneio (e volta para ela; `lobby`: para o lobby dele);
    * `home`: veio do "Ao vivo agora" do menu.
@@ -179,6 +184,13 @@ function MainApp() {
       for (const p of DECK_LINK_PARAMS) here.searchParams.delete(p);
       history.replaceState(null, '', here.toString());
     }
+    // Link do Sandbox de regras (`/?sandbox=<mesa>`): abre o editor com a mesa, sem jogar nada sozinho.
+    if (here.searchParams.has(SANDBOX_PARAM)) {
+      const { spec, invalid } = parseSandboxLink(here.searchParams);
+      setScreen({ name: 'sandbox', ...(spec ? { spec } : {}), ...(invalid ? { linkInvalid: true } : {}) });
+      here.searchParams.delete(SANDBOX_PARAM);
+      history.replaceState(null, '', here.toString());
+    }
     const onMessage = (e: MessageEvent) => {
       if (e.data?.type === 'gumgum:open' && typeof e.data.url === 'string') open(e.data.url);
     };
@@ -197,7 +209,26 @@ function MainApp() {
       />
     );
   }
-  if (screen.name === 'learn') return <Learn onExit={() => setScreen({ name: 'menu' })} onLesson={(id) => setScreen({ name: 'lesson', id })} />;
+  if (screen.name === 'learn') {
+    return (
+      <Learn
+        onExit={() => setScreen({ name: 'menu' })}
+        onLesson={(id) => setScreen({ name: 'lesson', id })}
+        onSandbox={() => setScreen({ name: 'sandbox', from: 'learn' })}
+      />
+    );
+  }
+  if (screen.name === 'sandbox') {
+    const back: Screen = screen.from === 'learn' ? { name: 'learn' } : { name: 'menu' };
+    return (
+      <Sandbox
+        initial={screen.spec}
+        linkInvalid={screen.linkInvalid}
+        onExit={() => setScreen(back)}
+        onPlay={(setup, spec) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'sandbox', spec, from: screen.from } })}
+      />
+    );
+  }
   if (screen.name === 'lesson') {
     return (
       <Lesson
@@ -341,6 +372,7 @@ function MainApp() {
       onStart={(setup) => setScreen({ name: 'game', setup, key: Date.now() })}
       onBuildDecks={(id) => setScreen({ name: 'builder', ...(id ? { open: id } : {}) })}
       onLearn={() => setScreen({ name: 'learn' })}
+      onSandbox={() => setScreen({ name: 'sandbox' })}
       onCoverage={dev ? () => setScreen({ name: 'coverage' }) : undefined}
       onStats={() => setScreen({ name: 'stats' })}
       onOnline={(seat) => setScreen({ name: 'online', seat })}

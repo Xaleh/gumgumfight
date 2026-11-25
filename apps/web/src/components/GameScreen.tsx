@@ -247,7 +247,8 @@ export function GameScreen({
   const [matchId, setMatchId] = useState<number | null>(null);
   useEffect(() => {
     // O treino do Selado não é gravado: o servidor só aceita decks construídos nesta rota, e o Selado fica fora das estatísticas.
-    if (game.state.phase !== 'gameover' || saved.current || setup.mode === 'replay' || setup.format === 'sealed') return;
+    // O sandbox de regras também não: a mesa foi montada à mão e não é uma partida.
+    if (game.state.phase !== 'gameover' || saved.current || setup.mode === 'replay' || setup.mode === 'sandbox' || setup.format === 'sealed') return;
     saved.current = true;
     void api
       .saveMatch({
@@ -294,6 +295,7 @@ export function GameScreen({
         onRematch={onRematch && (setup.mode === 'bot' && confirmDeck ? () => setConfirming(true) : () => onRematch())}
         startNotice={setup.notice}
         embed={embed}
+        exitTo={setup.mode === 'sandbox' ? 'back' : undefined}
       />
       {confirming && (
         <DeckConfirm
@@ -797,7 +799,9 @@ function Table({
   const closeHands = useCallback(() => openHandsRef.current.forEach(closeHand), [closeHand]);
   useEffect(() => () => Object.values(closeTimers.current).forEach(clearTimeout), []);
   // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
-  const [showBotHand, setShowBotHand] = useState(kind === 'replay' || watching);
+  /** Sandbox de regras: a mesma pessoa joga os dois lados (mãos abertas, sem replay nem relato de partida). */
+  const sandbox = kind === 'sandbox';
+  const [showBotHand, setShowBotHand] = useState(kind === 'replay' || sandbox || watching);
   const [banner, setBanner] = useState<{ text: string; kicker: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
   // Relato de bug: só para quem jogou (não no replay, no tutorial nem para quem assiste) e com a partida gravada no servidor.
@@ -805,7 +809,7 @@ function Table({
   /** Decklist aberta no resumo do fim (o jogador cujo deck aparece). */
   const [deckOf, setDeckOf] = useState<PlayerId | null>(null);
   const recorded = isOnline ? (online?.room?.result?.matchId ?? null) : (matchId ?? null);
-  const reportMatch = human !== null && !watching && !tutorial && !broadcast && kind !== 'replay' ? recorded : null;
+  const reportMatch = human !== null && !watching && !tutorial && !broadcast && kind !== 'replay' && !sandbox ? recorded : null;
   // Bot do Time: a nota e as marcações, para quem é do Time, numa partida contra o bot (no navegador ou na sala do servidor).
   const botMatch = kind === 'bot' || online?.room?.queue === 'bot';
   const effectiveBotLevel: BotLevel | undefined = isOnline ? online?.room?.botLevel : botLevel;
@@ -2028,7 +2032,18 @@ function Table({
                   {t('broadcast.sendThis')}
                 </button>
               )}
-              {(over || replay) && !tutorial && (
+              {sandbox && onRematch && (
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setSheet(null);
+                    onRematch();
+                  }}
+                >
+                  {t('sandbox.restart')}
+                </button>
+              )}
+              {(over || replay) && !tutorial && !sandbox && (
                 <button className="btn" onClick={game.downloadReplay}>
                   {t('game.downloadReplay')}
                 </button>
@@ -2038,7 +2053,7 @@ function Table({
                   {t('judge.call')}
                 </button>
               )}
-              {human !== null && state.phase === 'main' && !tutorial && (
+              {human !== null && state.phase === 'main' && !tutorial && !sandbox && (
                 <button
                   className="btn danger"
                   onClick={() => {
@@ -2052,7 +2067,7 @@ function Table({
                 </button>
               )}
               <button className="btn" onClick={onExit}>
-                {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : exitTo === 'back' ? t('game.exitBack') : t('game.exitToMenu')}
+                {tutorial ? t('tutorial.exitLesson') : sandbox ? t('sandbox.backToEditor') : toTournament ? t('game.exitToTournament') : exitTo === 'back' ? t('game.exitBack') : t('game.exitToMenu')}
               </button>
             </div>
             {lateral && (
@@ -2082,7 +2097,7 @@ function Table({
                 </div>
               </div>
             )}
-            {kind === 'bot' && !tutorial && (
+            {(kind === 'bot' || sandbox) && !tutorial && (
               <label className="check">
                 <input type="checkbox" checked={showBotHand} onChange={(e) => setShowBotHand(e.target.checked)} /> {t('game.showBotHand')}
               </label>
@@ -2181,10 +2196,10 @@ function Table({
         {state.phase === 'gameover' && showResult && !tutorial && (
           <GameResult
             state={state}
-            human={human}
+            human={sandbox ? null : human}
             actions={game.actions()}
             onExit={bare ? undefined : onExit}
-            exitLabel={toTournament ? t('game.backToTournament') : exitTo === 'back' ? t('common.back') : t('game.backToMenu')}
+            exitLabel={sandbox ? t('sandbox.backToEditor') : toTournament ? t('game.backToTournament') : exitTo === 'back' ? t('common.back') : t('game.backToMenu')}
             onRematch={
               replay
                 ? () => {
@@ -2194,10 +2209,10 @@ function Table({
                 : onRematch
             }
             rematchLabel={
-              (replay ? t('game.watchAgain') : rematchLabel) ??
+              (replay ? t('game.watchAgain') : sandbox ? t('sandbox.restart') : rematchLabel) ??
               (online && human !== null ? (online.room?.rematch[human] ? t('game.waitingOpponent') : t('game.askRematch')) : undefined)
             }
-            onReplay={online?.room?.tournament || bare ? undefined : game.downloadReplay}
+            onReplay={online?.room?.tournament || bare || sandbox ? undefined : game.downloadReplay}
             onLog={() => setSheet('log')}
             onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
@@ -2299,7 +2314,7 @@ function Table({
           {!bare && (
             <div className="panel-controls">
               <button className="btn small" onClick={onExit}>
-                {toTournament ? t('game.sideTournament') : exitTo === 'back' ? t('game.sideBack') : t('game.sideMenu')}
+                {sandbox ? t('sandbox.backToEditor') : toTournament ? t('game.sideTournament') : exitTo === 'back' ? t('game.sideBack') : t('game.sideMenu')}
               </button>
               {callJudge && (
                 <button className="btn small judge-call" onClick={callJudge}>
