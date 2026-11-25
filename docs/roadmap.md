@@ -155,10 +155,10 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   ganho contra a versão anterior.
   *Feito em:* —
 
-- [ ] **D3. Bots com personalidade**
+- [x] **D3. Bots com personalidade**
   Agressivo, controle e conservador com a Vida, além de fácil, normal e difícil.
   *Pronto quando:* a escolha aparece ao jogar contra o bot e cada personalidade tem teste que mostra o estilo dela.
-  *Feito em:* —
+  *Feito em:* 2026-11-25 — [PR #230](https://github.com/Xaleh/gumgumfight/pull/230)
 
 - [ ] **D4. Yonko, fase 4** 🧱
   Espectador e replay da mesa de 4 e o bot com busca, que o [`plano-modos-de-jogo.md`](plano-modos-de-jogo.md) aponta
