@@ -91,3 +91,16 @@ export {
 export { applyErrata, errataFor, ERRATA, type Errata, fixCard } from './errata';
 export { applySourceFixes, SOURCE_FIXES, SOURCE_TEXT_FIXES, type SourceFix } from './source-fixes';
 export { freshTrigger, MOTION_SPOT_MS, motionHoldMs, type TriggerHit } from './motion';
+export {
+  createSandbox,
+  parseSandboxSpec,
+  SANDBOX_LIMITS,
+  sandboxCards,
+  sandboxConfig,
+  sandboxDeck,
+  type SandboxIssue,
+  type SandboxIssueCode,
+  sandboxIssues,
+  type SandboxSide,
+  type SandboxSpec,
+} from './sandbox';

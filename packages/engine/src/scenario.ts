@@ -1,9 +1,10 @@
 // Cenários prontos (tutorial): uma partida já em andamento, montada a partir de uma descrição
 // de cada lado da mesa (mão, Personagens, Vida, DON!!...). A partida é criada normalmente
 // (decks, mulligans) e as cartas são então redistribuídas entre as áreas, de modo que o
-// estado continua válido: cada carta do deck está em exatamente uma área e há 10 DON!!.
+// estado continua válido: cada carta do deck está em exatamente uma área e os DON!! somam o deck
+// de DON!! do Líder (10, salvo regra própria).
 
-import { applyAction, createGame, DON_DECK_SIZE, opponent } from './engine';
+import { applyAction, createGame, opponent } from './engine';
 import { legalActions } from './actions';
 import type { Action, FieldCard, GameConfig, GameState, PlayerId } from './types';
 
@@ -62,6 +63,8 @@ export function createScenario(config: GameConfig, spec: ScenarioSpec): GameStat
   for (const player of [0, 1] as PlayerId[]) {
     const side = spec.sides[player];
     const ps = s.players[player];
+    // DON!! do jogador (10, ou o que a regra do Líder disser), contados antes da redistribuição.
+    const donTotal = ps.donDeck + ps.donActive + ps.donRested;
     const pool = [...ps.hand, ...ps.deck, ...ps.life, ...ps.trash];
     for (const fc of ps.characters) pool.push(fc.uid);
     if (ps.stage) pool.push(ps.stage.uid);
@@ -96,8 +99,8 @@ export function createScenario(config: GameConfig, spec: ScenarioSpec): GameStat
     const attached = ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
     ps.donActive = side.donActive ?? 0;
     ps.donRested = side.donRested ?? 0;
-    ps.donDeck = DON_DECK_SIZE - ps.donActive - ps.donRested - attached;
-    if (ps.donDeck < 0) throw new Error(`mais de ${DON_DECK_SIZE} DON!! para ${ps.name}`);
+    ps.donDeck = donTotal - ps.donActive - ps.donRested - attached;
+    if (ps.donDeck < 0) throw new Error(`mais de ${donTotal} DON!! para ${ps.name}`);
     ps.mulliganDone = true;
   }
 

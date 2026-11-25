@@ -283,6 +283,7 @@ export function Menu({
   onStart,
   onBuildDecks,
   onLearn,
+  onSandbox,
   onDaily,
   onCoverage,
   onStats,
@@ -305,6 +306,8 @@ export function Menu({
   onBuildDecks: (deckId?: string) => void;
   /** Tutorial "Aprender a jogar". */
   onLearn: () => void;
+  /** Sandbox de regras (mesa livre para testar cartas). */
+  onSandbox: () => void;
   /** Desafio do dia. */
   onDaily: () => void;
   /** Cobertura das cartas (só para Dev). */
@@ -721,6 +724,7 @@ export function Menu({
   const extra: NavItem[] = [
     { key: 'settings', label: t('menu.navSettings'), icon: 'sliders', onClick: () => setShowSettings(true) },
     { key: 'replay', label: t('menu.navReplay'), icon: 'play', onClick: () => setShowReplay(true) },
+    { key: 'sandbox', label: t('sandbox.nav'), icon: 'grid', onClick: onSandbox },
     ...(supportOn ? [{ key: 'support', label: t('support.nav'), icon: 'heart' as const, onClick: () => setShowSupport(true) }] : []),
     ...(onAdmin ? [{ key: 'admin', label: t('menu.navAdmin'), icon: 'shield' as const, onClick: onAdmin }] : []),
     ...(onTeamBot ? [{ key: 'teambot', label: t('menu.navTeamBot'), icon: 'bot' as const, onClick: onTeamBot }] : []),

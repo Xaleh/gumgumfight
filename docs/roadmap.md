@@ -96,11 +96,11 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   sequência dele e pode compartilhar o resultado sem entregar a resposta.
   *Feito em:* 25/11/2026, [PR #225](https://github.com/Xaleh/gumgumfight/pull/225)
 
-- [ ] **B5. Sandbox de regras**
+- [x] **B5. Sandbox de regras**
   Mesa livre para montar uma situação (cartas em campo, na mão, DON!!, Vida) e testar a interação de duas cartas, sem
   partida inteira.
   *Pronto quando:* dá para montar a mesa, jogar os dois lados e compartilhar a situação por link.
-  *Feito em:* —
+  *Feito em:* 2026-11-25, [PR #222](https://github.com/Xaleh/gumgumfight/pull/222)
 
 ## Fase C — Construtor de decks
 

@@ -1186,6 +1186,29 @@ o bot (opção nas Configurações, desligada por padrão), palavras-chave clic�
 administração, o funil anônimo das lições (onde as pessoas desistem). Detalhes e como escrever uma lição nova:
 [`docs/tutorial.md`](docs/tutorial.md).
 
+## Sandbox de regras
+
+Mesa livre para testar como duas cartas interagem sem jogar a partida inteira. Fica em **Sandbox de regras** no menu
+(junto de Configurações e Replay) e no link **Testar cartas no Sandbox** da tela Aprender.
+
+- **Montar a mesa:** para cada lado (Lado A e Lado B), o Líder (virado ou não, com DON!! dados), até 5 Personagens
+  (virado, DON!! dados, "jogado neste turno" para quem não tem [Rush]), o Stage, a mão, o lixo, as cartas do topo do
+  deck (a primeira é a de cima), a Vida e os DON!! ativos e virados. Também o turno e de quem é a vez. As cartas vêm da
+  base inteira, de qualquer cor e coleção, sem as regras de construção de deck; o resto do deck são cópias das
+  cartas que estão na mesa. O editor aponta o que impede a mesa (carta que não é Personagem, DON!! demais, Vida acima
+  de 10…) e guarda a última mesa no navegador.
+- **Jogar os dois lados:** **Jogar a situação** abre a mesa de verdade na Main Phase de quem tem a vez. A mesma pessoa
+  joga os dois lados: a mesa vira para quem tem de agir (o defensor no Blocker e no Counter, por exemplo), as duas mãos
+  ficam abertas e o **Desfazer** volta uma ação de qualquer lado. No menu da mesa, **Recomeçar a situação** monta a
+  mesa de novo e **Editar a mesa** volta para o editor. Nada é gravado: não conta para as estatísticas, não tem replay
+  nem relato de partida.
+- **Compartilhar:** **Copiar link** gera `/?sandbox=<mesa>` com a situação inteira. Quem abre vê o editor preenchido e
+  decide se joga (um link ilegível abre a última mesa montada, com um aviso).
+
+As regras ficam no motor (`packages/engine/src/sandbox.ts`): validação (`sandboxIssues`), montagem dos decks
+(`sandboxConfig`), a mesa (`createSandbox`, sobre o `createScenario` do tutorial) e a leitura do link
+(`parseSandboxSpec`).
+
 ## Desafio do dia
 
 Um cenário novo por dia (vira à meia-noite de Brasília), em **Desafio do dia** no menu, no cartão da home ou pelo
