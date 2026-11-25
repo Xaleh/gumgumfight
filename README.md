@@ -676,6 +676,26 @@ está na fila e os espectadores também contam.
 - Código: `apps/server/src/online/` (`room.ts`: uma partida e o relógio; `lobby.ts`: salas, filas e gravação;
   `routes.ts`: rotas e SSE) e `apps/web/src/game/useOnlineGame.ts` (canal e ações).
 
+### Amigos e convite direto
+
+Com login Google, o item **Amigos** do menu abre a lista de amigos:
+
+- **Adicionar:** cada conta tem um **código de amigo** de 8 letras e um link (`/?amigo=CÓDIGO`, botão **Copiar link**).
+  Quem recebe o código digita em **Adicionar pelo código**; o outro lado vê o pedido em **Pedidos recebidos** e
+  aceita ou recusa. Quem pediu pode cancelar, e qualquer um dos dois remove a amizade quando quiser. Se os dois
+  pedirem, a amizade vale na hora. Até 200 amigos por conta e 30 pedidos por hora (o código não dá para ser varrido).
+- **Quem está online:** cada amigo aparece como **Jogando** (numa partida online ou num treino transmitido),
+  **Online** (com o app aberto no menu ou na lista de amigos, numa sala de espera ou na fila) ou **Offline**. Só
+  amigos aceitos veem o status, e nunca qual partida nem o código da sala. O nome mostrado é o apelido do jogador,
+  nunca o da conta Google.
+- **Convidar com um toque:** **Convidar** cria uma sala privada com o deck equipado e as regras da Sala privada, leva
+  você para a sala de espera e avisa o amigo por notificação. Tocar no aviso (`/?convite=CÓDIGO`) abre o app e entra
+  direto na sala com o deck equipado (com a confirmação do deck, se ela estiver ligada nas Configurações). Com o app
+  aberto, o convite aparece como faixa na tela inicial, com **Entrar** e **Recusar**. O convite vale enquanto a sala
+  espera (no máximo 30 min) e dá para repetir a cada 15 s.
+- O item **Amigos** mostra quantos pedidos e convites estão esperando. Código: `apps/server/src/friends/` e
+  `apps/web/src/components/Friends.tsx`.
+
 ### Modo espectador
 
 No menu, **Assistir partidas** lista as partidas online em andamento (ranqueadas primeiro), atualizada a cada 5 s.
@@ -1566,6 +1586,8 @@ O site é um PWA: dá para instalar na tela de início e ele abre em tela cheia,
     (no máximo um aviso a cada 30 s). O app conta ao servidor quando sai da tela; com ele na tela, nada é enviado.
   - **Torneios:** check-in aberto (para quem ainda não confirmou), rodada nova (com o oponente e o prazo de
     tolerância, ou o aviso de bye) e oponente esperando você na sala.
+  - **Amigos:** pedido de amizade, amizade aceita e convite para partida (veja
+    [Amigos e convite direto](#amigos-e-convite-direto)).
 
   Tocar no aviso abre o app direto na partida ou na página do torneio. Desligar cancela a inscrição deste navegador no
   servidor. No iPhone/iPad, as notificações só funcionam com o app instalado na tela de início (iOS 16.4 ou mais novo).
