@@ -97,6 +97,7 @@ Não há roteador (react-router), gerenciador de estado nem biblioteca de compon
 |---|---|
 | `esbuild ^0.24` | Empacota `apps/server/src/{index,import-cards,seed-cli}.ts` em `release/server/*.mjs` (ESM, `--platform=node --target=node22`). |
 | `vitest ^3` | Testes do motor (46 arquivos, ~440 casos, inclui simulações bot x bot) e do servidor (9 arquivos: API, auth, decks, online, spoilers, stats, torneios…). |
+| `@playwright/test 1.63.0` | Testes de ponta a ponta no navegador (`e2e/`, `npm run e2e`): Chromium e WebKit (Safari do iPhone). |
 | `concurrently`, `wait-on` | `npm run dev` sobe API e Vite; o Vite só sobe quando `/api/health` responde. |
 | GitHub Actions | `.github/workflows/ci-deploy.yml`: typecheck, testes, build, smoke test do pacote, deploy por SSH. |
 | pm2 | Mantém o processo no ar (`deploy/ecosystem.config.cjs`, modo `fork`, 1 instância, `max_memory_restart: 400M`). |
@@ -193,6 +194,8 @@ gumgumfight/
 │   ├── translations/pt.json     traduções revisadas (hoje vazio)
 │   └── card-types.json          172 tipos conhecidos (para separar "Heart Pirates Supernovas")
 ├── deploy/                      bootstrap-hostinger.sh, setup-vm.sh, remote-deploy.sh, ecosystem.config.cjs, HOSTINGER.md
+├── e2e/                         testes de ponta a ponta (Playwright): playwright.config.ts, serve.ts (servidor com banco
+│                                temporário), support/ (textos pela chave do pt-BR, fixture de erros, passos comuns), *.spec.ts
 ├── scripts/build-release.sh     monta release/
 ├── docs/rules/                  base de regras (CR v1.2.1), interações, divergências do motor, mapeamento da DSL
 └── .github/workflows/ci-deploy.yml
@@ -1753,10 +1756,18 @@ Total 5,1 MB. Roda com `node release/server/index.mjs` em qualquer máquina com 
 push/PR em qualquer branch ──▶ job "test": npm ci → typecheck → npm test → build:release → smoke test
                                            (sobe o pacote, /api/health, /api/decks, index.html, import --dry-run)
                                            → artefato gumgumfight-<sha>.tgz (7 dias)
-push na main ────────────────▶ job "deploy" (environment production,  https://gumgumfight.app)
+                           └─▶ job "e2e" (em paralelo): npm ci → playwright install chromium webkit → npm run e2e
+                                           → artefato e2e-report (relatório HTML e traces) só quando falha
+push na main ────────────────▶ job "deploy", depois de "test" e "e2e" (environment production,  https://gumgumfight.app)
 push na hmg ─────────────────▶ job "deploy" (environment homologacao, https://gumgumfight.duckdns.org)
 "Run workflow" em outro branch ▶ deploy na homologação (input import_sets opcional)
 ```
+
+Testes de ponta a ponta (`e2e/`, Playwright, plano em [`plano-testes-e2e.md`](plano-testes-e2e.md)): o `webServer` do
+`e2e/playwright.config.ts` roda `e2e/serve.ts`, que sobe o mesmo `apps/server/src/index.ts` com um banco SQLite novo em
+`e2e/.tmp/<porta>/` (`NODE_ENV=test`, `CARD_IMAGES=off`, `PUSH=off`) servindo `apps/web/dist`. Projetos `desktop`
+(Chromium) e `iphone` (iPhone 13 no WebKit, só os testes `@iphone`; sem WebKit instalado, fora do CI, cai para o
+Chromium com a emulação do iPhone). Um worker, textos pela chave do dicionário pt-BR, erro não tratado na página reprova.
 
 Deploy: `scp` do `.tgz` para `~/apps/gumgumfight/releases/<sha>`, `remote-deploy.sh`: grava `GOOGLE_CLIENT_ID`/
 `ADMIN_EMAILS` em `shared/deploy.env`, troca o symlink `current` (atomicamente, `mv -T`), `pm2 startOrReload`,

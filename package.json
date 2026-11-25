@@ -13,7 +13,8 @@
     "build": "npm run build -w @gumgum/web",
     "start": "npm run start -w @gumgum/server",
     "test": "npm run test -w @gumgum/engine && npm run test -w @gumgum/server && npm run test -w @gumgum/web",
-    "typecheck": "tsc -p packages/engine && tsc -p apps/server && tsc -p apps/web",
+    "e2e": "npm run build && playwright test -c e2e",
+    "typecheck": "tsc -p packages/engine && tsc -p apps/server && tsc -p apps/web && tsc -p e2e",
     "db:seed": "npm run db:seed -w @gumgum/server --",
     "cards:import": "npm run cards:import -w @gumgum/server --",
     "cube:build": "npm run cube:build -w @gumgum/server --",
@@ -21,6 +22,7 @@
     "oauth:client": "npm run oauth:client -w @gumgum/server --"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "^22.20.4",
     "concurrently": "^9.1.0",
     "esbuild": "^0.24.2",

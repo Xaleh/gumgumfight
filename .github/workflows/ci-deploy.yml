@@ -70,9 +70,41 @@ jobs:
           path: gumgumfight-${{ github.sha }}.tgz
           retention-days: 7
 
+  e2e:
+    name: Testes de ponta a ponta (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Chromium (desktop) e WebKit (o motor do Safari, para os testes @iphone), com as bibliotecas do sistema.
+      - name: Navegadores do Playwright
+        run: npx playwright install --with-deps chromium webkit
+
+      # Compila o web e roda e2e/ contra o servidor com um banco novo (ver e2e/playwright.config.ts).
+      - run: npm run e2e
+
+      - name: Relatório e traces (só quando falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/e2e/
+          retention-days: 7
+
   deploy:
     name: Deploy (${{ github.ref == 'refs/heads/main' && 'produção' || 'homologação' }})
-    needs: test
+    # Só publica com os testes de unidade e os de ponta a ponta passando.
+    needs: [test, e2e]
     # Push na main ou na hmg, ou "Run workflow" em qualquer branch (vai para a homologação, exceto na main).
     if: >-
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/hmg'))
