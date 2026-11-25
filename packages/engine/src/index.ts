@@ -62,6 +62,7 @@ export { translateToPt, type Translation } from './i18n/pt';
 export { translateCardPt, type CardTranslation } from './i18n/render';
 export * from './deck';
 export * from './handtest';
+export * from './suggest';
 export * from './formats';
 export * from './sealed';
 export * from './draft';

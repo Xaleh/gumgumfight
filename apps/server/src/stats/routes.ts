@@ -1,6 +1,6 @@
 // Rotas de partidas, perfil e estatísticas.
 
-import { type Action, type CardData, countsInStats, type DeckList, formatLabel, parseArts, type PlayerId, REPLAY_VERSION, validateDeck } from '@gumgum/engine';
+import { type Action, type CardData, countsInStats, type DeckList, formatLabel, type LeaderNumbers, parseArts, type PlayerId, REPLAY_VERSION, SUGGESTION_MIN_GAMES, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { seesProStats, type User } from '../auth/store';
 import { ResponseCache } from '../cache';
@@ -295,6 +295,30 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
       const f = parseFilter(req);
       const s = summarizeDecks(leaderLists(db, f));
       return { leader: f.leader, ...s, cardInfo: cardInfo([f.leader!, ...s.cards.map((c) => c.cardId)]) };
+    });
+  });
+
+  /**
+   * Números de um Líder para as sugestões do construtor (roadmap C3): partidas e vitórias do Líder,
+   * e de cada carta as partidas e vitórias com ela no deck e as cópias mais comuns, mais o Deck médio.
+   * O deck que está sendo montado não vem para cá: a comparação roda no navegador
+   * (`deckSuggestions` do motor). Mesmos filtros e mesma separação geral/Pro das Estatísticas.
+   */
+  app.get<{ Querystring: Query }>('/api/stats/suggestions', { config: { scope: 'stats:read' } }, async (req, reply) => {
+    if (!req.query.leader) return reply.code(400).send(fail('chooseLeader', 'Escolha um Líder.'));
+    return cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
+      const f = parseFilter(req);
+      const totals = summary(db, f);
+      const decks = summarizeDecks(leaderLists(db, f));
+      const usual = new Map(decks.cards.map((c) => [c.cardId, c.usual]));
+      const numbers: LeaderNumbers = {
+        leader: f.leader!,
+        games: totals.games,
+        wins: totals.wins,
+        cards: cardStats(db, f).map((c) => ({ cardId: c.cardId, games: c.games, wins: c.wins, usual: usual.get(c.cardId) ?? Math.max(1, Math.round(c.avgCopies)) })),
+        average: decks.average,
+      };
+      return { ...numbers, scope: f.queues ? 'casual' : 'all', minGames: SUGGESTION_MIN_GAMES };
     });
   });
 

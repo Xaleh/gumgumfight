@@ -22,6 +22,7 @@ import {
   type PlayMode,
   type SpoilerRule,
   type TableRules,
+  type LeaderNumbers,
 } from '@gumgum/engine';
 
 export type { FormatId, PlayFormat, PlayMode };
@@ -781,6 +782,8 @@ export const api = {
     ),
   /** Decks de um Líder: cartas no deck, deck médio e decks populares (com os filtros das estatísticas). */
   leaderDecks: (f: StatsQuery) => get<LeaderDecksResponse>(`/api/stats/decks?${statsQs(f)}`),
+  /** Números de um Líder para as sugestões do construtor (C3); a comparação com o deck roda no navegador. */
+  leaderSuggestions: (f: StatsQuery) => get<LeaderSuggestionsResponse>(`/api/stats/suggestions?${statsQs(f)}`),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
   /** Meta global (TCG Matchmaking): Líderes e matchups de uma fila (sem fila: a primeira). */
   globalStats: (queue?: string) => get<GlobalStats>(`/api/stats/global${queue ? `?queue=${encodeURIComponent(queue)}` : ''}`),
@@ -2303,6 +2306,12 @@ export interface TrendResponse {
   weeks: string[];
   rows: Array<WinCount & { week: string; leader: string }>;
   cards: Record<string, CardInfo>;
+}
+
+export interface LeaderSuggestionsResponse extends LeaderNumbers {
+  /** `casual`: estatísticas gerais (só partidas casuais); `all`: Estatísticas Pro (todas as filas). */
+  scope: 'casual' | 'all';
+  minGames: number;
 }
 
 export interface LeaderDecksResponse {

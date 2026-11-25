@@ -149,6 +149,16 @@ describe('API de estatísticas', () => {
     expect((await app.inject({ url: '/api/stats/decks?leader=ST02-001', headers: ALICE })).json()).toMatchObject({ games: 0, lists: 0, cards: [], popular: [] });
     expect((await app.inject('/api/stats/decks')).statusCode).toBe(400);
 
+    // Sugestões do construtor (C3): os números do Líder, sem o deck de quem pede.
+    const sug = (await app.inject({ url: '/api/stats/suggestions?leader=ST01-001', headers: ALICE })).json();
+    expect(sug).toMatchObject({ leader: 'ST01-001', games: 1, wins: r.winner === 0 ? 1 : 0, scope: 'casual', minGames: 20 });
+    expect(sug.cards).toHaveLength(new Set(decks[0].cards.map((c) => c.id)).size);
+    expect(sug.cards[0]).toEqual({ cardId: expect.any(String), games: 1, wins: expect.any(Number), usual: expect.any(Number) });
+    expect(sug.average).toEqual(deckRes.average);
+    expect((await app.inject('/api/stats/suggestions')).statusCode).toBe(400);
+    expect((await app.inject({ url: '/api/stats/suggestions?leader=ST01-001&format=standard', headers: ALICE })).json()).toMatchObject({ games: 0, cards: [] });
+    expect((await app.inject({ url: '/api/stats/suggestions?leader=ST01-001', headers: proViewer(db) })).json()).toMatchObject({ games: 1, scope: 'all' });
+
     const trend = (await app.inject('/api/stats/trend?weeks=4')).json();
     expect(trend.weeks).toHaveLength(4);
     expect(new Date(`${trend.weeks[3]}T00:00:00Z`).getUTCDay()).toBe(1);

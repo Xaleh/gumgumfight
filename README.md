@@ -203,6 +203,19 @@ Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construto
    - a soma de **Counter na mão inicial** (chance de ter ≥ 1000, 2000, 3000 e 4000, e a média).
    Com **Mulligan quando a mão inicial não tem a carta** marcado, a conta supõe que você troca a mão quando ela não tem o
    Personagem ou a carta-chave. Tudo roda no navegador: nada vai para o servidor.
+5. **Sugestões** (o quinto modo, com 💡) compara o deck com as estatísticas do Líder no formato escolhido (Standard ou
+   EGB; começa no formato em que o deck vale), as mesmas da tela de Estatísticas (partidas casuais, ou todas as filas
+   com as Estatísticas Pro):
+   - **Os decks deste Líder usam e você não:** cartas em pelo menos metade das partidas do Líder, com a fração, as
+     partidas e as cópias mais comuns;
+   - **No seu deck, com lift negativo** e **Ganham mais e você não usa:** cartas com lift (vitórias com a carta no deck
+     menos as do Líder em geral) de pelo menos 5 pontos para baixo ou para cima;
+   - **Cópias diferentes do Deck médio**, e quantas cartas do Deck médio o deck já tem.
+   Cada sugestão mostra o número de partidas por trás e tem o botão **+** ou **−** para mexer no deck. As que têm menos
+   de 20 partidas, ou um lift dentro da margem da própria amostra (um erro padrão), ficam escondidas, e o painel diz
+   quantas foram escondidas. Com menos de 20 partidas do Líder no formato, nenhuma sugestão aparece. O servidor só
+   entrega os números do Líder (`GET /api/stats/suggestions?leader=`); a comparação roda no navegador
+   (`packages/engine/src/suggest.ts`), e o deck não sai dele.
 
 Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por número e toda carta com ao menos uma
 cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.
@@ -1689,6 +1702,7 @@ pode chamar sem login nem token:
 | GET | `/api/decks` · `/api/decks/:id` | Decks prontos e da comunidade, com validação por formato; `mine=1` filtra os seus (navegador ou conta) |
 | GET | `/api/stats/meta` · `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=` | Estatísticas gerais: filtros, totais, Líderes, matchups, tendência semanal e cartas de um Líder |
 | GET | `/api/stats/decks?leader=` | Decks de um Líder (mesmos filtros de `/api/stats`): cartas no deck, deck médio e decks populares |
+| GET | `/api/stats/suggestions?leader=` | Números de um Líder para as sugestões do construtor (mesmos filtros de `/api/stats`): partidas e vitórias do Líder, de cada carta e o Deck médio |
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups de uma fila, tendência e a comparação com as partidas daqui (404 sem a chave) |
 | GET | `/api/online/stats` · `/api/online/live` · `/api/online/rooms/:id` | Contadores do menu, partidas para assistir e o resumo de uma sala |
 | GET · POST | `/api/yonko/active` · `/api/yonko/tables` · `/api/yonko/tables/join` · `/api/yonko/tables/:id/…` | Mesas online do Yonko: as suas (com o token), criar, entrar pelo código, o canal `events` (SSE) e os pedidos da mesa (`deck`, `ready`, `rules`, `bot`, `clear`, `start`, `action`, `reopen`, `leave`), todos com o token do lugar |

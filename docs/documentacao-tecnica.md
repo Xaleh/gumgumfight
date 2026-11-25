@@ -122,6 +122,7 @@ gumgumfight/
 │   ├── src/clip.ts              trecho do replay em vídeo/GIF: clipFrames (quadros só com o público), highlightedCard
 │   ├── src/deck.ts              validateDeck, parse/format de listas
 │   ├── src/handtest.ts          mão de teste do construtor: sorteio, mulligan e chances exatas (hipergeométrica)
+│   ├── src/suggest.ts           sugestões de cartas do construtor: compara o deck com os números do Líder (lift, Deck médio)
 │   ├── src/formats.ts           Standard / Extra Grand Battle / All Blue, banidas, rotação
 │   ├── src/errata.ts, source-fixes.ts   correções de dados (errata oficial / erros da optcgapi)
 │   ├── src/cards/parser.ts      texto da carta → habilidades (DSL) (3.180 linhas)
@@ -2080,6 +2081,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=\|deck=` | Totais, Líderes e matchups; tendência semanal; cartas de um Líder. Ranqueada e torneios só com o plano (salvo `mine=1`) | Pública; Token (`stats:read`) |
 | GET | `/api/stats/teaser?format=` | Amostra das Estatísticas Pro para quem não tem o plano | Pública |
 | GET | `/api/stats/decks?leader=` | Decks de um Líder com os filtros de `/api/stats` (`stats/decks.ts`): cartas no deck (partidas com a carta e com 1..4 cópias), deck médio (até 50 cartas) e os 5 decks populares; cada lista pesa pelas partidas | Pública; Token (`stats:read`) |
+| GET | `/api/stats/suggestions?leader=` | Números de um Líder para as sugestões do construtor (roadmap C3), com os filtros de `/api/stats`: partidas e vitórias do Líder; de cada carta, partidas e vitórias com ela no deck e as cópias mais comuns; o Deck médio; `scope` (`casual` ou `all`) e `minGames`. O deck do construtor não é enviado: a comparação roda no navegador (`deckSuggestions` do motor) | Pública; Token (`stats:read`) |
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups da fila (no formato de `/api/stats`, com `secondGames`/`secondWins`), tendência semanal dos resumos diários e a comparação com as partidas daqui (o que quem pede vê). 404 `globalOff` sem a chave | Pública; Token (`stats:read`) |
 | POST | `/api/admin/stats/global/sync` | Força uma rodada do sync do meta global | Admin |
 | GET | `/api/online/config` · `/api/online/stats` · `/api/online/leaders?format=` | Configuração do online, contadores do menu e Líderes na fila casual | Pública |
