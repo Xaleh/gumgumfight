@@ -2,7 +2,7 @@
 // (decks prontos e semente) é jogado duas vezes, com os assentos trocados. O deck provável de cada lado é o deck pronto
 // do Líder adversário (nos decks prontos, a lista que todo mundo joga com aquele Líder: o "meta" desse universo).
 //
-//   npx tsx scripts/duel-handguess.ts <semente> <partidas> [nível]
+//   npx tsx scripts/duel-handguess.ts <semente> <partidas> [nível] ['<pesos do lado com a estimativa (json parcial)>']
 //   saída: "<vitórias com a estimativa> <vitórias sem>"
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -11,6 +11,7 @@ import {
   actingPlayer,
   actionFromView,
   applyAction,
+  BOT_WEIGHTS,
   type BotLevel,
   type CardData,
   chooseBotAction,
@@ -32,7 +33,8 @@ const cards: CardData[] = readdirSync(join(DATA, 'cards'))
 const byId = new Map(cards.map((c) => [c.id, c]));
 const DECKS = readdirSync(join(DATA, 'decks')).filter((f) => f.endsWith('.json'));
 
-const [seedArg, gamesArg, levelArg] = process.argv.slice(2);
+const [seedArg, gamesArg, levelArg, wa] = process.argv.slice(2);
+const weightsA = { ...BOT_WEIGHTS, ...JSON.parse(wa ?? '{}') };
 const level = (levelArg ?? 'hard') as BotLevel;
 let rng = Number(seedArg) >>> 0;
 const rand = () => {
@@ -62,7 +64,7 @@ for (let g = 0; g < Number(gamesArg); g += 2) {
       for (let i = 0; i < 3000 && s.phase !== 'gameover'; i++) {
         const p = actingPlayer(s)!;
         // Sem teto de tempo: o resultado não depende da carga da máquina. O lado A conhece o deck provável do oponente.
-        const over = { timeBudgetMs: 1e9, ...(p === seatA ? { handGuess: guesses[1 - p] } : {}) };
+        const over = { timeBudgetMs: 1e9, ...(p === seatA ? { handGuess: guesses[1 - p], weights: weightsA } : {}) };
         const action = actionFromView(s, aliases, chooseBotAction(viewFor(s, p, aliases), p, level, over));
         if (typeof action === 'string') throw new Error(action);
         s = applyAction(s, action);
