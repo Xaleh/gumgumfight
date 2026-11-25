@@ -1,0 +1,47 @@
+// Textes de l’analyse de la partie (français).
+
+import type analysisPtBR from './pt-BR';
+
+const analysis: Record<keyof typeof analysisPtBR, string> = {
+  'analysis.run': 'Analyser la partie',
+  'analysis.runTitle': 'Le bot revoit chaque décision avec ce que le joueur savait à ce moment-là et marque les coups qui ont perdu de la valeur.',
+  'analysis.running': 'Analyse… {done}/{total}',
+  'analysis.preparing': 'Préparation de l’analyse…',
+  'analysis.cancel': 'Annuler',
+  'analysis.retry': 'Réessayer',
+  'analysis.notFinished': 'Seul un replay terminé peut être analysé.',
+  'analysis.invalid': 'Analyse impossible : le jeu actuel refuse une action de ce replay.',
+  'analysis.failed': 'L’analyse a échoué : {message}',
+  'analysis.summary': 'Analyse',
+  'analysis.accuracy': 'Précision {n} %',
+  'analysis.noDecisions': 'aucune décision',
+  'analysis.blunders': '{n|# gaffe|# gaffes}',
+  'analysis.mistakes': '{n|# erreur|# erreurs}',
+  'analysis.inaccuracies': '{n|# imprécision|# imprécisions}',
+  'analysis.lethals': '{n|# létal manqué|# létaux manqués}',
+  'analysis.clean': 'Aucun coup marqué.',
+  'analysis.knowledge': 'L’analyse n’utilise que ce que chaque joueur voyait à ce moment-là : la main et le deck de l’adversaire restent cachés.',
+  'analysis.marksLabel': 'Marqueurs de l’analyse',
+  'analysis.markAt': 'Tour {turn} · {name} : {severity}',
+  'analysis.prev': 'Marqueur précédent',
+  'analysis.next': 'Marqueur suivant',
+  'analysis.severity.inaccuracy': 'Imprécision',
+  'analysis.severity.mistake': 'Erreur',
+  'analysis.severity.blunder': 'Gaffe',
+  'analysis.tag.lethal': 'Il y avait un létal ici.',
+  'analysis.tag.wastedCounter': 'Counter gaspillé : l’attaque pouvait passer.',
+  'analysis.tag.missedCounter': 'Il fallait un Counter.',
+  'analysis.tag.badBlock': 'Le blocage n’en valait pas la peine.',
+  'analysis.tag.missedBlock': 'Il fallait bloquer.',
+  'analysis.tag.attackLeader': 'Attaquer le Leader valait mieux que le Personnage.',
+  'analysis.tag.attackCharacter': 'Attaquer {target} valait mieux.',
+  'analysis.tag.endedEarly': 'Tour terminé alors qu’il restait un meilleur coup.',
+  'analysis.tag.trigger': 'Le choix de la carte de Vie a perdu de la valeur.',
+  'analysis.tag.better': 'Il y avait un meilleur coup.',
+  'analysis.played': 'Joué',
+  'analysis.suggested': 'Suggestion',
+  'analysis.loss': '−{n}',
+  'analysis.lossTitle': 'Valeur perdue dans l’évaluation du bot (1 000 ≈ +1000 de puissance en attaque)',
+};
+
+export default analysis;

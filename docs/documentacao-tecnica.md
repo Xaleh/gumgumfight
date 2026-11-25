@@ -128,6 +128,7 @@ gumgumfight/
 │   ├── src/bot/simple.ts        bot heurístico (nível fácil)
 │   ├── src/bot/evaluate.ts      função de avaliação do bot com busca
 │   ├── src/bot/planner.ts       bot com busca (níveis normal e difícil)
+│   ├── src/bot/analysis.ts      análise da partida: cada decisão do replay contra a melhor jogada do bot
 │   ├── scripts/simulate*.ts     simulações bot x bot na linha de comando
 │   └── test/                    46 arquivos de teste + fixtures
 ├── apps/server/                 API Fastify
@@ -167,6 +168,7 @@ gumgumfight/
 │   ├── src/game/useMatchAudio.ts   sons derivados das mudanças de estado da partida
 │   ├── src/game/useGame.ts      partida local (motor + bot no navegador, undo, replay)
 │   ├── src/game/botWorker.ts    Web Worker do bot (botClient.ts pede a jogada; botMove.ts é a conta, também usada sem worker)
+│   ├── src/game/analysisWorker.ts  Web Worker da análise da partida (useReplayAnalysis.ts pede; analysis.ts é a conta)
 │   ├── src/game/preloadImages.ts   baixa antes, com o navegador ocioso, as imagens das cartas já visíveis
 │   ├── src/hooks/useBoardSize.ts   mede a coluna da mesa (--bw/--bh, data-landscape/data-narrow) no lugar da container query
 │   ├── src/game/useOnlineGame.ts   canal SSE, reconexão, fila de ações
@@ -439,6 +441,17 @@ termos de `evaluateTerms` que mais mudaram e as alternativas), que o servidor ma
 `coach`) e o navegador guarda (`useGame.coach`). `GameState.knownHand` lembra as cartas da mão reveladas ao oponente
 enquanto ficam lá (a visão as mostra; cada ação tira as que saíram).
 
+**Análise da partida** (`bot/analysis.ts`, roadmap B1, [`docs/plano-analise-partida.md`](plano-analise-partida.md)):
+`analyzeReplay(initial, actions)` refaz um replay **terminado** (senão `AnalysisError('notFinished')`) e, em cada decisão
+com escolha de verdade (`isDecision`), chama `reviewDecision`, que monta a visão de quem decide (`viewFor` com
+`identityAliases`) e pede ao planejador `scoreDecision`: na fase principal, a melhor linha da busca do turno (`searchTurn`,
+a mesma do `planTurn`) contra a melhor continuação depois da jogada feita; numa escolha pendente, cada resposta simulada
+como em `decidePending` (média de sorteios nas perguntas pagas e nas opções). A perda (`melhor − feita`) vira gravidade
+(`ANALYSIS_LIMITS`), precisão (`accuracyOf`) e, nos marcadores, um tipo (`AnalysisTag`); `summarizeAnalysis` faz o resumo
+por jogador. O sorteio usa um gerador fixo por decisão. No navegador, a `ReplayBar` pede a análise
+(`useReplayAnalysis`), que roda no Web Worker `game/analysisWorker.ts` (sem worker, `runAnalysisInPage`, uma decisão por
+tarefa) e mostra os marcadores na barra de busca e o cartão da decisão (`ReplayAnalysis.tsx`). Nada é gravado (fase 1).
+
 Os conceitos de tempo que a avaliação representa e os testes de posição que os cobrem estão em
 [`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`; contra um
 "humano fraco" que defende como gente (`scripts/human.ts`): `npx tsx packages/engine/scripts/vs-human.ts 200 hard`.
@@ -601,7 +614,8 @@ responde 503 (transmissão lotada), o menu começa o treino no navegador e a mes
 **Assistir replay** (`ReplayLoader.tsx` + modo `replay` do `useGame`): o `.json` vira um `GameSetup` com o roteiro já
 convertido; com `decks` no arquivo (online e, desde o card 73, também os baixados no navegador) os decks não precisam
 existir. O `useGame` usa um `ReplayCursor`; a `ReplayBar` (abaixo da mesa) avança, volta e pula. Pulos e a velocidade 8×
-mudam a mesa sem animação. Nada é gravado em `matches`.
+mudam a mesa sem animação. Nada é gravado em `matches`. A `ReplayBar` também pede a **análise da partida** (seção 4,
+"Bot"): os marcadores ficam sobre a barra de busca e o cartão do marcador aparece quando a mesa está na decisão.
 
 **Clique/seleção no replay** (`game/replayCue.ts` + `ReplayCue.tsx`): antes de cada ação do roteiro ser aplicada, a mesa
 mostra o que o jogador tocou, para quem assiste ou audita ver a decisão e não só o resultado. O replay não grava cliques à

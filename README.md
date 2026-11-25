@@ -2,7 +2,7 @@
 
 Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](https://duels.ink/) (Lorcana).
 
-> **Status:** partidas contra um bot, replays, **multiplayer online** (salas privadas, fila casual e
+> **Status:** partidas contra um bot, replays com **análise da partida**, **multiplayer online** (salas privadas, fila casual e
 > ranqueada) e **torneios** (suíço com top cut e eliminação simples, com melhor de 3 e de 5). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
 > com textos em português (tradução automática) ou inglês e imagens opcionais. Interface em **seis idiomas**
 > (🇧🇷 português do Brasil, 🇬🇧 inglês, 🇪🇸 espanhol, 🇯🇵 japonês, 🇫🇷 francês e 🇩🇪 alemão), escolhidos pela bandeira.
@@ -713,6 +713,31 @@ Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas
 - A tela **Cobertura das cartas** (o endpoint `GET /api/coverage` continua público).
 - **Opções de teste** no menu (seed do embaralhamento). Baixar e assistir a um replay é para todos (um jogador pode
   mandar o replay a um Dev ao relatar um problema).
+
+## Análise da partida
+
+Revisão depois do jogo, como a do chess.com. Em qualquer **replay terminado**, o botão **Analisar a partida** (na barra do
+replay) faz o bot rever cada decisão de cada jogador que tinha escolha de verdade e comparar a jogada feita com a melhor
+jogada que ele acha:
+
+- **Só o que o jogador sabia**: cada decisão é avaliada sobre a visão de quem decidiu (`viewFor`), a mesma com que o bot
+  joga. A mão e o deck do oponente ficam escondidos; do próprio deck, só a composição. Por isso a análise só roda em
+  replay terminado: numa partida em andamento, a jogada sugerida contaria o que há na mão de quem joga.
+- **Marcadores na linha do tempo**: a jogada que perdeu valor na avaliação do bot vira um marcador colorido na barra
+  de busca, com a gravidade (**?!** imprecisão a partir de −1.500, **?** erro a partir de −4.000, **??** erro grave a
+  partir de −10.000; 1.000 ≈ +1000 de poder num ataque). Um toque leva a mesa à decisão e abre o cartão com o tipo
+  ("aqui havia letal", "Counter desperdiçado", "faltou bloquear", "atacar o Líder era melhor que o Personagem",
+  "encerrou o turno com jogada melhor por fazer"…), o que foi jogado e a **jogada sugerida** (a linha do turno).
+  ‹ e › pulam entre os marcadores.
+- **Resumo**: a precisão de cada jogador (média das decisões; a melhor jogada vale 100%) e a contagem de erros graves,
+  erros, imprecisões e letais perdidos, com a lista dos marcadores.
+- A conta (uma ou duas buscas do bot por decisão) roda num Web Worker, com o progresso na barra e os marcadores
+  aparecendo enquanto ela anda; dá para cancelar. Leva de alguns segundos a cerca de um minuto, conforme o tamanho da
+  partida e o aparelho. Como a busca do bot tem um teto de tempo, aparelhos diferentes podem dar números um pouco
+  diferentes.
+
+Fases seguintes (análise guardada no servidor, precisão em "Minhas partidas", prévia da jogada sugerida na mesa):
+[`docs/plano-analise-partida.md`](docs/plano-analise-partida.md).
 
 ## Bot do Time
 
