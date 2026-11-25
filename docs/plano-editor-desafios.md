@@ -11,7 +11,7 @@ navegador de quem joga; a mesa de quem joga continua sendo só a visão dele (`v
 
 ## Fases
 
-### Fase 1 — Desafios no banco e o editor de mesa
+### Fase 1 — Desafios no banco e o editor de mesa ✅
 
 - Tabela `daily_challenges`: o desafio (`spec`, o `ChallengeSpec` com as listas dos dois decks congeladas no momento
   de salvar), a solução e a linha errada gravadas como ações, o nível, uma nota interna, quem criou e quando.

@@ -51,7 +51,7 @@ const daily = {
   'daily.admin.queuePos': "Queue position",
   'daily.admin.fromCatalog': "catalog",
   'daily.admin.fromAdmin': "built here",
-  'daily.admin.days': "{n|published on {days}|published # times (latest: {days})}",
+  'daily.admin.days': "published {n|once|# times} ({days})",
   'daily.admin.notYet': "not published yet",
   'daily.admin.remove': "Remove",
   'daily.admin.chooseDeck': "Choose a deck",

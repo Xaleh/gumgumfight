@@ -51,7 +51,7 @@ const dailyPtBR = {
   'daily.admin.queuePos': "Posição na fila",
   'daily.admin.fromCatalog': "catálogo",
   'daily.admin.fromAdmin': "montado aqui",
-  'daily.admin.days': "{n|saiu em {days}|saiu # vezes (últimas: {days})}",
+  'daily.admin.days': "saiu {n|# vez|# vezes} ({days})",
   'daily.admin.notYet': "ainda não saiu",
   'daily.admin.remove': "Remover",
   'daily.admin.chooseDeck': "Escolha um deck",

@@ -51,7 +51,7 @@ const daily = {
   'daily.admin.queuePos': "Posición en la cola",
   'daily.admin.fromCatalog': "catálogo",
   'daily.admin.fromAdmin': "armado aquí",
-  'daily.admin.days': "{n|salió el {days}|salió # veces (últimas: {days})}",
+  'daily.admin.days': "salió {n|# vez|# veces} ({days})",
   'daily.admin.notYet': "aún no salió",
   'daily.admin.remove': "Quitar",
   'daily.admin.chooseDeck': "Elige un mazo",

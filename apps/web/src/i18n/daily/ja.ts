@@ -51,7 +51,7 @@ const daily = {
   'daily.admin.queuePos': "キューの順番",
   'daily.admin.fromCatalog': "カタログ",
   'daily.admin.fromAdmin': "ここで作成",
-  'daily.admin.days': "{n|公開日 {days}|#回公開（最近：{days}）}",
+  'daily.admin.days': "公開{n|#回}（{days}）",
   'daily.admin.notYet': "未公開",
   'daily.admin.remove': "削除",
   'daily.admin.chooseDeck': "デッキを選択",

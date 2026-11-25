@@ -1201,10 +1201,21 @@ conta, e depois de resolver o resultado do dia não muda (dá para jogar de novo
 seguidos**, o recorde e os últimos dias. **Compartilhar** gera um texto com o número do desafio, as tentativas, a
 sequência e os quadradinhos dos últimos dias (✅/⬛), sem nada das jogadas.
 
-Os desafios ficam em `apps/server/src/daily/catalog.ts`, na ordem da fila: cada dia publicado recebe o próximo ainda
-não usado e, depois de usar todos, recomeça pelo publicado há mais tempo. Para incluir um, acrescente no fim da lista o
-cenário (`ScenarioSpec`, como nas lições), o objetivo, a solução e uma linha errada; o teste `daily.test.ts` joga as
-duas contra o servidor. A Administração vê a fila em `GET /api/admin/daily`.
+A fila é o catálogo em código (`apps/server/src/daily/catalog.ts`, a semente) seguido dos desafios montados na
+Administração. Cada dia publicado recebe o próximo ainda não usado e, depois de usar todos, recomeça pelo publicado há
+mais tempo.
+
+**Montar um desafio (Administração › Desafio do dia › Novo desafio):** escolha o objetivo, a dificuldade, o turno e o
+deck de cada lado (qualquer deck do servidor: do meta, pronto ou seu, então dá para usar as coleções atuais) e ponha as
+cartas área por área: mão, Personagens (virados, com DON!! ou jogados neste turno), Stage, Líder, Vida (quantidade ou
+cartas exatas), topo do deck, descarte e DON!! ativos e virados. No "sobreviva", monte também o roteiro de ataques do
+oponente. Depois, **Ir para a mesa e gravar**: jogue a solução na mesa de verdade, com o oponente respondendo pelas
+regras do desafio, e marque a tentativa como solução (e, se quiser, uma que falha como linha errada). Ao salvar, o
+servidor monta a mesa de novo com as cartas dele, confere que a solução resolve e que a linha errada falha, e só então
+põe o desafio na fila. As listas dos decks ficam congeladas no desafio (editar o deck depois não muda nada). Carta com
+efeito ⚙ na mesa pede uma confirmação, porque o efeito não roda sozinho. Um desafio que ainda não saiu pode ser apagado.
+O catálogo em código continua aceitando desafios novos com a solução escrita (o teste `daily.test.ts` joga a solução e
+a linha errada contra o servidor), mas só com cartas que existem no repositório.
 
 ## Como jogar
 

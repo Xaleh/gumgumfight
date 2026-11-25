@@ -51,7 +51,7 @@ const daily = {
   'daily.admin.queuePos': "Position dans la file",
   'daily.admin.fromCatalog': "catalogue",
   'daily.admin.fromAdmin': "monté ici",
-  'daily.admin.days': "{n|publié le {days}|publié # fois (derniers : {days})}",
+  'daily.admin.days': "publié {n|# fois|# fois} ({days})",
   'daily.admin.notYet': "pas encore publié",
   'daily.admin.remove': "Retirer",
   'daily.admin.chooseDeck': "Choisissez un deck",
