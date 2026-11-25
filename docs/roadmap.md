@@ -49,7 +49,9 @@ em várias branches ao mesmo tempo.
   *Pronto quando:* existe `npm run e2e`, os fluxos acima passam e o workflow **CI e deploy** roda os testes.
   *Plano:* [`plano-testes-e2e.md`](plano-testes-e2e.md) (3 fases).
   *Progresso:* fase 1 de 3 (`npm run e2e`, job no CI com Chromium e WebKit, partida contra o bot até o fim e abrir
-  boosters, também no iPhone) em 2026-11-25, [PR #236](https://github.com/Xaleh/gumgumfight/pull/236).
+  boosters, também no iPhone) em 2026-11-25, [PR #236](https://github.com/Xaleh/gumgumfight/pull/236); fase 2 de 3
+  (fila online com dois navegadores: casual com a mão do oponente escondida, troca de turno, recarregar e voltar à sala e
+  desistência; ranqueada com contas de teste e bounty) em 2026-11-25, [PR #237](https://github.com/Xaleh/gumgumfight/pull/237).
   *Feito em:* —
 
 - [x] **A2. Monitoramento em produção**
