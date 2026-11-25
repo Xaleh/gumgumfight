@@ -153,6 +153,10 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   as cartas prováveis (o Counter que deve estar lá, a carta-chave do Líder) e usar isso no planejamento.
   *Pronto quando:* o bot usa a estimativa nas decisões de ataque e defesa, sem ler a mão real, e os testes mostram
   ganho contra a versão anterior.
+  *Progresso:* 25/11/2026 · [PR #234](https://github.com/Xaleh/gumgumfight/pull/234): a estimativa existe e está em uso
+  no ataque (Counter pelo deck provável do Líder) e na defesa ([Rush] provável na ameaça), com testes de posição. Falta
+  o ganho medido: no auto-jogo e contra o humano fraco ficou dentro do ruído (51,5% e 78,5% x 77,5%;
+  [`bot-tempo.md`, seção 13](bot-tempo.md)). Próximo passo: medir nos decks do meta e nas partidas de gente.
   *Feito em:* —
 
 - [ ] **D3. Bots com personalidade**
