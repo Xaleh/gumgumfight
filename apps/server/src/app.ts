@@ -55,6 +55,7 @@ import { registerFriendRoutes } from './friends/routes';
 import { type PushSender, registerPushRoutes } from './push/routes';
 import { vapidKeys } from './push/store';
 import { deckHash } from './stats/derive';
+import { deckVersions } from './decks/versions';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
 import { registerProfileRoutes } from './profiles/routes';
@@ -306,6 +307,17 @@ export function buildApp(
     const cards = present(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]));
     const summary = summarize(deck, new Map(cards.map((c) => [c.id, c])), viewer);
     return { deck: { ...publicDeck(deck), mine: summary.mine }, cards, summary };
+  });
+
+  /**
+   * Versões do deck (o que entrou e saiu de uma lista para a outra) com as partidas e a taxa de vitória de cada
+   * uma. Mesma regra de leitura do deck: com token, só os próprios e os prontos.
+   */
+  app.get<{ Params: { id: string } }>('/api/decks/:id/versions', { config: { scope: 'decks:read' } }, async (req, reply) => {
+    const deck = getDeck(db, req.params.id);
+    if (!deck) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
+    if (req.apiAuth && deck.kind === 'user' && !isMine(deck, viewerHash(req))) return reply.code(403).send(fail('deckNotMine', 'Este deck pertence a outro jogador.'));
+    return deckVersions(db, deck);
   });
 
   type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown; arts?: unknown; expectedUpdatedAt?: unknown; checkDuplicate?: unknown };

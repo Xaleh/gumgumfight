@@ -600,40 +600,6 @@ com a visão exata do bot na jogada) viram testes de posição; o extrator mede 
 (`--leader`); o `decisions:tune --profile <deck>` ajusta os `weights` do perfil por imitação; e o agente
 (`npm run bot:agent`) escreve o rascunho do perfil a partir do guia e aponta, numa partida, onde o bot fugiu do plano.
 
-## Como medir
-
-```bash
-npm run compare-bots -w @gumgum/engine -- 100 hard easy          # taxa de vitória e tempo por decisão
-npm run compare-bots -w @gumgum/engine -- 100 hard normal st03-crocodile st04-kaido
-npx vitest run test/bot-positions.test.ts -w @gumgum/engine        # testes de posição deste documento
-
-# Comparar dois conjuntos de pesos (json parcial sobre DEFAULT_WEIGHTS), assentos trocados:
-npx tsx packages/engine/scripts/duel.ts 1 200 hard '{"exposed":800}' '{}'
-# Otimizar os pesos (retoma de onde parou; confira o resultado no hard com o duel antes de adotar):
-npm run tune-weights -w @gumgum/engine -- tune.jsonl 150 96 normal
-# Ver uma partida jogada a jogada (DBG=<turno> mostra a linha escolhida em cada decisão):
-npx tsx packages/engine/scripts/trace-game.ts 3 hard hard st10-law st09-yamato
-# Contra o "humano fraco" (seção 10): taxa de vitória do bot, e uma partida jogada a jogada
-npx tsx packages/engine/scripts/vs-human.ts 200 hard
-HUMAN=careful npx tsx packages/engine/scripts/vs-human.ts 200 hard
-npx tsx packages/engine/scripts/trace-human.ts 5 hard st02-kid st01-luffy
-```
-
-Medições de referência (ST01 x ST02, 100 partidas, assento e quem começa alternados):
-
-| Confronto | Vitórias do primeiro | Antes desta rodada | Tempo por decisão do primeiro (p50 / p95) |
-|---|---|---|---|
-| hard x easy | 96% | 88% | 0,3 ms / 126 ms |
-| normal x easy | 94% | 80% | 1,2 ms / 31 ms |
-| hard x normal | 58% | 70% | 0,3 ms / 108 ms |
-
-O `normal` foi quem mais ganhou com os pesos novos (a otimização joga nesse nível); a busca do turno
-inteiro ainda dá ao `hard` a vantagem sobre ele, menor que antes. Contra o `hard` anterior, em 10 decks
-prontos: **60%** (400 partidas).
-
-O p50 baixo do `hard` vem do plano guardado: a busca roda uma vez por turno e as decisões seguintes
-saem do plano enquanto a partida segue o previsto.
-
 ## 13. A mão provável do oponente
 
 O bot sabia só o tamanho da mão do oponente: todo deck tinha 72% de cartas com Counter, o Rocks.D.Xebec (quase sem
@@ -695,3 +661,40 @@ A parte do Counter sozinha, com a vantagem de 1,45, deixava o bot cauteloso dema
 modelo mais otimista para o atacante ganha no auto-jogo. A estimativa fica pelo raciocínio e pelos testes de posição;
 o próximo passo é medir onde ela pesa de verdade: nos decks do meta (Rocks.D.Xebec, quase sem Counter) e nas partidas
 de gente (o extrator da seção 11 com `--leader`).
+
+## Como medir
+
+```bash
+npm run compare-bots -w @gumgum/engine -- 100 hard easy          # taxa de vitória e tempo por decisão
+npm run compare-bots -w @gumgum/engine -- 100 hard normal st03-crocodile st04-kaido
+npx vitest run test/bot-positions.test.ts -w @gumgum/engine        # testes de posição deste documento
+
+# Comparar dois conjuntos de pesos (json parcial sobre DEFAULT_WEIGHTS), assentos trocados:
+npx tsx packages/engine/scripts/duel.ts 1 200 hard '{"exposed":800}' '{}'
+# Otimizar os pesos (retoma de onde parou; confira o resultado no hard com o duel antes de adotar):
+npm run tune-weights -w @gumgum/engine -- tune.jsonl 150 96 normal
+# Ver uma partida jogada a jogada (DBG=<turno> mostra a linha escolhida em cada decisão):
+npx tsx packages/engine/scripts/trace-game.ts 3 hard hard st10-law st09-yamato
+# Contra o "humano fraco" (seção 10): taxa de vitória do bot, e uma partida jogada a jogada
+npx tsx packages/engine/scripts/vs-human.ts 200 hard
+HUMAN=careful npx tsx packages/engine/scripts/vs-human.ts 200 hard
+# Mão provável do oponente (seção 13): com x sem a estimativa, e contra o humano fraco com ela
+npx tsx packages/engine/scripts/duel-handguess.ts 1 200 hard
+GUESS=1 npx tsx packages/engine/scripts/vs-human.ts 200 hard
+npx tsx packages/engine/scripts/trace-human.ts 5 hard st02-kid st01-luffy
+```
+
+Medições de referência (ST01 x ST02, 100 partidas, assento e quem começa alternados):
+
+| Confronto | Vitórias do primeiro | Antes desta rodada | Tempo por decisão do primeiro (p50 / p95) |
+|---|---|---|---|
+| hard x easy | 96% | 88% | 0,3 ms / 126 ms |
+| normal x easy | 94% | 80% | 1,2 ms / 31 ms |
+| hard x normal | 58% | 70% | 0,3 ms / 108 ms |
+
+O `normal` foi quem mais ganhou com os pesos novos (a otimização joga nesse nível); a busca do turno
+inteiro ainda dá ao `hard` a vantagem sobre ele, menor que antes. Contra o `hard` anterior, em 10 decks
+prontos: **60%** (400 partidas).
+
+O p50 baixo do `hard` vem do plano guardado: a busca roda uma vez por turno e as decisões seguintes
+saem do plano enquanto a partida segue o previsto.

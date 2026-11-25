@@ -6,6 +6,7 @@ import {
   actionFromView,
   type BotExplanation,
   type BotLevel,
+  type BotPersonality,
   chooseBotAction,
   chooseSimpleBotAction,
   type DeckGuess,
@@ -20,6 +21,8 @@ export interface BotRequest {
   state: GameState;
   player: PlayerId;
   level: BotLevel;
+  /** Estilo do bot (agressivo, controle, conservador); o Bot do Time ignora. */
+  personality?: BotPersonality;
   /** Bot do Time: o perfil do deck que o bot joga (pesos, papéis das cartas, mulligan). */
   profile?: DeckProfile;
   /** Bot do Time: devolve as explicações da jogada (painel do treinador). */
@@ -39,7 +42,7 @@ export interface BotMove {
  * Se a tradução de volta falhar (não deveria), o bot heurístico decide pelo estado completo para a
  * partida não travar.
  */
-export function computeBotMove({ state, player, level, profile, explain, handGuess }: BotRequest): BotMove {
+export function computeBotMove({ state, player, level, personality, profile, explain, handGuess }: BotRequest): BotMove {
   const aliases = identityAliases(state);
   const toReal = (a: Action): Action => {
     const r = actionFromView(state, aliases, a);
@@ -47,19 +50,17 @@ export function computeBotMove({ state, player, level, profile, explain, handGue
   };
   const explanations: BotExplanation[] = [];
   const team = level === 'team';
-  const over =
-    (team && (profile || explain)) || (handGuess && level !== 'easy')
+  const over = {
+    ...(team && profile ? { profile } : {}),
+    ...(!team && personality ? { personality } : {}),
+    ...(handGuess && level !== 'easy' ? { handGuess } : {}),
+    ...(team && explain
       ? {
-          ...(team && profile ? { profile } : {}),
-          ...(handGuess ? { handGuess } : {}),
-          ...(team && explain
-            ? {
-                explain: (e: BotExplanation) =>
-                  explanations.push({ ...e, actions: e.actions.map(toReal), alternatives: e.alternatives.map((alt) => ({ ...alt, actions: alt.actions.map(toReal) })) }),
-              }
-            : {}),
+          explain: (e: BotExplanation) =>
+            explanations.push({ ...e, actions: e.actions.map(toReal), alternatives: e.alternatives.map((alt) => ({ ...alt, actions: alt.actions.map(toReal) })) }),
         }
-      : undefined;
-  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, player, aliases), player, level, over));
+      : {}),
+  };
+  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, player, aliases), player, level, Object.keys(over).length ? over : undefined));
   return { action: typeof real === 'string' ? chooseSimpleBotAction(state, player) : real, explanations };
 }

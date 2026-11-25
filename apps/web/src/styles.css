@@ -15178,6 +15178,129 @@ div.dk-tile-main {
 .ht-tr > span {
   color: var(--muted);
 }
+/* Versões do deck (C2): uma linha por lista salva, com o que entrou e saiu e os números dela. */
+.deck-versions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--panel);
+}
+.deck-versions p {
+  margin: 0;
+}
+.dv-note {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
+}
+.dv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dv-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--panel2);
+  border: 1px solid transparent;
+}
+.dv-item.current {
+  border-color: var(--accent);
+}
+.dv-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.dv-restore {
+  margin-left: auto;
+}
+.dv-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.dv-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.dv-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+.dv-in {
+  color: var(--ok);
+}
+.dv-out {
+  color: var(--danger-text);
+}
+.deck-tips .seg {
+  align-self: flex-start;
+}
+.tip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tip {
+  --cw: 44px;
+  --ch: calc(var(--cw) * 1.396);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tip-missing {
+  flex: none;
+  width: var(--cw);
+  height: var(--ch);
+  border-radius: 4px;
+  background: var(--panel);
+}
+.tip-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+}
+.tip-text b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tip > .btn {
+  flex: none;
+  min-width: 36px;
+}
+.tip-loser .tip-text span {
+  color: var(--danger-text);
+}
+.tip-winner .tip-text span {
+  color: var(--ok);
+}
 .dk-dupe {
   display: flex;
   flex-wrap: wrap;

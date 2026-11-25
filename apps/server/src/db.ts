@@ -12,6 +12,7 @@ import { dirname } from 'node:path';
 import { type CardArt, type CardData, type DeckList, fixCard, needsManual } from '@gumgum/engine';
 import { DatabaseSync } from 'node:sqlite';
 import { artId, baseCardId } from './optcgapi';
+import { migrateDeckVersions, recordDeckVersion } from './decks/versions';
 import { DB_PATH } from './paths';
 import { migrateSealed } from './sealed/store';
 
@@ -262,6 +263,7 @@ function migrateDecks(db: DB) {
     CREATE INDEX IF NOT EXISTS seats_deck ON match_seats(deck_id);
   `);
   db.exec("DELETE FROM decks WHERE kind = 'user' AND trim(leader) = ''");
+  migrateDeckVersions(db);
 }
 
 /**
@@ -1621,6 +1623,8 @@ export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', o
     ownerHash,
     group,
   );
+  // Versões do deck (decks/versions.ts): a lista nova entra na linha do tempo se mudou.
+  recordDeckVersion(db, deck);
 }
 
 type DeckRow = {

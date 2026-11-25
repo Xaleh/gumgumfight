@@ -16,6 +16,7 @@ import {
   type DeckGuess,
   type DeckProfile,
   isBotLevel,
+  isBotPersonality,
   buildCardDef,
   type CardData,
   cardLegality,
@@ -491,14 +492,17 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
    * `botDeckId` ausente ou "random": um deck pronto sorteado entre os permitidos no formato.
    * `first`: 0 = o jogador começa, 1 = o bot começa; ausente ou "random" = sorteio.
    * `level`: nível do bot (ausente = `hard`); `team` (o Bot do Time) só para quem é do Time.
+   * `personality`: estilo do bot (`balanced`, `aggressive`, `control`, `cautious`; ausente = equilibrado). O Bot do Time ignora.
    */
-  app.post<{ Body: RoomBody & { botDeckId?: unknown; first?: unknown; level?: unknown } }>('/api/online/bot', async (req, reply) => {
+  app.post<{ Body: RoomBody & { botDeckId?: unknown; first?: unknown; level?: unknown; personality?: unknown } }>('/api/online/bot', async (req, reply) => {
     if (!botRooms) return reply.code(404).send(fail('botRoomsOff', 'O treino online contra o bot está desligado neste servidor.'));
     const u = user(req);
     if (!u) return reply.code(401).send(fail('botRoomLoginRequired', 'Para transmitir o treino contra o bot, entre com a conta Google.'));
     const level = req.body?.level === undefined ? 'hard' : req.body.level;
     if (!isBotLevel(level) || level === 'easy') return reply.code(400).send(fail('invalidBotLevel', 'Nível do bot inválido.'));
     if (level === 'team' && !isTeam(u)) return reply.code(403).send(fail('teamOnly', 'O Bot do Time é só para quem faz parte do Time.'));
+    const personality = req.body?.personality === undefined ? 'balanced' : req.body.personality;
+    if (!isBotPersonality(personality)) return reply.code(400).send(fail('invalidBotPersonality', 'Estilo do bot inválido.'));
     const mode = modeOf(req.body);
     const { format } = mode;
     const seat = seatFor(req, req.body, false, format, seatRules(mode));
@@ -512,7 +516,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
       if (!deck) return reply.code(400).send(fail('sealedSetUnavailable', 'Essa coleção não está disponível no Selado.', { set: mode.sealedSet ?? '' }));
       const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: deck.id!, deck };
       const first = req.body?.first;
-      const r = lobby.createBotRoom(seat, bot, mode, first === 0 || first === 1 ? first : undefined, level);
+      const r = lobby.createBotRoom(seat, bot, mode, first === 0 || first === 1 ? first : undefined, level, undefined, personality);
       if (isError(r)) return reply.code(r.code).send(r);
       lobby.tagIp(r.room.id, req.ip);
       return reply.code(201).send({ roomId: r.room.id, token: r.token });
@@ -536,7 +540,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     }
     const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: botDeck.id!, deck: botDeck };
     const first = req.body?.first;
-    const r = lobby.createBotRoom(seat, bot, mode, first === 0 || first === 1 ? first : undefined, level);
+    const r = lobby.createBotRoom(seat, bot, mode, first === 0 || first === 1 ? first : undefined, level, undefined, personality);
     if (isError(r)) return reply.code(r.code).send(r);
     lobby.tagIp(r.room.id, req.ip);
     return reply.code(201).send({ roomId: r.room.id, token: r.token });

@@ -122,6 +122,7 @@ gumgumfight/
 │   ├── src/clip.ts              trecho do replay em vídeo/GIF: clipFrames (quadros só com o público), highlightedCard
 │   ├── src/deck.ts              validateDeck, parse/format de listas
 │   ├── src/handtest.ts          mão de teste do construtor: sorteio, mulligan e chances exatas (hipergeométrica)
+│   ├── src/suggest.ts           sugestões de cartas do construtor: compara o deck com os números do Líder (lift, Deck médio)
 │   ├── src/formats.ts           Standard / Extra Grand Battle / All Blue, banidas, rotação
 │   ├── src/errata.ts, source-fixes.ts   correções de dados (errata oficial / erros da optcgapi)
 │   ├── src/cards/parser.ts      texto da carta → habilidades (DSL) (3.180 linhas)
@@ -130,6 +131,7 @@ gumgumfight/
 │   ├── src/bot/simple.ts        bot heurístico (nível fácil)
 │   ├── src/bot/evaluate.ts      função de avaliação do bot com busca
 │   ├── src/bot/planner.ts       bot com busca (níveis normal e difícil)
+│   ├── src/bot/personality.ts   estilos do bot (agressivo, controle, conservador): pesos e limiares
 │   ├── src/bot/analysis.ts      análise da partida: cada decisão do replay contra a melhor jogada do bot
 │   ├── src/bot/handguess.ts     a mão provável do oponente: deck provável do Líder dele − o que já saiu (D2)
 │   ├── scripts/simulate*.ts     simulações bot x bot na linha de comando
@@ -479,6 +481,14 @@ Sem worker (navegador antigo, arquivo indisponível, testes), a mesma conta roda
   as cartas escondidas somam, e um ataque fatal ele defende sempre que pode, parando o acerto mais barato da linha).
   Uma vitória provável vale `winCap` vezes a chance de passar, não `win`, para a posição que sobra se o ataque
   for parado continuar pesando.
+- **Personalidade** (`personality.ts`, roadmap D3): eixo independente do nível, `BotPersonality` =
+  `balanced | aggressive | control | cautious`, passado em `chooseBotAction(..., { personality })`. No `normal`/`hard`,
+  `PERSONALITY_WEIGHTS[p]` entra por cima de `DEFAULT_WEIGHTS` (só pesos numéricos que já existem, como o perfil de
+  deck); no `easy`, `SIMPLE_STYLES[p]` troca os limiares do `simple.ts` (Vida para Counter e bloqueio, custo do
+  Personagem que vale salvar, custo a partir do qual o K.O. vem antes do Líder). O `team` ignora (o estilo sai do
+  perfil). No navegador, `GameSetup.botPersonality` vai para o Worker (`BotRequest.personality`); no servidor,
+  `POST /api/online/bot` valida `personality` (`invalidBotPersonality`) e guarda em `RoomData.botPersonality` (ausente =
+  equilibrado; vai também em `info()`). Sem tabela nova.
 - Para a simulação funcionar na visão, os frames de efeito **do próprio jogador** vão inteiros na visão (passos,
   escolhas, alvos, com uids apelidados); os do oponente seguem só com a carta de origem.
 - O próprio deck é sorteado antes de simular (`determinize`, a partir de `unseen`): efeitos que leem o topo
@@ -851,7 +861,8 @@ baixadas quando tocam) + `public/`.
 | `broadcasts` | `user_id` | `key` (único: segredo do link do OBS, guardado como está para o streamer copiar de novo), `room_id` (partida na transmissão), opções `delay_s` (0–600), `hands_players`, `hands_own`, `delay_tournaments`, `chat` (0/1), `rev` (sobe a cada troca), `updated_at` | `/api/broadcast/*` |
 | `players` | `id` (`p-` + 12 hex) | `owner_hash` (único: `sha256(navegador)` ou `user:<id>`), `name` (público, "Pirata XXXX"), `bounty` (Beries), `ranked_games` | primeira partida/consulta, ranqueada, `PUT /api/players/me` |
 | `player_profiles` | `player_id` (FK `players`, `ON DELETE CASCADE`) | Perfil público: `visible`, `leaders`, `matches`, `replays` (0/1), `decks` (JSON com até 6 ids de decks do próprio jogador), `updated_at`. Sem linha = os padrões (visível, com Líderes e partidas, sem replays e sem decks) | `PUT /api/players/me/profile` |
-| `deck_lists` | `hash` (16 hex) | `leader`, `cards` (JSON) — lista **exata** e imutável usada numa partida | gravação de partida |
+| `deck_lists` | `hash` (16 hex) | `leader`, `cards` (JSON) — lista **exata** e imutável usada numa partida ou salva como versão de um deck | gravação de partida, `upsertDeck` |
+| `deck_versions` | `(deck_id, hash)` `WITHOUT ROWID` (FK `decks`, `ON DELETE CASCADE`; `hash` → `deck_lists`) | Versões do deck (C2): cada lista que o deck já teve, `seq` (ordem das gravações) e `saved_at` (última vez que a lista passou a ser a do deck). Na criação, a lista atual de cada deck entra como versão | `upsertDeck` (só quando a lista muda: renomear não cria versão) |
 | `matches` | `id` autoincrement | `seed`, `mode`, `deck0`, `deck1`, `winner`, `turns`, `reason`, `format`, `queue`, `first_player`, **`replay` (JSON; nas online, com os `engineTexts` do começo da partida, para refazê-la depois com as mesmas regras)**, `created_at` | gravação de partida |
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`, `listed` (0 = fora das estatísticas: Livre ou spoilers). Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
@@ -893,6 +904,7 @@ users 1──n tournament_players n──1 tournaments 1──n tournament_match
 players (owner_hash = user:<id> | sha256(navegador))
 matches 1──2 match_seats ──n match_cards
 match_seats ──(deck_hash)──> deck_lists
+decks 1──n deck_versions ──(hash)──> deck_lists
 match_seats ──(player_id)──> players 1──1 player_profiles
 decks (owner_hash → players.owner_hash, por convenção, sem FK)
 cards (sem FK; decks e partidas referenciam por id textual)
@@ -1085,6 +1097,17 @@ pelo servidor ao refazer o replay (`stats/derive.ts`), nunca informado pelo nave
 `hash = sha256("LEADER|4xOP01-016|…")[0:16]`. Guarda a lista no momento da partida, porque o deck salvo pode mudar
 depois. `GET /api/stats/cards?deck=<hash>` usa essa chave.
 
+### `deck_versions` — versões do deck (`decks/versions.ts`)
+
+`upsertDeck` chama `recordDeckVersion`: se o hash da lista nova não é o da última versão do deck, grava a lista em
+`deck_lists` e a versão (ou, se a lista já foi do deck antes, sobe o `seq` e o `saved_at` dela). `GET
+/api/decks/:id/versions` junta essas versões com as listas que só aparecem em `match_seats` (`deck_id` do deck,
+`controller = 'human'`, partidas de antes das versões), ordena pela data (`saved_at`, ou a primeira partida) e devolve,
+da mais nova para a mais antiga (até 50, com `total`): `number`, `leader`, `cards`, `savedAt`, `firstPlayedAt`,
+`lastPlayedAt`, `games`, `wins`, `losses`, `draws` (`matches.winner IS NULL`), `winRate`, `current` (hash igual ao da
+lista salva agora) e `diff` (`deckListDiff` do motor contra a versão anterior: Líder trocado, cartas que entraram e
+que saíram, com as cópias de antes e de depois).
+
 ### `players` — perfil e recompensa
 
 Criado na primeira partida ou consulta. `bounty` só muda na ranqueada entre duas contas distintas:
@@ -1167,7 +1190,7 @@ aqui, o desenho:
   cookie; `last_used_at` é gravado no máximo 1×/min por token. O logger do Fastify tem `redact` em
   `req.headers.authorization`.
 - **Rotas liberadas** (`config: { scope }`): `profile` → `/api/auth/me` (resposta reduzida), `/api/players/me`;
-  `decks:read` → `GET /api/decks` (`mine=1` filtra por dono; os decks de quem pede trazem a lista `cards`), `GET /api/decks/:id` (os próprios e os prontos);
+  `decks:read` → `GET /api/decks` (`mine=1` filtra por dono; os decks de quem pede trazem a lista `cards`), `GET /api/decks/:id` e `GET /api/decks/:id/versions` (os próprios e os prontos);
   `decks:write` → `POST/PUT/DELETE /api/decks` (o `PUT` aceita `expectedUpdatedAt`/`If-Unmodified-Since` e responde
   409 `deck_conflict` com a versão atual; o resumo dos decks ganhou `deckHash`); `matches:read` →
   `GET /api/players/me/matches` (`matches.ts`: `match_seats` por `player_id`, `since`, `cursor` = `match_id`, até 100),
@@ -2033,6 +2056,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/decks?mine=1` | Lista decks com validação (os de quem pede trazem `cards`); `mine=1`: só os de quem pede | Pública; Token (`decks:read`) |
 | GET | `/api/decks/:id` | Deck + definições das cartas usadas (com token: só os próprios e os prontos) | Pública; Token (`decks:read`) |
 | POST | `/api/decks` | Cria um deck (`{ name, leader, cards, arts? }`) | Navegador; Token (`decks:write`) |
+| GET | `/api/decks/:id/versions` | Versões do deck: o que entrou e saiu de cada lista e as partidas e a taxa de vitória de cada uma (com token: só os próprios e os prontos) | Pública; Token (`decks:read`) |
 | PUT | `/api/decks/:id` | Atualiza um deck (`expectedUpdatedAt` ou `If-Unmodified-Since`: 409 `deck_conflict` se mudou depois) | Dono; Token (`decks:write`) |
 | PUT | `/api/decks/:id/name` | Só o nome | Dono ou Admin |
 | DELETE | `/api/decks/:id` | Apaga um deck | Dono; Token (`decks:write`) |
@@ -2087,6 +2111,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=\|deck=` | Totais, Líderes e matchups; tendência semanal; cartas de um Líder. Ranqueada e torneios só com o plano (salvo `mine=1`) | Pública; Token (`stats:read`) |
 | GET | `/api/stats/teaser?format=` | Amostra das Estatísticas Pro para quem não tem o plano | Pública |
 | GET | `/api/stats/decks?leader=` | Decks de um Líder com os filtros de `/api/stats` (`stats/decks.ts`): cartas no deck (partidas com a carta e com 1..4 cópias), deck médio (até 50 cartas) e os 5 decks populares; cada lista pesa pelas partidas | Pública; Token (`stats:read`) |
+| GET | `/api/stats/suggestions?leader=` | Números de um Líder para as sugestões do construtor (roadmap C3), com os filtros de `/api/stats`: partidas e vitórias do Líder; de cada carta, partidas e vitórias com ela no deck e as cópias mais comuns; o Deck médio; `scope` (`casual` ou `all`) e `minGames`. O deck do construtor não é enviado: a comparação roda no navegador (`deckSuggestions` do motor) | Pública; Token (`stats:read`) |
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups da fila (no formato de `/api/stats`, com `secondGames`/`secondWins`), tendência semanal dos resumos diários e a comparação com as partidas daqui (o que quem pede vê). 404 `globalOff` sem a chave | Pública; Token (`stats:read`) |
 | POST | `/api/admin/stats/global/sync` | Força uma rodada do sync do meta global | Admin |
 | GET | `/api/online/config` · `/api/online/stats` · `/api/online/leaders?format=` | Configuração do online, contadores do menu e Líderes na fila casual | Pública |
@@ -2098,7 +2123,7 @@ Quem chama, na coluna da direita:
 | DELETE | `/api/friends/invites/:code` | Recusa o convite (some da tela inicial; a sala de quem convidou continua) | Sessão |
 | POST | `/api/online/rooms` · `/api/online/rooms/join` · `/api/online/queue` | Cria uma sala privada; entra numa; entra na fila (`{ deckId, format, queue }`; ranqueada exige login) | Navegador |
 | GET · DELETE | `/api/online/queue/:ticket` | Consulta a fila / sai dela | Quem tem o ticket |
-| POST | `/api/online/bot` | Treino contra o bot transmitido (`{ deckId, botDeckId \| random, format, first? }`) | Sessão |
+| POST | `/api/online/bot` | Treino contra o bot transmitido (`{ deckId, botDeckId \| random, format, first?, level?, personality? }`) | Sessão |
 | GET | `/api/online/rooms/:id/events?t=` | Canal SSE do jogador | Assento |
 | POST | `/api/online/rooms/:id/{action,dice,emote,chat,focus,rematch,leave}` | Ação, dado, emote, chat (censurado), presença, revanche, sair | Assento |
 | GET | `/api/online/rooms/:id/replay` | Replay completo da sala (depois do fim; nunca de torneio) | Pública |

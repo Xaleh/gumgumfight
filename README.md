@@ -203,6 +203,25 @@ Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construto
    - a soma de **Counter na mão inicial** (chance de ter ≥ 1000, 2000, 3000 e 4000, e a média).
    Com **Mulligan quando a mão inicial não tem a carta** marcado, a conta supõe que você troca a mão quando ela não tem o
    Personagem ou a carta-chave. Tudo roda no navegador: nada vai para o servidor.
+5. **Sugestões** (o quinto modo, com 💡) compara o deck com as estatísticas do Líder no formato escolhido (Standard ou
+   EGB; começa no formato em que o deck vale), as mesmas da tela de Estatísticas (partidas casuais, ou todas as filas
+   com as Estatísticas Pro):
+   - **Os decks deste Líder usam e você não:** cartas em pelo menos metade das partidas do Líder, com a fração, as
+     partidas e as cópias mais comuns;
+   - **No seu deck, com lift negativo** e **Ganham mais e você não usa:** cartas com lift (vitórias com a carta no deck
+     menos as do Líder em geral) de pelo menos 5 pontos para baixo ou para cima;
+   - **Cópias diferentes do Deck médio**, e quantas cartas do Deck médio o deck já tem.
+   Cada sugestão mostra o número de partidas por trás e tem o botão **+** ou **−** para mexer no deck. As que têm menos
+   de 20 partidas, ou um lift dentro da margem da própria amostra (um erro padrão), ficam escondidas, e o painel diz
+   quantas foram escondidas. Com menos de 20 partidas do Líder no formato, nenhuma sugestão aparece. O servidor só
+   entrega os números do Líder (`GET /api/stats/suggestions?leader=`); a comparação roda no navegador
+   (`packages/engine/src/suggest.ts`), e o deck não sai dele.
+6. **Versões** (o sexto modo, só em deck salvo) mostra o histórico do deck: cada lista salva é uma versão, com a data,
+   **o que entrou e o que saiu** em relação à anterior (por exemplo, "+2 Nefeltari Vivi (2→4)" e "−2 Usopp (4→2)") e as
+   **partidas e a taxa de vitória** daquela lista (vitórias, derrotas e empates de pessoas; o lado do robô não conta).
+   As partidas caem na versão certa pelo hash da lista exata (`deck_lists`), inclusive as jogadas antes de existirem as
+   versões. Renomear não cria versão; voltar a uma lista antiga leva aquela versão para o topo, com as partidas que ela
+   já tinha. **Restaurar** põe a lista de uma versão no rascunho (com desfazer), e ela só vale depois de salvar.
 
 Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por número e toda carta com ao menos uma
 cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.
@@ -739,7 +758,7 @@ espectadores seguem para a partida nova.
   **Gerar novo link** invalida o anterior; a conta que perde o perfil perde o link.
 - **Transmitir o treino contra o bot:** em **Contra o bot**, quem entrou com o Google pode marcar **Transmitir esta
   partida**. A partida roda no servidor, que joga pelo bot (decidindo só com a visão do bot), e aparece na lista para
-  assistir. "Quem começa" vale como no treino local; a seed e o desfazer ficam só no treino no navegador. Entra nas
+  assistir. "Quem começa" e o [estilo do bot](#estilos-do-bot) valem como no treino local; a seed e o desfazer ficam só no treino no navegador. Entra nas
   estatísticas como partida contra o bot. Com a transmissão lotada (`ONLINE_MAX_BOT_ROOMS`), o treino roda no
   navegador, com um aviso na mesa. `ONLINE_BOT_ROOMS=off` tira a opção do menu e essas salas da lista.
 
@@ -791,6 +810,24 @@ jogada que ele acha:
 
 Fases seguintes (análise guardada no servidor, precisão em "Minhas partidas", prévia da jogada sugerida na mesa):
 [`docs/plano-analise-partida.md`](docs/plano-analise-partida.md).
+
+## Estilos do bot
+
+Em **Contra o bot**, além do **Nível** (Fácil, Normal, Difícil), há o **Estilo do bot**, salvo no navegador:
+
+- **Equilibrado** (padrão): o bot de sempre, com os pesos ajustados em auto-jogo.
+- **Agressivo**: vai na Vida do oponente. Defende pouco (não bloqueia nem na última Vida, guarda o Counter), aceita
+  deixar Personagens expostos e prefere bater no Líder a tirar um Personagem médio.
+- **Controle**: a mão e o campo são o recurso. Tira os Personagens do oponente antes de ir no Líder (mesmo com o
+  oponente em 2 de Vida), guarda cartas e protege os próprios Personagens.
+- **Conservador**: protege a própria Vida. Usa Counter com até 3 de Vida e bloqueia com 2, e evita deixar
+  Personagens virados expostos.
+
+O estilo vale nos três níveis: no Normal e no Difícil é uma camada de pesos sobre a avaliação do bot com busca
+(`packages/engine/src/bot/personality.ts`, `PERSONALITY_WEIGHTS`); no Fácil muda os limiares do bot heurístico
+(`SIMPLE_STYLES`). Vale também no treino transmitido (o servidor joga com o estilo escolhido). O **Bot do Time** não tem
+estilo: o dele vem do perfil do deck. Cada estilo tem testes de posição que mostram a diferença
+(`packages/engine/test/bot-personality.test.ts`).
 
 ## O bot deduz a sua mão
 
@@ -1041,7 +1078,7 @@ ativos por conta), vê o que cada app pode fazer e quando foi usado pela última
 | Scope | Libera |
 |---|---|
 | `profile` | `GET /api/auth/me` (só `{ user: { id, role: 'player' }, player: { id, name, bounty, tier } }`: nunca e-mail, nome ou foto do Google) e `GET /api/players/me` |
-| `decks:read` | `GET /api/decks?mine=1` (os próprios, com a lista `cards` (`{ id, count }`), `size`, `updatedAt`, `deckHash` e a validação por formato), `GET /api/decks/:id` (os próprios e os prontos, com as definições das cartas) |
+| `decks:read` | `GET /api/decks?mine=1` (os próprios, com a lista `cards` (`{ id, count }`), `size`, `updatedAt`, `deckHash` e a validação por formato), `GET /api/decks/:id` (os próprios e os prontos, com as definições das cartas), `GET /api/decks/:id/versions` (as versões do deck, com o que entrou e saiu e as partidas e a taxa de vitória de cada uma) |
 | `decks:write` | `POST /api/decks`, `PUT /api/decks/:id`, `DELETE /api/decks/:id` (só os próprios) |
 | `matches:read` | `GET /api/players/me/matches`, `GET /api/matches/:id`, `GET /api/matches/:id/replay` e `POST /api/matches/:id/replay-link` (só partidas que o usuário jogou) |
 | `stats:read` | `GET /api/stats*` (com `mine=1`, as próprias; sem ele, as consultas públicas de sempre) |
@@ -1689,6 +1726,7 @@ pode chamar sem login nem token:
 | GET | `/api/decks` · `/api/decks/:id` | Decks prontos e da comunidade, com validação por formato; `mine=1` filtra os seus (navegador ou conta) |
 | GET | `/api/stats/meta` · `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=` | Estatísticas gerais: filtros, totais, Líderes, matchups, tendência semanal e cartas de um Líder |
 | GET | `/api/stats/decks?leader=` | Decks de um Líder (mesmos filtros de `/api/stats`): cartas no deck, deck médio e decks populares |
+| GET | `/api/stats/suggestions?leader=` | Números de um Líder para as sugestões do construtor (mesmos filtros de `/api/stats`): partidas e vitórias do Líder, de cada carta e o Deck médio |
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups de uma fila, tendência e a comparação com as partidas daqui (404 sem a chave) |
 | GET | `/api/online/stats` · `/api/online/live` · `/api/online/rooms/:id` | Contadores do menu, partidas para assistir e o resumo de uma sala |
 | GET · POST | `/api/yonko/active` · `/api/yonko/tables` · `/api/yonko/tables/join` · `/api/yonko/tables/:id/…` | Mesas online do Yonko: as suas (com o token), criar, entrar pelo código, o canal `events` (SSE) e os pedidos da mesa (`deck`, `ready`, `rules`, `bot`, `clear`, `start`, `action`, `reopen`, `leave`), todos com o token do lugar |

@@ -4,9 +4,11 @@ import {
   barredSpoilers,
   type BotExplanation,
   type BotLevel,
+  type BotPersonality,
   type CardData,
   type CardDef,
   type ChallengeSpec,
+  type DeckDiff,
   type DeckList,
   type DeckGuess,
   type DeckProfile,
@@ -22,9 +24,28 @@ import {
   type PlayMode,
   type SpoilerRule,
   type TableRules,
+  type LeaderNumbers,
 } from '@gumgum/engine';
 
 export type { FormatId, PlayFormat, PlayMode };
+
+/** Uma versão do deck (`GET /api/decks/:id/versions`): a lista, o que mudou desde a anterior e os números dela. */
+export interface DeckVersion {
+  hash: string;
+  number: number;
+  leader: string;
+  cards: Array<{ id: string; count: number }>;
+  savedAt: string | null;
+  firstPlayedAt: string | null;
+  lastPlayedAt: string | null;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number | null;
+  current: boolean;
+  diff: DeckDiff;
+}
 
 export interface DeckSummary {
   id: string;
@@ -734,6 +755,8 @@ export const api = {
     get<{ deck: DeckList & { kind: DeckSummary['kind']; mine: boolean }; cards: ApiCard[]; summary: DeckSummary }>(
       `/api/decks/${encodeURIComponent(id)}`,
     ),
+  /** Versões do deck, da mais nova para a mais antiga (roadmap C2). */
+  deckVersions: (id: string) => get<{ deckId: string; total: number; versions: DeckVersion[] }>(`/api/decks/${encodeURIComponent(id)}/versions`),
   cards: () => get<ApiCard[]>('/api/cards'),
   coverage: () => get<{ total: CoverageRow; sets: CoverageRow[] }>('/api/coverage'),
   /** Perfil Dev: lacunas do leitor automático (resumo, cartas e as novas com ⚙). */
@@ -781,6 +804,8 @@ export const api = {
     ),
   /** Decks de um Líder: cartas no deck, deck médio e decks populares (com os filtros das estatísticas). */
   leaderDecks: (f: StatsQuery) => get<LeaderDecksResponse>(`/api/stats/decks?${statsQs(f)}`),
+  /** Números de um Líder para as sugestões do construtor (C3); a comparação com o deck roda no navegador. */
+  leaderSuggestions: (f: StatsQuery) => get<LeaderSuggestionsResponse>(`/api/stats/suggestions?${statsQs(f)}`),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
   /** Meta global (TCG Matchmaking): Líderes e matchups de uma fila (sem fila: a primeira). */
   globalStats: (queue?: string) => get<GlobalStats>(`/api/stats/global${queue ? `?queue=${encodeURIComponent(queue)}` : ''}`),
@@ -1040,13 +1065,14 @@ export const api = {
     /** Contadores do menu; a consulta também conta este navegador como conectado. */
     stats: () => get<OnlineStats>('/api/online/stats'),
     /** Treino contra o bot transmitido: o servidor joga pelo bot e a partida aparece em "Assistir" (exige login). */
-    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId, level?: BotLevel) =>
+    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId, level?: BotLevel, personality?: BotPersonality) =>
       send<{ roomId: string; token: string }>('POST', '/api/online/bot', {
         deckId,
         botDeckId,
         ...mode,
         ...(first !== undefined ? { first } : {}),
         ...(level ? { level } : {}),
+        ...(personality ? { personality } : {}),
       }),
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
@@ -1277,6 +1303,8 @@ export interface OnlineRoomInfo {
   rematch: [boolean, boolean];
   /** Treino contra o bot: o nível do bot do servidor (servidores antigos não mandam). */
   botLevel?: BotLevel;
+  /** Treino contra o bot: o estilo do bot (ausente = equilibrado). */
+  botPersonality?: BotPersonality;
   /** Treino contra o bot: o deck que o bot joga (relatório do Bot do Time). */
   botDeckId?: string | null;
   botDeckName?: string | null;
@@ -2302,6 +2330,12 @@ export interface TrendResponse {
   weeks: string[];
   rows: Array<WinCount & { week: string; leader: string }>;
   cards: Record<string, CardInfo>;
+}
+
+export interface LeaderSuggestionsResponse extends LeaderNumbers {
+  /** `casual`: estatísticas gerais (só partidas casuais); `all`: Estatísticas Pro (todas as filas). */
+  scope: 'casual' | 'all';
+  minGames: number;
 }
 
 export interface LeaderDecksResponse {

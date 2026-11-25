@@ -27,6 +27,7 @@ import type { Action, GameState, Pending, PlayerId } from '../types';
 import { HIDDEN_CARD } from '../view';
 import { DEFAULT_WEIGHTS, evaluate, evaluateTerms, handCardValue, hasDiscardOutlet, type Weights } from './evaluate';
 import { counterChance, counterEventPowerOf, type DeckGuess, handModel } from './handguess';
+import { type BotPersonality, personalityWeights, SIMPLE_STYLES } from './personality';
 import { type DeckProfile, keepHand, opponentLeader, profileWeights } from './profile';
 import { chooseBotAction as simpleBot } from './simple';
 
@@ -58,6 +59,11 @@ export interface PlannerOptions {
    * (`weights.oppHand`), que o risco de Counter e a ameaça do próximo ataque leem. Só vale se o Líder bate.
    */
   handGuess?: DeckGuess;
+  /**
+   * Personalidade (`personality.ts`): nos níveis com busca, os pesos dela entram por cima de `weights`; no fácil, os
+   * limiares do bot heurístico. O Bot do Time (com perfil) a ignora.
+   */
+  personality?: BotPersonality;
   /** Painel do treinador: recebe a explicação de cada decisão de verdade (a linha ou a resposta escolhida, a nota e os termos). */
   explain?: (e: BotExplanation) => void;
 }
@@ -136,11 +142,14 @@ interface Sim {
 
 /** Ação do bot no nível pedido (padrão `hard`). */
 export function chooseBotAction(state: GameState, player: PlayerId, level: BotLevel = 'hard', over?: Partial<PlannerOptions>): Action {
-  if (level === 'easy') return simpleBot(state, player);
+  const personality = level === 'team' ? undefined : over?.personality;
+  if (level === 'easy') return simpleBot(state, player, SIMPLE_STYLES[personality ?? 'balanced']);
   const oppLeader = opponentLeader(state, player);
   let weights = over?.weights ?? DEFAULT_WEIGHTS;
   // Com o perfil do deck, os pesos saem dele (arquétipo, ajustes do guia e o confronto com o Líder adversário).
+  // Sem perfil, a personalidade escolhida pelo jogador (o Bot do Time não tem: o estilo dele é o do deck).
   if (over?.profile) weights = profileWeights(over.profile, oppLeader, weights);
+  else if (personality && personality !== 'balanced') weights = personalityWeights(personality, weights);
   // Com o deck provável do Líder adversário, a mão provável dele, deduzida só do que o bot vê.
   const model = over?.handGuess && over.handGuess.leader === oppLeader ? handModel(state, player, over.handGuess, weights.guessHold) : undefined;
   if (model) weights = { ...weights, oppHand: model };
