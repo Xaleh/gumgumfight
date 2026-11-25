@@ -8,8 +8,7 @@ const dailyPtBR = {
   'daily.level2': 'Médio',
   'daily.level3': 'Difícil',
   'daily.goal.lethal.title': 'Ache o letal neste turno',
-  'daily.goal.lethal.body':
-    'É o seu turno. Derrote o oponente antes de passar a vez.\nEle se defende assim: bloqueia e usa o Counter dos Personagens da mão só quando isso segura um ataque ao Líder dele, e nunca ativa [Trigger].',
+  'daily.goal.lethal.body': "É o seu turno. Derrote o oponente antes de passar a vez.",
   'daily.goal.survive.title': 'Sobreviva a este turno',
   'daily.goal.survive.body': 'É o turno do oponente. Chegue vivo ao seu turno escolhendo o que bloquear e quais Counters usar. Ele ataca nesta ordem e depois passa a vez:',
   'daily.attack': '{attacker} ataca {target}',
@@ -146,6 +145,20 @@ const dailyPtBR = {
   'errors.pinPublished': "Este dia já tem desafio publicado.",
   'errors.pinTaken': "Outro desafio já está fixado neste dia.",
   'errors.badOrder': "Ordem inválida.",
+  'daily.defense.title': "Como o oponente se defende:",
+  'daily.defense.block': "Bloqueia só o ataque que acertaria o Líder dele.",
+  'daily.defense.characters': "Usa o Counter dos Personagens da mão só quando isso segura o ataque ao Líder.",
+  'daily.defense.events': "Também usa os Eventos de [Counter] que dão poder, pagando os DON!! ativos.",
+  'daily.defense.noEvents': "Não usa Eventos de [Counter].",
+  'daily.defense.triggers': "Ativa o [Trigger] das cartas que saem da Vida (no efeito, ajuda vai no atacado e dano no atacante).",
+  'daily.defense.noTriggers': "Nunca ativa [Trigger].",
+  'daily.admin.defense': "Defesa do oponente",
+  'daily.admin.defenseHint': "Além de bloquear e usar o Counter dos Personagens. Nas escolhas dos efeitos dele: ajuda vai no atacado, dano no atacante, descarte só o mínimo e custo opcional é pago.",
+  'daily.admin.eventCounters': "Usa Eventos de [Counter] que dão poder (pagando DON!!)",
+  'daily.admin.triggers': "Ativa o [Trigger] da Vida",
+  'daily.admin.intro': "Enunciado (aparece para quem joga)",
+  'daily.admin.introPlaceholder': "Ex.: O Xebec acabou de baixar a sua Vida. Ache o caminho até o Líder dele.",
+  'daily.admin.introTranslations': "Traduções do enunciado (sem tradução, vale o português)",
 };
 
 export default dailyPtBR;

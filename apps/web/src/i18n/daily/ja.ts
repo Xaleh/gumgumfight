@@ -8,8 +8,7 @@ const daily = {
   'daily.level2': 'ふつう',
   'daily.level3': 'むずかしい',
   'daily.goal.lethal.title': 'このターンでリーサルを見つけよう',
-  'daily.goal.lethal.body':
-    'あなたのターンです。ターンを終える前に相手を倒してください。\n相手の守り方：リーダーへのアタックを止められるときだけブロックし、手札のキャラクターのカウンターを使います。[Trigger]は発動しません。',
+  'daily.goal.lethal.body': "あなたのターンです。ターンを終える前に相手を倒してください。",
   'daily.goal.survive.title': 'このターンを生き延びよう',
   'daily.goal.survive.body': '相手のターンです。何をブロックし、どのカウンターを使うかを選んで、自分のターンまで生き残ってください。相手はこの順にアタックしてからターンを終えます：',
   'daily.attack': '{attacker} が {target} にアタック',
@@ -146,6 +145,20 @@ const daily = {
   'errors.pinPublished': "この日はすでにチャレンジが公開されています。",
   'errors.pinTaken': "この日には別のチャレンジが固定されています。",
   'errors.badOrder': "順番が不正です。",
+  'daily.defense.title': "相手の守り方：",
+  'daily.defense.block': "リーダーに当たるアタックだけをブロックします。",
+  'daily.defense.characters': "リーダーへのアタックを止められるときだけ、手札のキャラクターのカウンターを使います。",
+  'daily.defense.events': "パワーを上げる[カウンター]イベントも、アクティブなDON!!を払って使います。",
+  'daily.defense.noEvents': "[カウンター]イベントは使いません。",
+  'daily.defense.triggers': "ライフから出たカードの[トリガー]を発動します（効果の強化は攻撃されたカード、妨害はアタッカーに）。",
+  'daily.defense.noTriggers': "[トリガー]は発動しません。",
+  'daily.admin.defense': "相手の守り",
+  'daily.admin.defenseHint': "ブロックとキャラクターのカウンターに加えて。効果の選択では、強化は攻撃されたカード、妨害はアタッカー、捨てるのは最小限、任意コストは支払います。",
+  'daily.admin.eventCounters': "パワーを上げる[カウンター]イベントを使う（DON!!を払う）",
+  'daily.admin.triggers': "ライフの[トリガー]を発動する",
+  'daily.admin.intro': "問題文（プレイヤーに表示）",
+  'daily.admin.introPlaceholder': "例：Xebecにライフを削られた。相手リーダーまでの道を見つけよう。",
+  'daily.admin.introTranslations': "問題文の翻訳（なければポルトガル語を表示）",
 };
 
 export default daily;

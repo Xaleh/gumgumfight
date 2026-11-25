@@ -2403,6 +2403,10 @@ function statsQs(f: StatsQuery): string {
 // ------------------------------------------------------------------ desafio do dia
 
 export type DailyStatus = 'playing' | 'solved' | 'failed';
+export interface DailyDefense {
+  eventCounters: boolean;
+  triggers: boolean;
+}
 export interface DailyResult {
   attempts: number;
   solved: boolean;
@@ -2422,6 +2426,10 @@ export interface DailyToday {
     revealHand: boolean;
     /** "Sobreviva": a ordem dos ataques do oponente (número da carta ou 'leader'). */
     attacks: Array<{ attacker: string; target: string }>;
+    /** "Ache o letal": o que o oponente faz na defesa além de bloquear e usar o Counter dos Personagens. */
+    defense: DailyDefense;
+    /** Enunciado livre por idioma (null = nenhum). */
+    intro: Partial<Record<string, string>> | null;
   };
   /** A mesa no começo, como o jogador a vê (sem `brief`). */
   view?: GameState;

@@ -8,8 +8,7 @@ const daily = {
   'daily.level2': 'Mittel',
   'daily.level3': 'Schwer',
   'daily.goal.lethal.title': 'Finde den Lethal in diesem Zug',
-  'daily.goal.lethal.body':
-    'Du bist am Zug. Besiege den Gegner, bevor du den Zug beendest.\nEr verteidigt sich so: Er blockt und nutzt den Counter der Charaktere auf der Hand nur, wenn das einen Angriff auf seinen Leader stoppt, und aktiviert nie [Trigger].',
+  'daily.goal.lethal.body': "Du bist am Zug. Besiege den Gegner, bevor du den Zug beendest.",
   'daily.goal.survive.title': 'Überlebe diesen Zug',
   'daily.goal.survive.body': 'Der Gegner ist am Zug. Erreiche lebend deinen Zug, indem du wählst, was du blockst und welche Counter du nutzt. Er greift in dieser Reihenfolge an und beendet dann den Zug:',
   'daily.attack': '{attacker} greift {target} an',
@@ -146,6 +145,20 @@ const daily = {
   'errors.pinPublished': "An diesem Tag ist schon ein Rätsel erschienen.",
   'errors.pinTaken': "Für diesen Tag ist schon ein anderes Rätsel festgelegt.",
   'errors.badOrder': "Ungültige Reihenfolge.",
+  'daily.defense.title': "So verteidigt sich der Gegner:",
+  'daily.defense.block': "Blockt nur einen Angriff, der seinen Leader treffen würde.",
+  'daily.defense.characters': "Nutzt den Counter der Charaktere auf der Hand nur, wenn das den Angriff auf seinen Leader stoppt.",
+  'daily.defense.events': "Nutzt auch [Counter]-Events, die Stärke geben, und bezahlt mit aktiven DON!!.",
+  'daily.defense.noEvents': "Nutzt keine [Counter]-Events.",
+  'daily.defense.triggers': "Aktiviert den [Trigger] von Karten aus dem Leben (im Effekt geht Hilfe an die angegriffene Karte und Schaden an den Angreifer).",
+  'daily.defense.noTriggers': "Aktiviert nie [Trigger].",
+  'daily.admin.defense': "Verteidigung des Gegners",
+  'daily.admin.defenseHint': "Zusätzlich zum Blocken und den Countern der Charaktere. Bei seinen Effektwahlen: Hilfe an die angegriffene Karte, Schaden an den Angreifer, nur das Nötigste abwerfen, optionale Kosten zahlen.",
+  'daily.admin.eventCounters': "Nutzt [Counter]-Events, die Stärke geben (zahlt DON!!)",
+  'daily.admin.triggers': "Aktiviert [Trigger] aus dem Leben",
+  'daily.admin.intro': "Aufgabentext (für Spieler sichtbar)",
+  'daily.admin.introPlaceholder': "Z. B.: Xebec hat gerade dein Leben gesenkt. Finde den Weg zu seinem Leader.",
+  'daily.admin.introTranslations': "Übersetzungen des Aufgabentexts (ohne Übersetzung gilt Portugiesisch)",
 };
 
 export default daily;

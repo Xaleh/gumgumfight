@@ -75,6 +75,7 @@ export * from './clip';
 export { createScenario, passiveAction, type ScenarioCard, type ScenarioSide, type ScenarioSpec } from './scenario';
 export {
   buildChallenge,
+  type ChallengeDefense,
   type ChallengeGoal,
   type ChallengeMove,
   challengeRivalAction,

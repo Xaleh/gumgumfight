@@ -50,3 +50,20 @@ describe('desafio do dia: compartilhar', () => {
     expect(t('daily.admin.days', { n: 2, days: '2026-10-12, 2026-10-19' })).toBe('saiu 2 vezes (2026-10-12, 2026-10-19)');
   });
 });
+
+describe('desafio do dia: defesa e enunciado', () => {
+  it('linhas da defesa conforme o desafio', async () => {
+    const { defenseLines } = await import('../src/game/daily');
+    expect(defenseLines({ eventCounters: false, triggers: false })).toEqual(['daily.defense.block', 'daily.defense.characters', 'daily.defense.noEvents', 'daily.defense.noTriggers']);
+    expect(defenseLines({ eventCounters: true, triggers: true }).slice(2)).toEqual(['daily.defense.events', 'daily.defense.triggers']);
+    expect(defenseLines(undefined)).toHaveLength(4);
+  });
+
+  it('o enunciado vem no idioma da interface, senão em português', async () => {
+    const { introFor } = await import('../src/game/daily');
+    expect(introFor({ 'pt-BR': 'Olá', en: 'Hi' }, 'en')).toBe('Hi');
+    expect(introFor({ 'pt-BR': 'Olá', en: '  ' }, 'en')).toBe('Olá');
+    expect(introFor({ 'pt-BR': 'Olá' }, 'ja')).toBe('Olá');
+    expect(introFor(null, 'pt-BR')).toBeNull();
+  });
+});

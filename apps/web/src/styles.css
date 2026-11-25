@@ -20699,3 +20699,51 @@ div.dk-tile-main {
   font-weight: 900;
   color: var(--muted);
 }
+
+/* ---- desafio do dia: enunciado livre e defesa do oponente (fase 3) */
+.daily-intro {
+  font-weight: 700;
+}
+.daily-defense {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.daily-defense-title {
+  font-weight: 900;
+}
+.daily-defense ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.daily-editor textarea {
+  min-height: 52px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.daily-editor-intro {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.daily-editor-intro summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+.daily-editor-intro label {
+  margin-top: 6px;
+}
+.daily-editor-defense {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

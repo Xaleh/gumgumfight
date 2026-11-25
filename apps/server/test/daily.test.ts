@@ -299,7 +299,7 @@ describe('desafio do dia: editor da Administração', () => {
       clock.t = T0 + d * DAY_MS;
       await today(app);
     }
-    expect((await admin(app, db, 'GET', '/api/admin/daily/challenges')).json().challenges.at(-1)).toMatchObject({ id: b, days: ['2026-10-18'] });
+    expect((await admin(app, db, 'GET', '/api/admin/daily/challenges')).json().challenges.at(-1)).toMatchObject({ id: b, days: [dayOf(T0 + DAILY_CATALOG.length * DAY_MS)] });
     expect((await admin(app, db, 'DELETE', `/api/admin/daily/challenges/${b}`)).statusCode).toBe(409);
   });
 });
@@ -432,5 +432,50 @@ describe('desafio do dia: editar e duplicar', () => {
     expect(d.spec).toEqual(c.spec);
     expect((await put(app, db, `/api/admin/daily/challenges/${ids[0]}`, { spec: c.spec, solution: c.solution })).statusCode).toBe(404);
     expect((await admin(app, db, 'GET', '/api/admin/daily/challenges/nao-existe')).statusCode).toBe(404);
+  });
+});
+
+describe('desafio do dia: defensor configurável e enunciado (fase 3)', () => {
+  it('o enunciado leva a defesa e o texto livre; o desafio do Evento de Counter sai na vez dele', async () => {
+    const { app, clock } = setup();
+    const i = DAILY_CATALOG.findIndex((c) => c.id === 'mellow');
+    expect(i).toBeGreaterThan(0);
+    const first = (await today(app)).json();
+    expect(first.challenge).toMatchObject({ defense: { eventCounters: false, triggers: false }, intro: null });
+    await publishDays(app, clock, 1, i);
+    const g = (await today(app, browser('dia-' + i))).json();
+    expect(g.challenge).toMatchObject({ id: 'mellow', defense: { eventCounters: true, triggers: false }, revealHand: true });
+    // A mão aberta mostra o Love-Love Mellow.
+    expect(g.view.players[1].hand.map((u: string) => g.view.cards[u].cardId)).toEqual(['ST03-017']);
+  });
+
+  it('o editor salva a defesa e o enunciado por idioma; no "sobreviva" a defesa cai; idioma ou texto inválido é recusado', async () => {
+    const { db, app } = setup();
+    const c = editorChallenge(db);
+    const intro = { 'pt-BR': '  Gaste o Counter do oponente primeiro.  ', en: 'Burn their Counter first.', es: '   ' };
+    const r = await admin(app, db, 'POST', '/api/admin/daily/challenges', { spec: { ...c.spec, defense: { eventCounters: true, triggers: true }, intro }, solution: c.solution });
+    expect(r.statusCode).toBe(201);
+    const d = (await admin(app, db, 'GET', `/api/admin/daily/challenges/${r.json().id}`)).json();
+    expect(d.spec.defense).toEqual({ eventCounters: true, triggers: true });
+    expect(d.spec.intro).toEqual({ 'pt-BR': 'Gaste o Counter do oponente primeiro.', en: 'Burn their Counter first.' });
+    // Defesa desligada não é guardada.
+    const off = await admin(app, db, 'POST', '/api/admin/daily/challenges', { spec: { ...c.spec, defense: { eventCounters: false } }, solution: c.solution });
+    expect((await admin(app, db, 'GET', `/api/admin/daily/challenges/${off.json().id}`)).json().spec.defense).toBeUndefined();
+    const bad = async (spec: object) => (await admin(app, db, 'POST', '/api/admin/daily/challenges', { spec, solution: c.solution })).json();
+    expect(await bad({ ...c.spec, intro: { xx: 'oi' } })).toMatchObject({ errorCode: 'challengeInvalid', errorParams: { field: 'enunciado' } });
+    expect(await bad({ ...c.spec, intro: { 'pt-BR': 'x'.repeat(401) } })).toMatchObject({ errorCode: 'challengeInvalid' });
+    expect(await bad({ ...c.spec, defense: { triggers: 'sim' } })).toMatchObject({ errorCode: 'challengeInvalid', errorParams: { field: 'defesa do oponente' } });
+  });
+
+  it('a defesa conta na conferência: com o Evento ligado, a mesma solução pode deixar de valer', async () => {
+    const { db, app } = setup();
+    const c = editorChallenge(db);
+    // "isca" sem cartas na mão do oponente: ligar a defesa não muda nada e a solução continua valendo.
+    const ok = await admin(app, db, 'POST', '/api/admin/daily/challenges', { spec: { ...c.spec, defense: { eventCounters: true } }, solution: c.solution });
+    expect(ok.statusCode).toBe(201);
+    // Com o Love-Love Mellow na mão e 2 DON!!, a solução do "isca" deixa de resolver.
+    const sides = [c.spec.scenario.sides[0], { ...c.spec.scenario.sides[1], hand: ['ST03-017'], donActive: 2, donRested: 4 }];
+    const spec = { ...c.spec, scenario: { ...c.spec.scenario, sides }, defense: { eventCounters: true } };
+    expect((await admin(app, db, 'POST', '/api/admin/daily/challenges', { spec, solution: c.solution })).json().errorCode).toBe('challengeNotSolved');
   });
 });
