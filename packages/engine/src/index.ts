@@ -71,6 +71,7 @@ export * from './view';
 export * from './art';
 export * from './status';
 export * from './replay';
+export * from './clip';
 export { createScenario, passiveAction, type ScenarioCard, type ScenarioSide, type ScenarioSpec } from './scenario';
 export {
   buildChallenge,

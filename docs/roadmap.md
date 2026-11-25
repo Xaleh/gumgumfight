@@ -194,12 +194,12 @@ Ligado ao kit de Instagram (`marketing/instagram/`).
   *Pronto quando:* toda semana as imagens ficam prontas para baixar, nos formatos do feed e dos stories.
   *Feito em:* —
 
-- [ ] **F2. Trecho do replay em vídeo ou GIF**
+- [x] **F2. Trecho do replay em vídeo ou GIF**
   "Jogada da semana" pronta para Reels: escolher um trecho do replay e exportar, usando o destaque de carta do modo
   transmissão.
   *Pronto quando:* dá para marcar início e fim no replay e baixar o vídeo vertical (e o GIF) sem informação escondida
   da partida.
-  *Feito em:* —
+  *Feito em:* 2026-11-25, [PR #226](https://github.com/Xaleh/gumgumfight/pull/226)
 
 ## Fase G — Acessibilidade e apoio
 

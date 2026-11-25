@@ -1225,6 +1225,17 @@ duas contra o servidor. A Administração vê a fila em `GET /api/admin/daily`.
   replay" (nas configurações, ao abrir o replay ou no botão 👆 da barra).
   Replays antigos continuam abrindo (são convertidos para a versão atual); os que não trazem as listas precisam
   que os decks ainda existam.
+- **Trecho em vídeo ou GIF** ("jogada da semana" para Reels): no replay, **✂ Trecho** na barra abre o painel. Vá até
+  onde o trecho começa e toque em **Marcar início**; depois, até onde termina, e em **Marcar fim** (o trecho fica
+  marcado em amarelo na barra, com a duração). **Baixar vídeo** grava o vídeo vertical 1080 × 1920 (MP4 onde o
+  navegador grava, como o Safari e o Chrome recente; WebM no Firefox) em tempo real, então a aba precisa ficar aberta;
+  **Baixar GIF** sai em 360 × 640, em poucos segundos. Cada ação vira um quadro: a mesa vista por quem assiste
+  (Líder, Personagens, Stage, poder, DON!!, Vida, mão e deck em quantidade, topo do descarte), a seta do ataque e a
+  carta jogada, o Counter e o efeito ativado ampliados no meio, como o destaque da tela de transmissão; a carta em
+  destaque fica mais tempo na tela. **Nada escondido sai:** os quadros vêm do motor (`clipFrames`, em
+  `packages/engine/src/clip.ts`) com a visão de espectador, sem revelar nada nem no fim de jogo (o `.json` do replay
+  tem as duas mãos e os dois decks; o vídeo não). Ações que não mudam nada à vista não geram quadro, e o trecho para
+  em 90 s (o limite dos Reels). Não aparece no replay embutido em apps parceiros nem no tutorial.
 - Em **Opções de teste** (no menu, só para o perfil Dev), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
   reproduz a mesma partida.
 
