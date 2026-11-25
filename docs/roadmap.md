@@ -106,8 +106,9 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   *Progresso:* fase 1 de 3 (desafios no banco e o editor com a solução gravada jogando) em 2026-11-25,
   [PR #227](https://github.com/Xaleh/gumgumfight/pull/227); fase 2 de 3 (fila com datas fixas e ordem manual, números
   por dia, editar e duplicar) em 2026-11-25, [PR #228](https://github.com/Xaleh/gumgumfight/pull/228); fase 3 de 3
-  (defensor com Eventos de Counter e [Trigger], enunciado livre) em 2026-11-25.
-  *Feito em:* 25/11/2026, [PR #PRNUM](https://github.com/Xaleh/gumgumfight/pull/PRNUM)
+  (defensor com Eventos de Counter e [Trigger], enunciado livre) em 2026-11-25,
+  [PR #229](https://github.com/Xaleh/gumgumfight/pull/229).
+  *Feito em:* 25/11/2026, [PR #229](https://github.com/Xaleh/gumgumfight/pull/229)
 
 - [x] **B5. Sandbox de regras**
   Mesa livre para montar uma situação (cartas em campo, na mão, DON!!, Vida) e testar a interação de duas cartas, sem
