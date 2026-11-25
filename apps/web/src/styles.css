@@ -20870,3 +20870,159 @@ div.dk-tile-main {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ==== Administração → Monitoramento (A2) ==== */
+.monitor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.monitor h3 {
+  margin: 10px 0 0;
+}
+.monitor-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.monitor-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  min-width: 0;
+}
+.monitor-card b {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.monitor-bad {
+  color: var(--danger);
+}
+.monitor-hours {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel);
+  max-height: 360px;
+  overflow-y: auto;
+}
+.monitor-hour {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, minmax(56px, 96px));
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.monitor-hour > span:not(:first-child) {
+  position: relative;
+  isolation: isolate;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.monitor-hour.head {
+  border-top: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.monitor-hour.head > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.monitor-bar {
+  position: absolute;
+  inset: 2px auto 2px 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--blue) 18%, transparent);
+  z-index: -1;
+}
+.monitor-errors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.monitor-errors > li {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.monitor-errors > li.resolved {
+  opacity: 0.6;
+}
+.monitor-error-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.monitor-error-head:hover,
+.monitor-error-head[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+.monitor-error-msg {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.monitor-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--navy);
+}
+.monitor-tag.web {
+  background: var(--accent);
+}
+.monitor-tag.test {
+  background: var(--muted);
+}
+.monitor-error-body {
+  padding: 0 12px 10px;
+}
+.monitor-error-body p {
+  overflow-wrap: anywhere;
+}
+.monitor-stack {
+  margin: 0 0 8px;
+  padding: 8px;
+  max-height: 240px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--panel2);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+@media (max-width: 640px) {
+  .monitor-hour {
+    grid-template-columns: minmax(0, 1fr) repeat(4, 48px);
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}

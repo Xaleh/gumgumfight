@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { t } from '../i18n';
+import { reportError } from '../monitor';
 
 interface Props {
   children: ReactNode;
@@ -35,6 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('Erro na tela:', error, info.componentStack);
+    reportError('render', error);
     const now = Date.now();
     const quick = now - this.lastError < AUTO_RETRY_MS;
     this.lastError = now;

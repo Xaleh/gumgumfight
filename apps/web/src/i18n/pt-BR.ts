@@ -12,6 +12,7 @@ import sealedPtBR from './sealed/pt-BR';
 import yonkoPtBR from './yonko/pt-BR';
 import sandboxPtBR from './sandbox/pt-BR';
 import friendsPtBR from './friends/pt-BR';
+import monitorPtBR from './monitor/pt-BR';
 import dailyPtBR from './daily/pt-BR';
 import analysisPtBR from './analysis/pt-BR';
 
@@ -3168,6 +3169,8 @@ const ptBR = {
   ...sandboxPtBR,
   // ==== amigos e convite direto (i18n/friends) ====
   ...friendsPtBR,
+  // ==== Monitoramento: aba da Administração (i18n/monitor) ====
+  ...monitorPtBR,
   ...dailyPtBR,
   // ==== Análise da partida: revisão do replay terminado (i18n/analysis) ====
   ...analysisPtBR,

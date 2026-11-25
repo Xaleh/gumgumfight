@@ -12,6 +12,7 @@ import sealed from './sealed/ja';
 import yonko from './yonko/ja';
 import sandbox from './sandbox/ja';
 import friends from './friends/ja';
+import monitor from './monitor/ja';
 import daily from './daily/ja';
 import analysis from './analysis/ja';
 
@@ -3155,6 +3156,8 @@ export default {
   ...sandbox,
   // ==== amigos e convite direto (i18n/friends) ====
   ...friends,
+  // ==== Monitoramento: aba da Administração (i18n/monitor) ====
+  ...monitor,
   ...daily,
   ...analysis,
 } satisfies Messages;

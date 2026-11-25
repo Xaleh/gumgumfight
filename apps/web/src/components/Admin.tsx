@@ -6,6 +6,7 @@ import { type MessageKey, useT } from '../i18n';
 import { PaymentsPanel, SponsorsPanel, SupporterEditor } from './AdminSupport';
 import { DailyAdminPanel, DailyEditor, type EditorStart } from './DailyEditor';
 import { DeckCleanupPanel } from './DeckCleanup';
+import { MonitorPanel } from './Monitor';
 import { ReportsPanel } from './Reports';
 import { TeamBotPanel } from './TeamBot';
 import { TutorialFunnelPanel } from './TutorialFunnel';
@@ -19,11 +20,11 @@ const ROLE_HELP: Record<Role, MessageKey> = {
   dev: 'admin.roleHelp.dev',
 };
 
-/** Administração (só admin e dev): perfis das contas, relatos de problemas das partidas e o funil do tutorial. */
+/** Administração (só admin e dev): perfis das contas, relatos de problemas das partidas, o funil do tutorial e o monitoramento. */
 export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (setup: GameSetup) => void }) {
   const t = useT();
   const { user, refresh } = useAuth();
-  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'daily' | 'payments' | 'sponsors' | 'decks' | 'team'>('users');
+  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'daily' | 'payments' | 'sponsors' | 'decks' | 'team' | 'monitor'>('users');
   /** Editor de desafios do dia aberto (ocupa a tela inteira: a gravação joga na mesa). */
   const [dailyEditor, setDailyEditor] = useState<{ start: EditorStart | null } | null>(null);
   const [query, setQuery] = useState('');
@@ -110,7 +111,11 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
           <button className={tab === 'team' ? 'on' : ''} onClick={() => setTab('team')}>
             {t('admin.tabTeam')}
           </button>
+          <button className={tab === 'monitor' ? 'on' : ''} onClick={() => setTab('monitor')}>
+            {t('monitor.tab')}
+          </button>
         </div>
+        {tab === 'monitor' && <MonitorPanel />}
         {tab === 'team' && <TeamBotPanel onReplay={onReplay} admin />}
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
         {tab === 'tutorial' && <TutorialFunnelPanel />}

@@ -174,6 +174,27 @@ pm2 restart gumgumfight     # reiniciar
 (Na VPS preparada pelo `bootstrap-hostinger.sh`, o app roda no usuário `gumgum`: como root, use
 `sudo -u gumgum pm2 logs gumgumfight`, ou entre com `ssh gumgum@<IP>`.)
 
+### Monitoramento (erros, canais ao vivo e site fora do ar)
+
+- **Administração → Monitoramento** (admin e dev): os erros do servidor (toda rota que responde 5xx por uma exceção, e
+  as exceções e promessas rejeitadas sem tratamento antes de o processo cair) e do navegador (erros sem tratamento,
+  promessas rejeitadas e telas que o `ErrorBoundary` segura). Erros iguais ficam numa linha só, com quantas vezes e
+  quando; dá para abrir a pilha, marcar como resolvido (volta a abrir se acontecer de novo) e apagar os resolvidos.
+  Nada que identifique a pessoa ou a partida é guardado: as URLs perdem a query string (os links das salas levam o
+  token do lugar), e tokens, ids longos e e-mails viram `[…]`.
+- **Canais ao vivo (SSE)** das partidas online, dos espectadores e do Yonko: quantos estão abertos agora, e por hora
+  os abertos, as quedas (o navegador ou a rede fechou), os encerrados pelo servidor, as reconexões (o mesmo lugar volta
+  em até 2 min) e o pico. O histórico por hora fica 30 dias no banco e sobrevive aos deploys.
+- **Teste:** os botões **Forçar erro no servidor** e **Forçar erro no navegador** geram um erro de verdade em cada
+  lado; ele aparece na lista marcado como *teste*.
+- **Site fora do ar:** o workflow **Site no ar** (`.github/workflows/uptime.yml`) confere `https://gumgumfight.app/api/health`
+  de fora da VPS a cada 5 min. Três falhas seguidas abrem a issue **"Site fora do ar"** (rótulo `site-fora-do-ar`,
+  atribuída ao dono do repositório: o GitHub avisa por e-mail e no app) e, se o secret `ALERT_WEBHOOK_URL` existir
+  (webhook do Discord ou do Slack, ou um tópico do ntfy.sh para notificação no celular), avisam lá também. Quando o
+  site volta, o workflow comenta quanto tempo ficou fora e fecha a issue. Para **simular uma queda**: Actions →
+  "Site no ar" → *Run workflow* com uma URL que falhe (ex.: `https://gumgumfight.app/api/simula-queda`); a issue sai
+  como "(simulação)" e a próxima conferência normal a fecha. `UPTIME_URL` (Variables) troca o endereço conferido.
+
 Para importar mais coleções, use `import-cards.mjs` do release atual com o `DB_PATH` do banco compartilhado
 (para `--spoilers`, informe também `DATA_DIR=<release>/data`; o app no pm2 já recebe essa variável);
 para desligar as imagens, defina `CARD_IMAGES=off` no ambiente do app e recarregue-o no pm2.
@@ -1732,6 +1753,7 @@ pode chamar sem login nem token:
 | GET · POST | `/api/yonko/active` · `/api/yonko/tables` · `/api/yonko/tables/join` · `/api/yonko/tables/:id/…` | Mesas online do Yonko: as suas (com o token), criar, entrar pelo código, o canal `events` (SSE) e os pedidos da mesa (`deck`, `ready`, `rules`, `bot`, `clear`, `start`, `action`, `reopen`, `leave`), todos com o token do lugar |
 | GET | `/api/tournaments` · `/api/tournaments/:id` | Torneios e o detalhe de um torneio (o que quem pede pode fazer vem na resposta) |
 | GET | `/api/sponsors` · `/api/support` · `/api/support/supporters` | Lojas parceiras, apoio ao projeto e lista pública de apoiadores |
+| POST | `/api/monitor/errors` | Relato de erro do navegador para o monitoramento (`{kind, message, stack?, url?, release?}`; 20 por IP a cada 10 min) |
 | GET · POST | `/api/daily[?brief=1]` · `/api/daily/play` | Desafio do dia: enunciado, mesa (visão do jogador), resultado e sequência; e a tentativa (as jogadas), conferida no servidor (com o código do navegador) |
 
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked, tournament), `opponent` (bot,

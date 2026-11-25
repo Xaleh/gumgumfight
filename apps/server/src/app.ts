@@ -75,6 +75,8 @@ import { registerDraftRoutes } from './draft/routes';
 import { registerSealedRoutes } from './sealed/routes';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { registerDailyRoutes } from './daily/routes';
+import { registerMonitorRoutes } from './monitor/routes';
+import { SseMetrics } from './monitor/sse';
 import { reportFromGame } from './tournaments/store';
 import { currentSpoilerSet } from './spoiler-set';
 
@@ -103,6 +105,8 @@ export function buildApp(
     agentComplete?: Complete | null;
     /** Testes: a pasta dos presets da Sala do Tempo (sem ela, `data/chamber`). */
     chamberDir?: string;
+    /** Testes: versão mostrada no monitoramento (sem ela, `currentRelease()`). */
+    release?: string;
   } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
@@ -196,6 +200,9 @@ export function buildApp(
     adminEmails: server.adminEmails,
     afterLogin,
   });
+  // Monitoramento (A2): erros do servidor (hook onError) e do navegador, e as métricas dos canais SSE.
+  const sse = new SseMetrics({ db, now: opts.now });
+  registerMonitorRoutes(app, { db, user: auth.viewer, now: opts.now, release: opts.release, sse });
 
   /**
    * Dono dos decks e do perfil: a conta Google, se houver sessão; sem login, o
@@ -491,6 +498,7 @@ export function buildApp(
     notifier,
     botProfile: (deckId, leader) => metaProfiles.profileFor(deckId, leader)?.profile,
     botHandGuess: (leader, ownerHash) => handGuesses.forLeader(leader, ownerHash),
+    sse,
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
@@ -506,6 +514,7 @@ export function buildApp(
     botDelayMs: opts.botDelayMs,
     rateLimit: opts.onlineRateLimit,
     sweepMs: opts.now ? 0 : undefined,
+    sse,
   });
   app.decorate('yonkoTables', yonkoTables);
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
