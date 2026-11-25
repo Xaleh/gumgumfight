@@ -86,12 +86,12 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   versão do Time continua com o que tem de exclusivo.
   *Feito em:* —
 
-- [ ] **B4. Desafio do dia**
+- [x] **B4. Desafio do dia**
   Um cenário por dia montado com o `scenario.ts` ("ache o letal neste turno", "sobreviva a este turno"), com resultado
   para compartilhar e sequência de dias seguidos. Também serve de conteúdo para o Instagram.
   *Pronto quando:* existe uma fila de desafios publicados por data, o servidor confere a solução, o jogador vê a
   sequência dele e pode compartilhar o resultado sem entregar a resposta.
-  *Feito em:* —
+  *Feito em:* 25/11/2026, [PR #225](https://github.com/Xaleh/gumgumfight/pull/225)
 
 - [ ] **B5. Sandbox de regras**
   Mesa livre para montar uma situação (cartas em campo, na mão, DON!!, Vida) e testar a interação de duas cartas, sem
