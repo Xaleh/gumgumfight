@@ -547,16 +547,26 @@ aparecem com o selo **Yonko**. Um deck comum de 50 também serve: na mesa ele vi
 uma cópia de cada carta dele, completado até 60 com cartas sorteadas da mesma cor), e a sala mostra isso a todos.
 Os bots jogam com decks prontos montados do mesmo jeito.
 
-**Na mesa:** os oponentes ficam em painéis no alto, com tudo o que é público (Líder, Vida, mão, DON!!, deck,
-descarte, Personagens, Stage e, no online, o relógio e quem está desconectado); a sua mesa fica embaixo, e ao lado
-vêm a ordem dos turnos, o registro e a carta em destaque. Tudo é por clique: toque numa carta da mão para jogar,
-numa carta sua em campo para atacar, dar DON!! ou ativar; ao atacar, os alvos válidos acendem nas três mesas. Só quem foi
-atacado usa Counter (o manual também deixa os outros usarem Evento [Counter]; por ora isso fica desligado).
-**No celular**, os oponentes viram abas e o registro e a carta abrem em gavetas.
+**Na mesa:** cada lugar é um **playmat na cor do Líder**, com tudo o que é público desenhado como na mesa de dois:
+a Vida empilhada, o deck, o descarte (o toque abre a lista), os DON!! em cartas, o Líder, o Stage, os Personagens e,
+nos oponentes, a mão num leque de versos (no online, também o relógio e quem está desconectado). Os oponentes ficam
+no alto, a sua mesa embaixo com a mão em leque, e no meio a **faixa de ação**, que mostra quem a mesa espera, a
+pergunta aberta e, numa batalha, o poder do atacante contra o do alvo; ao lado dela fica **"Encerrar turno"**. A
+barra de cima traz a **ordem dos turnos** com o Líder de cada um, e a coluna do lado a carta em destaque e o
+registro. Tudo é por clique: toque numa carta da mão para jogar, numa carta sua em campo para atacar, dar DON!! ou
+ativar; ao atacar, os alvos válidos acendem nas três mesas e uma seta liga o atacante ao alvo. Só quem foi atacado
+usa Counter (o manual também deixa os outros usarem Evento [Counter]; por ora isso fica desligado).
+**No celular**, os oponentes viram abas (com o Líder, a Vida e a mão de cada um), a mesa cabe na tela sem rolar, e
+o registro, a carta (toque e segure, ou toque numa carta que não tem ação) e o descarte abrem em janelas.
 
-O que ainda **não** tem: espectadores, replay, chat e avisos no celular na mesa online; arrastar cartas, animações e
-som da mesa de dois; ver o descarte carta a carta; dar o valor de Counter a outra carta que não a atacada; e o bot
-com busca (os bots são o bot simples, que completa a mesa mas joga mal).
+**Animações e som:** a mesa usa as animações da mesa de dois (cartas e DON!! voando entre as zonas, a carta jogada
+e o ataque no centro, o impacto no alvo, a faixa de troca de turno) e os mesmos sons e música. Tudo segue a opção
+**Animações** das Configurações (completas, suaves ou desligadas), que também abre pelo botão de opções da própria
+mesa, junto com os volumes: desligadas, a mesa muda na hora e nada se move.
+
+O que ainda **não** tem: espectadores, replay, chat e avisos no celular na mesa online; arrastar cartas; dar o
+valor de Counter a outra carta que não a atacada; e o bot com busca (os bots são o bot simples, que completa a mesa
+mas joga mal).
 
 ## Estatísticas
 

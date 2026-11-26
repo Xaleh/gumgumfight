@@ -80,7 +80,7 @@ function moves(prev: GameState, next: GameState): Move[] {
     else if (t.zone !== s.zone || t.player !== s.player) out.push({ from: s, to: t, uid });
   }
   for (const [uid, t] of b) if (!a.has(uid)) push(added, key(t), uid);
-  for (const p of [0, 1] as PlayerId[]) {
+  for (const p of next.players.map((ps) => ps.id)) {
     for (const [fz, tz] of PAIRS) {
       const r = removed.get(`${p}:${fz}`);
       const ad = added.get(`${p}:${tz}`);

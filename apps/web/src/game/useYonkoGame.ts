@@ -17,6 +17,7 @@ import {
   viewFor,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motionWait } from './motion';
 
 export interface YonkoSetup {
   config: GameConfig;
@@ -38,12 +39,15 @@ export function useYonkoGame(setup: YonkoSetup) {
   const [error, setError] = useState<string | null>(null);
   /** As jogadas dos bots esperam (a pessoa abriu o registro ou uma carta para ler). */
   const [paused, setPaused] = useState(false);
+  /** A última jogada aplicada, de quem for (a mesa destaca a habilidade ativada). */
+  const [lastAction, setLastAction] = useState<Action | undefined>(undefined);
 
   const dispatch = useCallback((action: Action) => {
     try {
       const next = applyAction(ref.current, action);
       ref.current = next;
       setFull(next);
+      setLastAction(action);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -54,7 +58,9 @@ export function useYonkoGame(setup: YonkoSetup) {
     if (full.phase === 'gameover' || paused) return;
     const seat = actingPlayer(full);
     if (seat === null || !full.players[seat].isBot) return;
-    const delay = hiddenDecision(full.pending) ? BOT_HIDDEN_MS[0] + Math.random() * (BOT_HIDDEN_MS[1] - BOT_HIDDEN_MS[0]) : full.pending ? BOT_MS * 0.7 : BOT_MS;
+    const think = hiddenDecision(full.pending) ? BOT_HIDDEN_MS[0] + Math.random() * (BOT_HIDDEN_MS[1] - BOT_HIDDEN_MS[0]) : full.pending ? BOT_MS * 0.7 : BOT_MS;
+    // Com as animações ligadas, o bot espera as cartas da jogada anterior pousarem (`holdMotion`, em Motion.tsx).
+    const delay = Math.max(think, motionWait() + 180);
     const timer = setTimeout(() => {
       // O bot só enxerga o que o lugar dele enxerga.
       const view = viewFor(full, seat, identityAliases(full));
@@ -73,5 +79,5 @@ export function useYonkoGame(setup: YonkoSetup) {
   // A mesa é desenhada pela visão de quem joga: as mãos dos bots e as linhas secretas do registro ficam de fora.
   const state = useMemo(() => viewFor(full, setup.human, identityAliases(full)), [full, setup.human]);
 
-  return { state, dispatch, error, setError, paused, setPaused };
+  return { state, dispatch, error, setError, paused, setPaused, lastAction };
 }

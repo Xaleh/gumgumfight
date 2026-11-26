@@ -78,3 +78,10 @@ reduzir as camadas da mesa no celular. Até lá, o CI tenta de novo uma vez.
   organizador vê o inscrito). A partida do torneio no iPhone fica de fora enquanto a queda da mesa no WebKit (acima)
   não for resolvida.
 - Com as três fases, o A1 fica `[x]`.
+
+### Depois das três fases
+
+- `yonko.spec.ts` (`@iphone`): a mesa local do Yonko, da tela inicial ao primeiro turno de quem joga. A preparação
+  (largada e mão inicial) e as perguntas dos bots são respondidas pelo botão em destaque da faixa de ação até
+  "Encerrar turno" acender; o turno passa para um bot; e as opções da mesa abrem com a escolha das animações, que
+  desligadas valem na hora (a mesa leva `anim-off`). Entrou com o redesenho da mesa (playmats, animações de voo).

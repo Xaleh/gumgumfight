@@ -1,15 +1,19 @@
-// Mesa de Yonko (todos contra todos): os três oponentes em painéis compactos no alto, a mesa de quem joga
-// embaixo, a faixa de ação no meio e, ao lado, a ordem dos turnos, o registro e a carta em destaque. No
-// celular os oponentes viram abas, com uma mesa aberta por vez.
+// Mesa de Yonko (todos contra todos): cada lugar é um playmat na cor do Líder (Vida empilhada, deck, descarte
+// e DON!! em cartas, como na mesa de dois), os oponentes no alto, a faixa de ação no meio, a mesa de quem joga
+// embaixo com a mão em leque, e ao lado a carta em destaque e o registro. No celular os oponentes viram abas,
+// com uma mesa aberta por vez.
 //
-// É uma tela própria, não uma adaptação da mesa de dois jogadores (`GameScreen`): aqui tudo é por clique
-// (sem arrastar e sem as animações de voo). A mesa recebe o jogo de fora: a partida local contra bots
-// (`useYonkoGame`, em `LocalYonkoTable`) ou a mesa online (`useYonkoOnline`, em `YonkoOnline.tsx`).
+// É uma tela própria, não uma adaptação da mesa de dois jogadores (`GameScreen`): aqui tudo é por clique (sem
+// arrastar). As animações são as da mesa de dois (`useBoardMotion`: cartas e DON!! voando, a vitrine no centro,
+// o impacto do ataque) e seguem a opção "Animações" do jogador: completas, suaves ou desligadas. A mesa recebe
+// o jogo de fora: a partida local contra bots (`useYonkoGame`, em `LocalYonkoTable`) ou a mesa online
+// (`useYonkoOnline`, em `YonkoOnline.tsx`).
 
 import {
   type Action,
   cancelAllowed,
   cardDef,
+  cardImage,
   cardStatuses,
   counterValue,
   type FieldCard,
@@ -19,21 +23,26 @@ import {
   HIDDEN_CARD,
   legalActions,
   locate,
+  MAX_CHARACTERS,
   type Pending,
   playCost,
   playError,
   type PlayerId,
   type PlayerState,
 } from '@gumgum/engine';
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, type PointerEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { listText, logText, msgText, winReasonText } from '../game/engineText';
+import { useMatchAudio } from '../game/useMatchAudio';
 import { useYonkoGame, type YonkoSetup } from '../game/useYonkoGame';
+import { useBoardSize } from '../hooks/useBoardSize';
 import { useLongPress } from '../hooks/useLongPress';
-import { type Translate, useLocale, useT, useTryT } from '../i18n';
+import { type Translate, useT, useTryT } from '../i18n';
+import { AnimationsSeg, useSettings, VolumeControl } from '../settings';
 import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight, PickOrderContext } from './CardView';
 import { Icon } from './Icons';
+import { useBoardMotion } from './Motion';
 
 type TryT = ReturnType<typeof useTryT>;
 /** O que a mesa precisa do jogo: a visão de quem joga, a jogada e o último erro. */
@@ -43,6 +52,8 @@ export interface TableGame {
   error: string | null;
   /** Segura os bots enquanto a pessoa lê o registro ou uma carta (só na mesa local). */
   setPaused?: (paused: boolean) => void;
+  /** A última jogada aplicada, de quem for (só na mesa local): a habilidade ativada ganha o destaque no centro. */
+  lastAction?: Action;
 }
 
 /** Na mesa online: o relógio e a conexão de cada jogador (para os painéis e a ordem dos turnos). */
@@ -126,8 +137,8 @@ interface BannerView {
   tray?: string[];
   /** O jogador da vez é quem está na tela (a faixa fica em destaque). */
   mine: boolean;
-  /** O texto já descreve a batalha (bloqueio, Counter): a linha da batalha não se repete. */
-  battle?: boolean;
+  /** A mesa espera outra pessoa (ou um bot): a faixa mostra os três pontinhos. */
+  waiting?: boolean;
 }
 
 /** Carta da mesa: `CardView` com o toque longo (celular) abrindo a carta para ler. */
@@ -164,28 +175,16 @@ function TableCard({
   );
 }
 
-/** Marcadores de Vida: os que restam cheios (os virados para cima em azul) e os perdidos vazados. */
-function LifePips({ s, id }: { s: GameState; id: PlayerId }) {
-  const ps = s.players[id];
-  const now = lifeNow(s, id);
-  const total = Math.max(startingLife(s, id), now);
-  const faceUp = (ps.lifeFaceUp ?? []).filter((u) => ps.life.includes(u)).length;
+/** O Líder do lugar num medalhão, recortado no rosto, com o anel na cor do lugar (sem imagens, a inicial). */
+function Avatar({ s, id, className }: { s: GameState; id: PlayerId; className?: string }) {
+  const { showImages } = useSettings();
+  const [failed, setFailed] = useState(false);
+  const uid = s.players[id].leader.uid;
+  const image = s.cards[uid] ? cardImage(s, uid) : undefined;
   return (
-    <span className="yk-pips" aria-hidden="true">
-      {Array.from({ length: total }, (_, i) => (
-        <i key={i} className={i >= now ? 'x' : i >= now - faceUp ? 'b' : ''} />
-      ))}
+    <span className={['yk-av', className ?? ''].join(' ')} style={vars({ '--pc': seatColor(s, id) })} aria-hidden="true">
+      {showImages && image && !failed ? <img src={image} alt="" referrerPolicy="no-referrer" draggable={false} onError={() => setFailed(true)} /> : s.players[id].name.slice(0, 1)}
     </span>
-  );
-}
-
-function Slots({ n }: { n: number }) {
-  return (
-    <>
-      {Array.from({ length: Math.max(0, n) }, (_, i) => (
-        <span key={i} className="yk-slot" />
-      ))}
-    </>
   );
 }
 
@@ -196,7 +195,114 @@ interface CardHandlers {
   onHover: (uid: string | null) => void;
 }
 
-/** O relógio e a conexão de um jogador, no canto do painel dele (só na mesa online). */
+/**
+ * A Vida empilhada como na mesa de dois (cartas deitadas, as viradas para cima com a frente à mostra) e, por
+ * cima, o contador. Durante a preparação a Vida ainda não foi posta: fica o contorno com a Vida que o jogador
+ * vai ter.
+ */
+function LifeStack({ s, id, h, t }: { s: GameState; id: PlayerId; h: CardHandlers; t: Translate }) {
+  const ps = s.players[id];
+  const now = lifeNow(s, id);
+  const max = Math.max(startingLife(s, id), now);
+  const n = ps.life.length;
+  return (
+    <div className="yk-life" title={t('yonko.life', { n: now, max })}>
+      <div className="yk-life-stack" key={`stack-${n}`} data-anchor={`life-${id}`} style={vars({ '--n': Math.max(n, 1) })}>
+        {ps.life.map((uid, i) => {
+          if (!ps.lifeFaceUp?.includes(uid)) return <div key={i} className="life-card" style={vars({ '--i': i })} />;
+          const image = cardImage(s, uid);
+          return (
+            <div
+              key={i}
+              className="life-card face-up"
+              title={cardDef(s, uid).name}
+              style={vars({ '--i': i, ...(image ? { '--face': `url("${image}")` } : {}) })}
+              onClick={() => h.onInspect(uid)}
+              onMouseEnter={() => h.onHover(uid)}
+              onMouseLeave={() => h.onHover(null)}
+            />
+          );
+        })}
+        {n === 0 && <span className="yk-life-empty" />}
+      </div>
+      <span key={`hearts-${now}`} className={['yk-hearts', now === 0 ? 'zero' : now <= 2 ? 'low' : ''].join(' ')}>
+        <Icon name="heart" size={12} />
+        <b>{now}</b>
+        <small>/{max}</small>
+      </span>
+    </div>
+  );
+}
+
+/** O deck de DON!!, os DON!! em campo em cartas (ativos em pé, virados deitados) e a conta dos ativos. */
+function DonRow({ ps, t }: { ps: PlayerState; t: Translate }) {
+  const total = ps.donActive + ps.donRested;
+  return (
+    <div className="yk-don" title={t('yonko.donTitle')}>
+      <span className="yk-dondeck" data-anchor={`dondeck-${ps.id}`}>
+        <span className={['don-card', ps.donDeck > 0 ? 'back' : 'empty'].join(' ')} />
+        <b className="yk-count">{ps.donDeck}</b>
+      </span>
+      <span className="yk-don-cards" data-anchor={`don-${ps.id}`} style={vars({ '--n': Math.max(total, 1) })}>
+        {Array.from({ length: total }, (_, i) => (
+          <span key={i} className={['don-card', i >= ps.donActive ? 'rested' : ''].join(' ')} />
+        ))}
+      </span>
+      <span className="yk-don-count" aria-label={t('yonko.don', { n: donOnField(ps), active: ps.donActive })}>
+        <b>{ps.donActive}</b>
+        <small>/{total}</small>
+      </span>
+    </div>
+  );
+}
+
+/** O deck (verso com a conta) e o descarte (a carta de cima; o toque abre a lista). */
+function Piles({ s, id, h, t, onTrash }: { s: GameState; id: PlayerId; h: CardHandlers; t: Translate; onTrash: (id: PlayerId) => void }) {
+  const ps = s.players[id];
+  const top = ps.trash[ps.trash.length - 1];
+  return (
+    <div className="yk-piles">
+      <span className="yk-pile" data-anchor={`deck-${id}`} title={t('board.deckTitle', { n: ps.deck.length })}>
+        {ps.deck.length > 0 ? <span className="card back" /> : <span className="yk-slot" />}
+        <b className="yk-count">{ps.deck.length}</b>
+      </span>
+      <span
+        className="yk-pile pile"
+        role="button"
+        tabIndex={0}
+        data-anchor={`trash-${id}`}
+        title={t('board.trashTitle', { n: ps.trash.length })}
+        onClick={() => onTrash(id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onTrash(id);
+          }
+        }}
+      >
+        {top && s.cards[top] ? <CardView state={s} uid={top} onHover={h.onHover} /> : <span className="yk-slot">{t('board.trashSlot')}</span>}
+        <b className="yk-count">{ps.trash.length}</b>
+      </span>
+    </div>
+  );
+}
+
+/** A mão de um oponente: um leque de versos com a conta (as cartas compradas e jogadas voam daqui). */
+function HandFan({ id, n, title }: { id: PlayerId; n: number; title: string }) {
+  const shown = Math.min(n, 7);
+  return (
+    <span className="yk-fan" data-anchor={`hand-${id}`} title={title}>
+      <span className="yk-fan-cards" aria-hidden="true">
+        {Array.from({ length: shown }, (_, i) => (
+          <i key={i} style={vars({ '--o': i - (shown - 1) / 2 })} />
+        ))}
+      </span>
+      <b>{n}</b>
+    </span>
+  );
+}
+
+/** O relógio e a conexão de um jogador, na placa dele (só na mesa online). */
 function SeatClock({ status, t }: { status?: SeatStatus; t: Translate }) {
   if (!status) return null;
   return (
@@ -211,82 +317,100 @@ function SeatClock({ status, t }: { status?: SeatStatus; t: Translate }) {
   );
 }
 
-/** Painel de um oponente: tudo o que é informação pública dele. */
+/** Os Personagens nos cinco lugares do campo (os vazios ficam marcados). */
+function FieldRow({ ps, card }: { ps: PlayerState; card: (fc: FieldCard) => ReactNode }) {
+  return (
+    <div className="yk-row">
+      {Array.from({ length: Math.max(MAX_CHARACTERS, ps.characters.length) }, (_, i) => {
+        const fc = ps.characters[i];
+        return (
+          <span key={fc?.uid ?? `empty-${i}`} className="yk-cell">
+            {fc ? card(fc) : <span className="yk-slot" />}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Playmat de um oponente: tudo o que é informação pública dele. */
 function Opponent({
   s,
   id,
+  index,
   place,
   h,
   targeted,
+  attacked,
   playing,
   hidden,
   t,
   status,
+  onTrash,
 }: {
   s: GameState;
   id: PlayerId;
+  /** Posição entre os oponentes (para a entrada em cascata). */
+  index: number;
   status?: SeatStatus;
   /** Posição na ordem dos turnos (1 = quem começou). */
   place: number;
   h: CardHandlers;
   /** Há um alvo válido nesta mesa, ou ela é a atacada. */
   targeted: boolean;
+  /** É a mesa atacada na batalha em curso. */
+  attacked: boolean;
   playing: boolean;
   /** No celular: outra aba está aberta. */
   hidden: boolean;
   t: Translate;
+  onTrash: (id: PlayerId) => void;
 }) {
   const ps = s.players[id];
   const leader = cardDef(s, ps.leader.uid);
   const card = (fc: FieldCard) => (
-    <TableCard key={fc.uid} s={s} uid={fc.uid} fc={fc} highlight={h.highlight(fc.uid)} onClick={() => h.onCard(fc.uid)} onInspect={h.onInspect} onHover={h.onHover} />
+    <div key={fc.uid} className="field-card">
+      <TableCard s={s} uid={fc.uid} fc={fc} highlight={h.highlight(fc.uid)} onClick={() => h.onCard(fc.uid)} onInspect={h.onInspect} onHover={h.onHover} />
+    </div>
   );
   return (
     <section
-      className={['yk-opp', targeted ? 'focus' : '', playing ? 'playing' : '', ps.out ? 'out' : '', hidden ? 'tab-off' : ''].join(' ')}
-      style={vars({ '--pc': seatColor(s, id) })}
+      className={['yk-mat', 'yk-opp', attacked ? 'focus' : targeted ? 'aim' : '', playing ? 'playing' : '', ps.out ? 'out' : '', hidden ? 'tab-off' : ''].join(' ')}
+      style={vars({ '--pc': seatColor(s, id), '--i': index })}
       aria-label={t('yonko.tableOf', { name: ps.name })}
     >
-      <header className="yk-opp-head">
+      <header className="yk-plate">
         <span className="yk-ord">{t('yonko.place', { n: place })}</span>
         <b className="yk-name">{ps.name}</b>
         <span className="yk-leader-name">{leader.name}</span>
         {ps.out ? <span className="yk-tag out">{t('yonko.tagOut')}</span> : targeted ? <span className="yk-tag">{t('yonko.tagTarget')}</span> : playing ? <span className="yk-tag turn">{t('yonko.tagTurn')}</span> : null}
         {!ps.out && <SeatClock status={status} t={t} />}
+        {!ps.out && <HandFan id={id} n={ps.hand.length} title={t('yonko.hand', { n: ps.hand.length })} />}
       </header>
       {ps.out ? (
-        <p className="yk-out-note">{t('yonko.outNote')}</p>
+        <div className="yk-out-note">
+          <b>{t('yonko.tagOut')}</b>
+          <p>{t('yonko.outNote')}</p>
+        </div>
       ) : (
         <>
-          <div className="yk-opp-top">
-            {card(ps.leader)}
-            <div className="yk-opp-info">
-              <div className="yk-life">
-                <span className="yk-life-label">{t('yonko.life', { n: lifeNow(s, id), max: startingLife(s, id) })}</span>
-                <LifePips s={s} id={id} />
-              </div>
-              <div className="yk-stats">
-                <span className="yk-stat" title={t('yonko.handTitle')}>
-                  <Icon name="deck" size={13} /> {t('yonko.hand', { n: ps.hand.length })}
-                </span>
-                <span className="yk-stat">{t('yonko.don', { n: donOnField(ps), active: ps.donActive })}</span>
-                <span className="yk-stat">{t('yonko.deck', { n: ps.deck.length })}</span>
-                <span className="yk-stat">{t('yonko.trash', { n: ps.trash.length })}</span>
-              </div>
+          <div className="yk-mat-top">
+            <LifeStack s={s} id={id} h={h} t={t} />
+            <span className="yk-cell">{card(ps.leader)}</span>
+            <span className="yk-cell">{ps.stage ? card(ps.stage) : <span className="yk-slot stage">{t('yonko.stage')}</span>}</span>
+            <div className="yk-res">
+              <DonRow ps={ps} t={t} />
+              <Piles s={s} id={id} h={h} t={t} onTrash={onTrash} />
             </div>
           </div>
-          <div className="yk-row">
-            {ps.characters.map(card)}
-            <Slots n={5 - ps.characters.length} />
-            {ps.stage && <span className="yk-stage">{card(ps.stage)}</span>}
-          </div>
+          <FieldRow ps={ps} card={card} />
         </>
       )}
     </section>
   );
 }
 
-/** Registro da partida, com a cor do jogador de cada linha. */
+/** Registro da partida: cada linha com a cor do jogador, e a troca de turno como divisória. */
 function Log({ s, tryT }: { s: GameState; tryT: TryT }) {
   const end = useRef<HTMLDivElement>(null);
   const lines = s.log.slice(-120);
@@ -295,11 +419,14 @@ function Log({ s, tryT }: { s: GameState; tryT: TryT }) {
   }, [s.log.length]);
   return (
     <div className="yk-log" role="log">
-      {lines.map((e, i) => (
-        <p key={s.log.length - lines.length + i} style={e.player !== null ? vars({ '--pc': seatColor(s, e.player) }) : undefined} className={e.player === null ? 'sys' : ''}>
-          {logText(tryT, e)}
-        </p>
-      ))}
+      {lines.map((e, i) => {
+        const text = logText(tryT, e);
+        return (
+          <p key={s.log.length - lines.length + i} style={e.player !== null ? vars({ '--pc': seatColor(s, e.player) }) : undefined} className={e.player === null ? (/^\s*[—–-]{1,2}\s/.test(text) ? 'sys turn' : 'sys') : ''}>
+            {e.player === null ? text.replace(/^\s*[—–-]{1,2}\s*|\s*[—–-]{1,2}\s*$/g, '') : text}
+          </p>
+        );
+      })}
       <div ref={end} />
     </div>
   );
@@ -308,10 +435,17 @@ function Log({ s, tryT }: { s: GameState; tryT: TryT }) {
 /** A carta em destaque: o texto dela e, em campo, o poder e o custo de agora. */
 function CardPanel({ s, uid, t }: { s: GameState; uid: string | null; t: Translate }) {
   const def = uid && s.cards[uid] ? cardDef(s, uid) : null;
-  if (!uid || !def || def.id === HIDDEN_CARD) return <p className="muted small">{t('yonko.cardHint')}</p>;
+  if (!uid || !def || def.id === HIDDEN_CARD) {
+    return (
+      <div className="yk-card-panel empty">
+        <span className="yk-card-ghost" aria-hidden="true" />
+        <p className="muted small">{t('yonko.cardHint')}</p>
+      </div>
+    );
+  }
   const onField = Boolean(locate(s, uid));
   return (
-    <div className="yk-card-panel">
+    <div className="yk-card-panel" key={uid}>
       <span className="yk-card-big">
         <CardView state={s} uid={uid} />
       </span>
@@ -345,26 +479,31 @@ function Result({
   // "You win the game" encerra a mesa com gente ainda de pé: esses ficam sem posição.
   const standing = s.players.map((ps) => ps.id).filter((id) => !ranked.includes(id));
   const title = s.winner === null ? t('yonko.resultDraw') : s.winner === me ? t('yonko.resultWin') : t('yonko.resultLose', { name: s.players[s.winner].name });
+  const row = (id: PlayerId, place: string, note: string, i: number) => (
+    <li key={id} className={[id === me ? 'me' : '', id === s.winner ? 'first' : ''].join(' ')} style={vars({ '--pc': seatColor(s, id), '--i': i })}>
+      <span className="yk-ord">{place}</span>
+      <Avatar s={s} id={id} />
+      <b>{id === me ? t('yonko.you') : s.players[id].name}</b>
+      <span className="muted">{note}</span>
+    </li>
+  );
   return (
     <div className="yk-result-back" onClick={onClose}>
-      <div className="yk-result" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div className={['yk-result', s.winner === me ? 'won' : ''].join(' ')} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+        {s.winner !== null && (
+          <div className="yk-result-crown" style={vars({ '--pc': seatColor(s, s.winner) })}>
+            <span className="yk-result-rays" aria-hidden="true" />
+            <Avatar s={s} id={s.winner} />
+            <span className="yk-result-icon" aria-hidden="true">
+              <Icon name="crown" size={26} />
+            </span>
+          </div>
+        )}
         <h2>{title}</h2>
         {s.winReason && <p className="muted">{winReasonText(tryT, s)}</p>}
         <ol className="yk-ranking">
-          {ranked.map((id, i) => (
-            <li key={id} className={id === me ? 'me' : ''} style={vars({ '--pc': seatColor(s, id) })}>
-              <span className="yk-ord">{t('yonko.place', { n: i + 1 })}</span>
-              <b>{id === me ? t('yonko.you') : s.players[id].name}</b>
-              <span className="muted">{cardDef(s, s.players[id].leader.uid).name}</span>
-            </li>
-          ))}
-          {standing.map((id) => (
-            <li key={id} className={id === me ? 'me' : ''} style={vars({ '--pc': seatColor(s, id) })}>
-              <span className="yk-ord">–</span>
-              <b>{id === me ? t('yonko.you') : s.players[id].name}</b>
-              <span className="muted">{t('yonko.resultStanding')}</span>
-            </li>
-          ))}
+          {ranked.map((id, i) => row(id, t('yonko.place', { n: i + 1 }), cardDef(s, s.players[id].leader.uid).name, i))}
+          {standing.map((id, i) => row(id, '–', t('yonko.resultStanding'), ranked.length + i))}
         </ol>
         {rematchNote && <p className="muted small">{rematchNote}</p>}
         <div className="yk-result-actions">
@@ -382,11 +521,82 @@ function Result({
   );
 }
 
+/**
+ * A seta do ataque, do atacante ao alvo: durante a batalha e, com um atacante escolhido, até o alvo sob o
+ * mouse. Atravessa as mesas, então fica por cima do tabuleiro inteiro. Com um dos dois fora da tela (no
+ * celular, a mesa de outra aba), não aparece.
+ */
+function BattleArrow({ from, to, aim }: { from: string | null; to: string | null; aim: boolean }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [path, setPath] = useState<{ d: string; key: string } | null>(null);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const onResize = () => setTick((n) => n + 1);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Mede as cartas depois do layout (a cada desenho da mesa: as cartas mudam de lugar a cada jogada).
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !from || !to) {
+      if (path) setPath(null);
+      return;
+    }
+    const base = svg.getBoundingClientRect();
+    const center = (uid: string) => {
+      const el = document.querySelector<HTMLElement>(`.yk-board .field-card .card[data-uid="${CSS.escape(uid)}"]`);
+      const r = el?.getBoundingClientRect();
+      if (!r || (r.width === 0 && r.height === 0)) return null;
+      return { x: r.left + r.width / 2 - base.left, y: r.top + r.height / 2 - base.top };
+    };
+    const a = center(from);
+    const b = center(to);
+    const len = a && b ? Math.hypot(b.x - a.x, b.y - a.y) : 0;
+    if (!a || !b || len < 12) {
+      if (path) setPath(null);
+      return;
+    }
+    // Curva suave: ponto de controle deslocado para o lado.
+    const bend = Math.min(70, len * 0.16);
+    const cx = (a.x + b.x) / 2 - ((b.y - a.y) / len) * bend;
+    const cy = (a.y + b.y) / 2 + ((b.x - a.x) / len) * bend;
+    const d = `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+    if (d !== path?.d) setPath({ d, key: `${from}>${to}` });
+  });
+
+  // A carta atacante vira ao atacar e as cartas voam ao pousar: mede de novo logo depois.
+  useEffect(() => {
+    if (!from) return;
+    const timers = [200, 420, 900].map((ms) => setTimeout(() => setTick((n) => n + 1), ms));
+    return () => timers.forEach(clearTimeout);
+  }, [from, to]);
+
+  return (
+    <svg ref={svgRef} className={['attack-arrow', 'yk-arrow', aim ? 'aim locked' : 'battle'].join(' ')} aria-hidden="true">
+      <defs>
+        <marker id="yk-arrow-head" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 L2.5 5 Z" fill="#ff4d2e" stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+        </marker>
+      </defs>
+      {path && (
+        <g key={path.key}>
+          <path className="arrow-shadow" d={path.d} />
+          <path className="arrow-line" d={path.d} markerEnd="url(#yk-arrow-head)" />
+        </g>
+      )}
+    </svg>
+  );
+}
+
 /** A partida local: uma pessoa contra bots, no navegador. */
 export function LocalYonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; onExit: () => void; onRematch: () => void }) {
   const game = useYonkoGame(setup);
   return <YonkoTable game={game} me={setup.human} onExit={onExit} onRematch={onRematch} />;
 }
+
+type Sheet = null | 'log' | 'card' | 'options' | { trash: PlayerId };
 
 export function YonkoTable({
   game,
@@ -405,8 +615,17 @@ export function YonkoTable({
   const { state: s, dispatch } = game;
   const t = useT();
   const tryT = useTryT();
-  const locale = useLocale();
+  const { locale, animations } = useSettings();
   const mine = s.players[me];
+
+  // Só a opção do app decide (como na mesa de dois): `off` troca a mesa na hora, `soft` tira as paradas no
+  // centro e os efeitos de enfeite, `full` mostra tudo.
+  const animate = animations !== 'off';
+  const showy = animations === 'full';
+  const board = useRef<HTMLDivElement>(null);
+  useBoardSize(board);
+  const motion = useBoardMotion(s, { enabled: animate, tempo: 0.85, lastAction: game.lastAction, lang: locale, calm: !showy, root: '.yk' });
+  useMatchAudio(s, { enabled: true, animate: showy, tempo: 0.85, human: me, lastAction: game.lastAction });
 
   /** Carta própria selecionada (na mão ou em campo), com a vez livre. */
   const [sel, setSel] = useState<string | null>(null);
@@ -414,10 +633,18 @@ export function YonkoTable({
   const [picked, setPicked] = useState<string[]>([]);
   /** Carta em destaque no painel (a última apontada ou tocada). */
   const [inspect, setInspect] = useState<string | null>(null);
+  /** Carta sob o mouse agora (a seta do ataque aponta para ela). */
+  const [hovered, setHovered] = useState<string | null>(null);
+  /** Carta da mão erguida sob o mouse. */
+  const [peek, setPeek] = useState<string | null>(null);
   /** Celular: a mesa de oponente aberta e a gaveta aberta. */
   const [tab, setTab] = useState<PlayerId | null>(null);
-  const [sheet, setSheet] = useState<null | 'log' | 'card'>(null);
+  const [sheet, setSheet] = useState<Sheet>(null);
+  /** As cartas de uma escolha (deck, descarte, Vida) recolhidas para olhar a mesa. */
+  const [trayHidden, setTrayHidden] = useState(false);
   const [resultOpen, setResultOpen] = useState(true);
+  /** A faixa que cruza a mesa na troca de turno. */
+  const [flash, setFlash] = useState<{ key: number; text: string; kicker: string; mine: boolean; color: string } | null>(null);
 
   const order = useMemo(() => seatOrder(s), [s.firstPlayer, s.players.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const placeOf = (id: PlayerId) => order.indexOf(id) + 1;
@@ -433,6 +660,7 @@ export function YonkoTable({
   useEffect(() => {
     setPicked([]);
     setSel(null);
+    setTrayHidden(false);
   }, [s.actionCount]);
 
   // A leitura de uma carta ou do registro (celular) segura os bots.
@@ -440,15 +668,38 @@ export function YonkoTable({
     game.setPaused?.(sheet !== null);
   }, [sheet]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Esc fecha a janela aberta; sem janela, solta a carta escolhida.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (sheet !== null) setSheet(null);
+      else setSel(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sheet]);
+
   // Celular: a aba acompanha a batalha (a mesa atacada, ou a de quem ataca quando o alvo é quem joga).
-  const battle = s.battle;
-  const attackerOwner = battle && s.cards[battle.attacker] ? s.cards[battle.attacker].owner : null;
-  const defender = battle && s.cards[battle.target] ? s.cards[battle.target].owner : null;
+  const battle = s.battle && s.cards[s.battle.attacker] && s.cards[s.battle.target] ? s.battle : null;
+  const attackerOwner = battle ? s.cards[battle.attacker].owner : null;
+  const defender = battle ? s.cards[battle.target].owner : null;
   useEffect(() => {
     const show = defender !== null && defender !== me ? defender : attackerOwner !== null && attackerOwner !== me ? attackerOwner : null;
     if (show !== null) setTab(show);
   }, [attackerOwner, defender, me]);
   const openTab = tab !== null && !s.players[tab].out && tab !== me ? tab : (opponents.find((id) => !s.players[id].out) ?? opponents[0]);
+
+  const round = Math.ceil(s.turn / Math.max(1, s.players.filter((ps) => !ps.out).length));
+
+  // Troca de turno: a faixa cruza a mesa com o nome de quem joga (com as animações desligadas, não aparece).
+  const turnKey = s.phase === 'main' ? s.turn : 0;
+  useEffect(() => {
+    if (!turnKey || !animate) return setFlash(null);
+    const p = s.activePlayer;
+    setFlash({ key: turnKey, text: p === me ? t('game.yourTurn') : t('game.turnOf', { name: s.players[p].name }), kicker: t('yonko.round', { n: round }), mine: p === me, color: seatColor(s, p) });
+    const timer = setTimeout(() => setFlash(null), 1150);
+    return () => clearTimeout(timer);
+  }, [turnKey, animate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = (a: Action) => dispatch(a);
   const targets = sel && myTurnIdle ? legal.filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack' && a.attacker === sel).map((a) => a.target) : [];
@@ -473,10 +724,14 @@ export function YonkoTable({
     return canAct(uid) ? 'ready' : null;
   };
 
+  /** No toque não há mouse para apontar: a carta que não tem o que fazer agora abre para ler. */
+  const read = (uid: string) => {
+    if (window.matchMedia?.('(hover: none)').matches) inspectCard(uid);
+  };
   const onCard = (uid: string) => {
     if (s.cards[uid] && cardDef(s, uid).id !== HIDDEN_CARD) setInspect(uid);
     if (select) {
-      if (!select.options.includes(uid)) return;
+      if (!select.options.includes(uid)) return read(uid);
       // Uma carta só: o toque já responde. Várias: marca e desmarca, e a faixa confirma.
       if (select.max === 1) return send({ type: 'choose', player: me, uids: [uid] });
       setPicked((p) => (p.includes(uid) ? p.filter((u) => u !== uid) : p.length < select.max ? [...p, uid] : p));
@@ -484,16 +739,18 @@ export function YonkoTable({
     }
     if (myPending?.kind === 'block') {
       if (myPending.options.includes(uid)) send({ type: 'choose', player: me, uids: [uid] });
+      else read(uid);
       return;
     }
     if (myPending?.kind === 'counter') {
       if (myPending.options.includes(uid)) send({ type: 'counter', player: me, uid });
+      else read(uid);
       return;
     }
-    if (!myTurnIdle) return;
+    if (!myTurnIdle) return read(uid);
     if (sel && targets.includes(uid)) return send({ type: 'attack', player: me, attacker: sel, target: uid });
     const own = s.cards[uid]?.owner === me && (mine.hand.includes(uid) || locate(s, uid)?.player === me);
-    if (!own) return;
+    if (!own) return read(uid);
     // O segundo toque na mesma carta da mão a joga.
     if (sel === uid && mine.hand.includes(uid) && canPlay(uid)) return send({ type: 'playCard', player: me, uid });
     setSel(sel === uid ? null : uid);
@@ -504,7 +761,11 @@ export function YonkoTable({
     setInspect(uid);
     setSheet('card');
   };
-  const h: CardHandlers = { highlight, onCard, onInspect: inspectCard, onHover: (uid) => uid && setInspect(uid) };
+  const onHover = (uid: string | null) => {
+    setHovered(uid);
+    if (uid) setInspect(uid);
+  };
+  const h: CardHandlers = { highlight, onCard, onInspect: inspectCard, onHover };
 
   const name = (uid: string) => cardDef(s, uid).name;
   const who = (id: PlayerId) => (id === me ? t('yonko.you') : s.players[id].name);
@@ -568,7 +829,6 @@ export function YonkoTable({
           return {
             icon: 'shield',
             mine: true,
-            battle: true,
             text: t('yonko.block', { attacker: name(battle!.attacker), power: getPower(s, battle!.attacker), target: name(battle!.target) }),
             chip: t('yonko.options', { n: p.options.length }),
             buttons: [{ label: t('yonko.noBlock'), kind: 'primary', onClick: () => send({ type: 'choose', player: me, uids: [] }) }],
@@ -577,7 +837,6 @@ export function YonkoTable({
           return {
             icon: 'shield',
             mine: true,
-            battle: true,
             text: p.bystander
               ? t('yonko.counterBystander', { attacker: s.players[attackerOwner ?? me].name, target: s.players[defender ?? me].name })
               : t('yonko.counter', { attacker: name(battle!.attacker), power: getPower(s, battle!.attacker), target: name(battle!.target), defense: getPower(s, battle!.target) }),
@@ -606,11 +865,11 @@ export function YonkoTable({
     if (pending) {
       const other = who(pending.player);
       const key = pending.kind === 'counter' ? 'yonko.waitCounter' : pending.kind === 'block' ? 'yonko.waitBlock' : pending.kind === 'mulligan' || (pending.kind === 'option' && pending.curve) ? 'yonko.waitSetup' : 'yonko.waitChoice';
-      return { icon: 'bot', mine: false, text: t(key, { name: other }), buttons: [] };
+      return { icon: 'bot', mine: false, waiting: true, text: t(key, { name: other }), buttons: [] };
     }
     if (!myTurnIdle) {
       const active = s.players[s.activePlayer];
-      return { icon: 'bot', mine: false, text: s.activePlayer === me ? t('yonko.resolving') : t('yonko.turnOf', { name: active.name }), buttons: [] };
+      return { icon: 'bot', mine: false, waiting: s.phase !== 'gameover', text: s.activePlayer === me ? t('yonko.resolving') : t('yonko.turnOf', { name: active.name }), buttons: [] };
     }
     if (sel && mine.hand.includes(sel)) {
       const why = playError(s, me, sel);
@@ -652,7 +911,8 @@ export function YonkoTable({
         ],
       };
     }
-    return { icon: 'crown', mine: true, text: t('yonko.yourTurn'), sub: t('yonko.yourTurnHint'), buttons: [...cancel, { label: t('yonko.endTurn'), kind: 'primary', onClick: () => send({ type: 'endTurn', player: me }) }] };
+    // "Encerrar turno" tem o botão próprio, ao lado da faixa (no celular, na barra de baixo).
+    return { icon: 'crown', mine: true, text: t('yonko.yourTurn'), sub: t('yonko.yourTurnHint'), buttons: cancel };
   })();
 
   /** A mesa de um oponente tem algo para quem joga: um alvo do ataque ou da escolha, ou é a atacada. */
@@ -664,17 +924,64 @@ export function YonkoTable({
     return defender === id;
   };
 
-  const round = Math.ceil(s.turn / Math.max(1, s.players.filter((ps) => !ps.out).length));
   const fieldCard = (fc: FieldCard) => (
-    <TableCard key={fc.uid} s={s} uid={fc.uid} fc={fc} highlight={highlight(fc.uid)} onClick={() => onCard(fc.uid)} onInspect={inspectCard} onHover={h.onHover} />
+    <div key={fc.uid} className="field-card">
+      <TableCard s={s} uid={fc.uid} fc={fc} highlight={highlight(fc.uid)} onClick={() => onCard(fc.uid)} onInspect={inspectCard} onHover={onHover} />
+    </div>
   );
   const leave = () => {
     if (s.phase === 'gameover' || window.confirm(t('yonko.leaveConfirm'))) onExit();
   };
+  const endTurn = () => send({ type: 'endTurn', player: me });
+
+  /** Quem a mesa espera agora (o medalhão da faixa do meio). */
+  const actor = pending ? pending.player : s.activePlayer;
+
+  // A batalha na faixa: o poder do atacante contra o do alvo e o que falta para acertar ou defender.
+  const clash = battle
+    ? (() => {
+        const atk = getPower(s, battle.attacker) ?? 0;
+        const def = getPower(s, battle.target) ?? 0;
+        const hits = atk >= def;
+        const status =
+          defender === me ? (hits ? t('game.needToDefend', { n: atk - def + 1000 }) : t('game.defendedBang')) : hits ? t('game.attackWillHit') : t('game.needToHit', { n: def - atk });
+        const label = t(defender === me ? 'yonko.battleMine' : 'yonko.battle', { attacker: name(battle.attacker), power: atk, target: name(battle.target), defense: def, owner: defender !== null ? s.players[defender].name : '' });
+        return { atk, def, hits, status, label };
+      })()
+    : null;
+
+  // A mão em leque: a carta erguida é a da faixa sob o ponteiro (as mesmas contas do leque no CSS, `.hand-card`).
+  const hand = mine.hand;
+  const peeked = peek !== null && hand.includes(peek) ? peek : null;
+  const onHandMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return;
+    const box = e.currentTarget;
+    const first = box.querySelector<HTMLElement>('.hand-card');
+    const n = hand.length;
+    if (!first || !(e.target as HTMLElement).closest('.hand-card')) {
+      if (peek !== null) setPeek(null);
+      return;
+    }
+    const w = box.clientWidth;
+    const cw = first.offsetWidth;
+    const step = n > 1 ? Math.min(cw * 0.9, (w - cw - 34) / (n - 1)) : cw;
+    const x = e.clientX - (box.getBoundingClientRect().left + w / 2 - cw / 2 - ((n - 1) / 2) * step);
+    const uid = hand[Math.max(0, Math.min(n - 1, Math.floor(x / Math.max(step, 1))))] ?? null;
+    if (uid !== peek) {
+      setPeek(uid);
+      onHover(uid);
+    }
+  };
+
+  // A seta: a batalha em curso ou, com um atacante escolhido, o alvo sob o mouse.
+  const aimAt = !battle && sel && hovered && targets.includes(hovered) ? hovered : null;
+  const trashOf = sheet && typeof sheet === 'object' ? sheet.trash : null;
+  const sheetTitle =
+    sheet === 'log' ? t('yonko.log') : sheet === 'card' ? t('yonko.card') : sheet === 'options' ? t('yonko.tableOptions') : trashOf !== null ? t('game.trashOf', { name: who(trashOf), n: s.players[trashOf].trash.length }) : '';
 
   return (
     <PickOrderContext.Provider value={pickOrder}>
-      <div className={['yk', s.phase === 'gameover' ? 'over' : ''].join(' ')}>
+      <div className={['yk', `anim-${animations}`, s.phase === 'gameover' ? 'over' : ''].join(' ')}>
         <header className="yk-top">
           <button type="button" className="yk-back" onClick={leave} aria-label={t('yonko.exit')}>
             <Icon name="chevron" size={18} />
@@ -683,202 +990,287 @@ export function YonkoTable({
             GUMGUM <em>FIGHT!</em>
           </span>
           <span className="yk-pill mode">{extras.pill ?? t('yonko.pillTable')}</span>
-          {s.phase === 'main' && <span className="yk-pill">{s.activePlayer === me ? t('yonko.pillTurnMine', { round }) : t('yonko.pillTurn', { round, name: s.players[s.activePlayer].name })}</span>}
+          <ol className="yk-track" aria-label={t('yonko.turnOrder')}>
+            {order.map((id) => {
+              const ps = s.players[id];
+              const on = s.phase === 'main' && s.activePlayer === id;
+              return (
+                <li key={id} className={[on ? 'on' : '', ps.out ? 'out' : '', id === me ? 'me' : ''].join(' ')} style={vars({ '--pc': seatColor(s, id) })} aria-current={on ? 'step' : undefined}>
+                  <Avatar s={s} id={id} />
+                  <span className="yk-track-text">
+                    <b>{who(id)}</b>
+                    <small>
+                      {ps.out ? (
+                        t('yonko.tagOut')
+                      ) : (
+                        <>
+                          <Icon name="heart" size={10} /> {lifeNow(s, id)}
+                        </>
+                      )}
+                    </small>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
           <span className="yk-sp" />
+          {s.phase === 'main' && <span className="yk-pill round">{s.activePlayer === me ? t('yonko.pillTurnMine', { round }) : t('yonko.pillTurn', { round, name: s.players[s.activePlayer].name })}</span>}
           {s.phase === 'gameover' && !resultOpen && (
             <button type="button" className="yk-pill btnlike" onClick={() => setResultOpen(true)}>
               {t('yonko.showResult')}
             </button>
           )}
+          <button type="button" className="yk-back gear" onClick={() => setSheet('options')} aria-label={t('yonko.tableOptions')} title={t('yonko.tableOptions')}>
+            <Icon name="sliders" size={18} />
+          </button>
         </header>
 
         <div className="yk-main">
-          <div className="yk-board">
+          <div className="yk-board" ref={board} style={vars({ '--n': opponents.length })}>
+            {/* O centro do tabuleiro: é para onde a carta jogada e o ataque vão na vitrine (Motion.tsx). */}
+            <span className="yk-arena" data-anchor="arena" aria-hidden="true" />
+
             <nav className="yk-tabs" aria-label={t('yonko.opponents')}>
+              <button type="button" className="yk-back" onClick={leave} aria-label={t('yonko.exit')}>
+                <Icon name="chevron" size={18} />
+              </button>
               {opponents.map((id) => {
                 const ps = s.players[id];
                 return (
                   <button
                     key={id}
                     type="button"
-                    className={[id === openTab ? 'on' : '', targeted(id) ? 'focus' : '', ps.out ? 'out' : ''].join(' ')}
+                    className={['tab', id === openTab ? 'on' : '', targeted(id) ? 'focus' : '', ps.out ? 'out' : '', s.phase === 'main' && s.activePlayer === id ? 'playing' : ''].join(' ')}
                     style={vars({ '--pc': seatColor(s, id) })}
                     aria-pressed={id === openTab}
+                    aria-label={`${ps.name}: ${ps.out ? t('yonko.tagOut') : t('yonko.tabSummary', { life: lifeNow(s, id), hand: ps.hand.length })}`}
                     onClick={() => setTab(id)}
                   >
-                    <span className="yk-ord">{t('yonko.place', { n: placeOf(id) })}</span>
-                    <b>{ps.name}</b>
-                    <small>{ps.out ? t('yonko.tagOut') : t('yonko.tabSummary', { life: lifeNow(s, id), hand: ps.hand.length })}</small>
+                    <Avatar s={s} id={id} />
+                    <span className="yk-tab-text">
+                      <b>{ps.name}</b>
+                      <small>
+                        {ps.out ? (
+                          t('yonko.tagOut')
+                        ) : (
+                          <>
+                            <span className="hp">
+                              <Icon name="heart" size={10} />
+                            </span>
+                            {lifeNow(s, id)}
+                            <Icon name="deck" size={10} />
+                            {ps.hand.length}
+                          </>
+                        )}
+                      </small>
+                    </span>
                   </button>
                 );
               })}
+              <button type="button" className="yk-back" onClick={() => setSheet('log')} aria-label={t('yonko.log')} title={t('yonko.log')}>
+                <Icon name="history" size={18} />
+              </button>
+              <button type="button" className="yk-back gear" onClick={() => setSheet('options')} aria-label={t('yonko.tableOptions')} title={t('yonko.tableOptions')}>
+                <Icon name="sliders" size={18} />
+              </button>
             </nav>
 
-            <div className="yk-opps" style={vars({ '--n': opponents.length })}>
-              {opponents.map((id) => (
+            <div className="yk-opps">
+              {opponents.map((id, i) => (
                 <Opponent
                   key={id}
                   s={s}
                   id={id}
+                  index={i}
                   place={placeOf(id)}
                   h={h}
                   targeted={targeted(id)}
+                  attacked={defender === id}
                   playing={s.phase === 'main' && s.activePlayer === id}
                   hidden={id !== openTab}
                   t={t}
                   status={extras.status?.(id)}
+                  onTrash={(p) => setSheet({ trash: p })}
                 />
               ))}
             </div>
 
-            <div className={['yk-banner', banner.mine ? 'mine' : ''].join(' ')} aria-live="polite">
-              <span className="yk-banner-icon">
-                <Icon name={banner.icon} size={22} />
-              </span>
-              <div className="yk-banner-text">
-                <p>
-                  <b>{banner.text}</b>
-                  {banner.sub && <span> {banner.sub}</span>}
-                </p>
-                {battle && !banner.battle && s.cards[battle.attacker] && s.cards[battle.target] && (
-                  <p className="yk-battle">
-                    {t(defender === me ? 'yonko.battleMine' : 'yonko.battle', {
-                      attacker: name(battle.attacker),
-                      power: getPower(s, battle.attacker),
-                      target: name(battle.target),
-                      defense: getPower(s, battle.target),
-                      owner: defender !== null ? s.players[defender].name : '',
-                    })}
+            <div className="yk-center">
+              <div className={['yk-banner', banner.mine ? 'mine' : '', banner.waiting ? 'waiting' : '', clash ? 'in-battle' : ''].join(' ')} style={vars({ '--pc': seatColor(s, actor) })} aria-live="polite">
+                <span className="yk-banner-who">
+                  <Avatar s={s} id={actor} />
+                  <span className="yk-banner-icon">
+                    <Icon name={banner.icon} size={14} />
+                  </span>
+                </span>
+                <div className="yk-banner-text" key={`${s.actionCount}:${sel ?? ''}`}>
+                  <p>
+                    <b>{banner.text}</b>
+                    {banner.waiting && (
+                      <span className="yk-dots" aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    )}
+                    {banner.sub && <span> {banner.sub}</span>}
                   </p>
+                  {(game.error || extras.notice) && (
+                    <p className="yk-error" role="alert">
+                      {game.error ?? extras.notice}
+                    </p>
+                  )}
+                </div>
+                {clash && (
+                  <div className={['yk-clash', clash.hits ? 'hit' : 'safe'].join(' ')} role="img" aria-label={clash.label} title={clash.label}>
+                    <span className="yk-pow" style={vars({ '--pc': seatColor(s, attackerOwner!) })}>
+                      <em>{name(battle!.attacker)}</em>
+                      <b key={clash.atk}>{clash.atk}</b>
+                    </span>
+                    <span className="yk-vs">
+                      <Icon name="swords" size={16} />
+                    </span>
+                    <span className="yk-pow" style={vars({ '--pc': seatColor(s, defender!) })}>
+                      <em>{name(battle!.target)}</em>
+                      <b key={clash.def}>{clash.def}</b>
+                    </span>
+                    <small>{clash.status}</small>
+                  </div>
                 )}
-                {(game.error || extras.notice) && (
-                  <p className="yk-error" role="alert">
-                    {game.error ?? extras.notice}
-                  </p>
-                )}
-                {banner.tray && (
-                  <div className="yk-tray">
+                <div className="yk-banner-actions">
+                  {banner.chip && <span className="yk-chip">{banner.chip}</span>}
+                  {banner.tray && (
+                    <button type="button" className="yk-btn ghost" aria-pressed={trayHidden} onClick={() => setTrayHidden((v) => !v)} title={t('game.peekTitle')} aria-label={t('game.peekTitle')}>
+                      <Icon name="eye" size={16} />
+                    </button>
+                  )}
+                  {sel && (
+                    <button type="button" className="yk-btn ghost read" onClick={() => inspectCard(sel)} aria-label={t('yonko.card')} title={t('yonko.card')}>
+                      <Icon name="search" size={16} />
+                    </button>
+                  )}
+                  {banner.buttons.map((b, i) => (
+                    <button key={`${i}:${b.label}`} type="button" className={['yk-btn', b.kind ?? ''].join(' ')} disabled={b.disabled} title={b.title} onClick={b.onClick}>
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+                {banner.tray && !trayHidden && (
+                  <div className="yk-tray" style={vars({ '--n': banner.tray.length })}>
                     {banner.tray.map((uid) => (
-                      <TableCard key={uid} s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onInspect={inspectCard} onHover={h.onHover} />
+                      <TableCard key={uid} s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onInspect={inspectCard} onHover={onHover} />
                     ))}
                   </div>
                 )}
               </div>
-              <div className="yk-banner-actions">
-                {banner.chip && <span className="yk-chip">{banner.chip}</span>}
-                {banner.buttons.map((b, i) => (
-                  <button key={`${i}:${b.label}`} type="button" className={['yk-btn', b.kind ?? ''].join(' ')} disabled={b.disabled} title={b.title} onClick={b.onClick}>
-                    {b.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <section className={['yk-me', s.activePlayer === me && s.phase === 'main' ? 'playing' : '', defender === me ? 'focus' : ''].join(' ')} style={vars({ '--pc': seatColor(s, me) })} aria-label={t('yonko.yourTable')}>
-              <div className="yk-me-side">
-                <header className="yk-opp-head">
-                  <span className="yk-ord">{t('yonko.place', { n: placeOf(me) })}</span>
-                  <b className="yk-name">{t('yonko.you')}</b>
-                  {!mine.out && <SeatClock status={extras.status?.(me)} t={t} />}
-                </header>
-                <div className="yk-me-leader">
-                  {fieldCard(mine.leader)}
-                  <div className="yk-life">
-                    <span className="yk-life-label">{t('yonko.life', { n: lifeNow(s, me), max: startingLife(s, me) })}</span>
-                    <LifePips s={s} id={me} />
+              <button type="button" className={['yk-end', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
+                {t('yonko.endTurn')}
+              </button>
+              {flash && s.phase === 'main' && (
+                <div key={flash.key} className={['turn-banner', 'yk-flash', flash.mine ? 'mine' : 'theirs', showy ? 'sweep' : ''].join(' ')} style={vars({ '--pc': flash.color })}>
+                  <div className="tb-stripe">
+                    <small>{flash.kicker}</small>
+                    <b>{flash.text}</b>
                   </div>
                 </div>
+              )}
+            </div>
+
+            <section
+              className={['yk-mat', 'yk-me', s.activePlayer === me && s.phase === 'main' ? 'playing' : '', defender === me ? 'focus' : '', mine.out ? 'out' : ''].join(' ')}
+              style={vars({ '--pc': seatColor(s, me), '--i': opponents.length })}
+              aria-label={t('yonko.yourTable')}
+            >
+              <div className="yk-me-row">
+                <LifeStack s={s} id={me} h={h} t={t} />
+                <span className="yk-cell">{fieldCard(mine.leader)}</span>
+                <span className="yk-cell">{mine.stage ? fieldCard(mine.stage) : <span className="yk-slot stage">{t('yonko.stage')}</span>}</span>
+                <FieldRow ps={mine} card={fieldCard} />
+                <Piles s={s} id={me} h={h} t={t} onTrash={(p) => setSheet({ trash: p })} />
               </div>
-              <div className="yk-me-field">
-                <div className="yk-row">
-                  {mine.characters.map(fieldCard)}
-                  <Slots n={5 - mine.characters.length} />
-                  <span className="yk-stage">{mine.stage ? fieldCard(mine.stage) : <span className="yk-slot stage">{t('yonko.stage')}</span>}</span>
-                </div>
-                <div className="yk-me-foot">
-                  <span className="yk-don" title={t('yonko.donTitle')}>
-                    <b>{t('yonko.donLabel', { n: donOnField(mine) })}</b>
-                    <span className="yk-don-cards" aria-hidden="true">
-                      {Array.from({ length: mine.donActive }, (_, i) => (
-                        <i key={`a${i}`} />
-                      ))}
-                      {Array.from({ length: mine.donRested }, (_, i) => (
-                        <i key={`r${i}`} className="r" />
-                      ))}
-                    </span>
-                    <span className="yk-stat">{t('yonko.donActive', { n: mine.donActive })}</span>
-                  </span>
-                  <span className="yk-stat">{t('yonko.deck', { n: mine.deck.length })}</span>
-                  <span className="yk-stat">{t('yonko.trash', { n: mine.trash.length })}</span>
-                  <span className="yk-sp" />
-                  <button type="button" className="yk-btn end" disabled={!myTurnIdle} onClick={() => send({ type: 'endTurn', player: me })}>
-                    {t('yonko.endTurn')}
-                  </button>
-                </div>
+              <div className="yk-me-foot">
+                <span className="yk-plate">
+                  <span className="yk-ord">{t('yonko.place', { n: placeOf(me) })}</span>
+                  <b className="yk-name">{t('yonko.you')}</b>
+                  {mine.out ? <span className="yk-tag out">{t('yonko.tagOut')}</span> : defender === me ? <span className="yk-tag">{t('yonko.tagTarget')}</span> : null}
+                  {!mine.out && <SeatClock status={extras.status?.(me)} t={t} />}
+                </span>
+                <DonRow ps={mine} t={t} />
+                <button type="button" className={['yk-end', 'small', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
+                  {t('yonko.endTurn')}
+                </button>
               </div>
             </section>
 
-            <section className="yk-hand" aria-label={t('yonko.yourHand', { n: mine.hand.length })}>
-              <span className="yk-hand-label">{t('yonko.yourHand', { n: mine.hand.length })}</span>
-              <div className="yk-hand-cards">
-                {mine.hand.map((uid) => (
-                  <TableCard key={uid} s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onInspect={inspectCard} onHover={h.onHover} />
-                ))}
+            <section className="yk-hand" aria-label={t('yonko.yourHand', { n: hand.length })}>
+              <div className="yk-hand-fan" data-anchor={`hand-${me}`} style={vars({ '--n': Math.max(hand.length, 1) })} onPointerMove={onHandMove} onPointerLeave={() => setPeek(null)}>
+                {hand.map((uid, i) => {
+                  const offset = i - (hand.length - 1) / 2;
+                  return (
+                    <div key={uid} className={['hand-card', uid === peeked ? 'peek' : '', uid === sel ? 'sel' : ''].join(' ')} data-hand-uid={uid} style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}>
+                      <TableCard s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onInspect={inspectCard} onHover={() => undefined} />
+                    </div>
+                  );
+                })}
               </div>
             </section>
+
+            <BattleArrow from={battle?.attacker ?? (aimAt ? sel : null)} to={battle?.target ?? aimAt} aim={!battle} />
+
           </div>
 
           <aside className="yk-side">
-            <section className="yk-panel">
-              <h3>{t('yonko.turnOrder')}</h3>
-              <ol className="yk-order">
-                {order.map((id, i) => {
-                  const ps = s.players[id];
-                  const on = s.phase === 'main' && s.activePlayer === id;
-                  return (
-                    <li key={id} className={[on ? 'on' : '', ps.out ? 'out' : ''].join(' ')} style={vars({ '--pc': seatColor(s, id) })}>
-                      <span className="yk-ord">{t('yonko.place', { n: i + 1 })}</span>
-                      <b>{who(id)}</b>
-                      {!ps.out && <SeatClock status={extras.status?.(id)} t={t} />}
-                      <span className="yk-stat">{ps.out ? t('yonko.tagOut') : on ? t('yonko.playing') : t('yonko.lifeShort', { n: lifeNow(s, id) })}</span>
-                    </li>
-                  );
-                })}
-              </ol>
+            <section className="yk-panel yk-inspect">
+              <h3>{t('yonko.card')}</h3>
+              <CardPanel s={s} uid={inspect} t={t} />
             </section>
             <section className="yk-panel grow">
               <h3>{t('yonko.log')}</h3>
               <Log s={s} tryT={tryT} />
             </section>
-            <section className="yk-panel">
-              <h3>{t('yonko.card')}</h3>
-              <CardPanel s={s} uid={inspect} t={t} />
-            </section>
           </aside>
         </div>
 
-        <nav className="yk-bottom">
-          <button type="button" className="yk-btn" onClick={() => setSheet('log')}>
-            {t('yonko.log')}
-          </button>
-          <button type="button" className="yk-btn" disabled={!inspect} onClick={() => setSheet('card')}>
-            {t('yonko.card')}
-          </button>
-          <button type="button" className="yk-btn end" disabled={!myTurnIdle} onClick={() => send({ type: 'endTurn', player: me })}>
-            {t('yonko.endTurn')}
-          </button>
-        </nav>
+        {motion.layer}
 
         {sheet && (
           <div className="yk-sheet-back" onClick={() => setSheet(null)}>
-            <div className="yk-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className={['yk-sheet', typeof sheet === 'object' ? 'trash' : sheet].join(' ')} role="dialog" aria-modal="true" aria-label={sheetTitle} onClick={(e) => e.stopPropagation()}>
               <header>
-                <h3>{sheet === 'log' ? t('yonko.log') : t('yonko.card')}</h3>
+                <h3>{sheetTitle}</h3>
                 <button type="button" className="yk-back" onClick={() => setSheet(null)} aria-label={t('yonko.close')}>
                   <Icon name="close" size={18} />
                 </button>
               </header>
-              {sheet === 'log' ? <Log s={s} tryT={tryT} /> : <CardPanel s={s} uid={inspect} t={t} />}
+              {sheet === 'log' ? (
+                <Log s={s} tryT={tryT} />
+              ) : sheet === 'card' ? (
+                <CardPanel s={s} uid={inspect} t={t} />
+              ) : sheet === 'options' ? (
+                <div className="yk-options">
+                  <div className="yk-option">
+                    <b>{t('settings.animations')}</b>
+                    <AnimationsSeg />
+                    <p className="muted small">{t('settings.animationsHint')}</p>
+                  </div>
+                  <div className="yk-option row">
+                    <b>{t('settings.sfx')}</b>
+                    <VolumeControl kind="sfxVolume" />
+                  </div>
+                  <div className="yk-option row">
+                    <b>{t('settings.music')}</b>
+                    <VolumeControl kind="musicVolume" />
+                  </div>
+                </div>
+              ) : trashOf !== null && s.players[trashOf].trash.length ? (
+                <div className="yk-trash-grid">
+                  {[...s.players[trashOf].trash].reverse().map((uid) => (
+                    <TableCard key={uid} s={s} uid={uid} highlight={null} onClick={() => setInspect(uid)} onInspect={inspectCard} onHover={onHover} />
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">{t('game.trashEmpty')}</p>
+              )}
             </div>
           </div>
         )}
