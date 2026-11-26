@@ -69,8 +69,10 @@ em várias branches ao mesmo tempo.
   *Pronto quando:* nenhum dos dois passa de ~1.500 linhas e todos os testes (inclusive os E2E de A1) passam sem alteração.
   *Plano:* [`plano-divisao-motor-e-mesa.md`](plano-divisao-motor-e-mesa.md) (4 fases).
   *Progresso:* fase 1 de 4 (`engine.ts` vira a pasta `packages/engine/src/engine/`, 20 módulos por etapa com a mesma
-  API; o `execStep`, de 2.560 linhas, segue inteiro em `exec-step.ts` até a fase 2) em 2026-11-26,
-  [PR #240](https://github.com/Xaleh/gumgumfight/pull/240).
+  API) em 2026-11-26, [PR #240](https://github.com/Xaleh/gumgumfight/pull/240); fase 2 de 4 (o `execStep`, de 2.560
+  linhas, vira um despacho e 8 executores por família de efeito em `engine/steps/`; o maior arquivo do motor fica com
+  506 linhas) em 2026-11-26, no mesmo [PR #240](https://github.com/Xaleh/gumgumfight/pull/240). Falta o
+  `GameScreen.tsx` (fases 3 e 4).
   *Feito em:* —
 
 ## Fase B — Treino e aprendizado

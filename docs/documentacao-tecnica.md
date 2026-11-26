@@ -117,7 +117,8 @@ gumgumfight/
 │   ├── src/engine/              createGame, applyAction: o motor, um módulo por etapa (index.ts lista todos e reexporta a API)
 │   │   ├── setup, apply, cancel, turn        criação e preparação, ações, cancelar a ação, fluxo de turno
 │   │   ├── stack, triggers, battle           pilha de resolução, efeitos disparados (CR 8-6), batalha e dano
-│   │   ├── effects, exec-step, costs         um passo de efeito por vez, o que cada passo faz (execStep), custos
+│   │   ├── effects, exec-step, costs         um passo de efeito por vez, o começo e o despacho de cada passo (execStep), custos
+│   │   ├── steps/                            o que cada passo de efeito faz, por família: power, field, don, hand, deck, life, play, choice
 │   │   ├── removal, zones, defeat, manual    K.O. e substituição, zonas/DON!!/Vida, derrota, ferramentas manuais
 │   │   └── queries, conditions, options, table, messages, constants   consultas (custo, poder, filtros), condições, o que dá para fazer, quem é o oponente, textos, limites
 │   ├── src/types.ts             CardData, GameState, Action, Pending, Frame, DSL de efeitos (1.400 linhas)

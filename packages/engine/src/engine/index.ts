@@ -14,7 +14,8 @@
 //   triggers    efeitos disparados (CR 8-6) e eventos ("When …")
 //   battle      batalha e dano
 //   effects     um passo de efeito por vez: alvos, perguntas, "cada oponente"
-//   exec-step   o que cada passo de efeito faz (`execStep`)
+//   exec-step   `execStep`: o começo de todo passo (o "If X, …") e o despacho para a família dele
+//   steps/      o que cada passo faz, um arquivo por família: power, field, don, hand, deck, life, play, choice
 //   costs       custos de habilidade
 //   removal     K.O., remoção e os efeitos de substituição
 //   zones       mover cartas e DON!! entre as zonas, Vida, comprar
