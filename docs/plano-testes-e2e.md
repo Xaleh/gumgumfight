@@ -79,7 +79,18 @@ reduzir as camadas da mesa no celular. Até lá, o CI tenta de novo uma vez.
   não for resolvida.
 - Com as três fases, o A1 fica `[x]`.
 
-### Depois das três fases
+### Depois do A1 — a mesa com o mouse e o teclado
+
+- `table.spec.ts` (entrou com a fase 4 do A3, antes de dividir o componente `Table`): numa partida contra o bot, arrastar
+  um DON!! até o Líder (anexa) e de volta para a fileira (devolve); segurar o clique numa carta (o toque longo abre a
+  carta ampliada, o Esc fecha); arrastar uma carta dentro da mão (muda a ordem); jogar até ter uma carta que dá para
+  jogar, arrastá-la para o campo e atacar arrastando o Líder até o Líder do oponente; e os atalhos de teclado, ligados
+  nas configurações do menu da partida (1 marca um DON!!, L escolhe o Líder, X anexa, Shift+L o Líder do oponente, D
+  abre o descarte, Esc fecha, Espaço encerra o turno).
+- Antes de arrastar, o teste espera o elemento parar e não ter nada por cima (as cartas e os DON!! chegam voando no
+  começo do turno). Só no desktop: o arrasto com o dedo (deslizar pela mão ergue a carta) continua sem teste.
+
+### Depois do A1 — a mesa do Yonko
 
 - `yonko.spec.ts` (`@iphone`): a mesa local do Yonko, da tela inicial ao primeiro turno de quem joga. A preparação
   (largada e mão inicial) e as perguntas dos bots são respondidas pelo botão em destaque da faixa de ação até

@@ -192,7 +192,7 @@ gumgumfight/
 │   ├── src/game/useOnlineGame.ts   canal SSE, reconexão, fila de ações
 │   ├── src/pwa.ts               service worker, convite de instalação, Wake Lock, inscrição nas notificações
 │   ├── src/service-worker.js    fonte do /sw.js (o plugin em vite.config.ts preenche versão e arquivos)
-│   ├── src/components/          Menu, DeckBuilder, GameScreen (as telas da partida e a mesa, 2.319 linhas; os componentes em volta dela em table/), Board, Watch, Tournaments, Stats, Admin…
+│   ├── src/components/          Menu, DeckBuilder, GameScreen (as telas da partida: bot, online, replay, assistir, lição), table/ (a mesa: Table.tsx e os hooks e componentes dela), Board, Watch, Tournaments, Stats, Admin…
 │   └── public/                  manifest, ícones, marca
 ├── data/
 │   ├── cards/*.json             34 arquivos de cartas provisórias (750 cartas; ST01–ST36 parciais, OP01, OP02)
@@ -695,7 +695,7 @@ deck), `status` (estados das cartas), `errors` (erros do servidor), `labels`, `s
   - `StatusInfo.textKey/untilKey/tagKey` (marcadores de estado nas cartas, seção `status`);
   - `DeckIssue`/`FormatIssue.code/params` e `parseDeckList().errorDetails` (validação de deck e formato, seção `rules`).
   `apps/web/src/game/engineText.ts` (`msgText`, `logText`, `winReasonText`) traduz isso na interface; sem chave, mostra o texto.
-  Os avisos da mesa (`NOTICE_KEYS` em `GameScreen.tsx`) são decididos pela chave do log, com um regex de reserva para estados
+  Os avisos da mesa (`NOTICE_KEYS` em `table/useTableNotices.ts`) são decididos pela chave do log, com um regex de reserva para estados
   antigos. Ainda só em português: as recusas `IllegalActionError` do motor (a interface só oferece ações legais, então só
   aparecem em corridas) e os rótulos de "Escolha um" que vêm da DSL do leitor.
 - **Carga:** `pt-BR` vai no bundle principal; os outros são chunks separados (`import()` em `loadLocale`), baixados ao escolher.

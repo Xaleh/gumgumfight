@@ -108,7 +108,7 @@ Os componentes que já eram funções separadas dentro do arquivo saíram para `
 
 | Arquivo | O que tem | Linhas |
 |---|---|---|
-| `GameScreen.tsx` | as telas de entrada (`GameScreen`, `OnlineGameScreen`, `WatchGameScreen`, `LessonTable`), os tipos da mesa (`TableGame`, `TableEmbed`…) e o `Table` (**ainda inteiro: fase 4**) | 2.319 |
+| `GameScreen.tsx` | as telas de entrada (`GameScreen`, `OnlineGameScreen`, `WatchGameScreen`, `LessonTable`), os tipos da mesa (`TableGame`, `TableEmbed`…) e o `Table` (dividido na fase 4) | 2.319 |
 | `table/Prompt.tsx` | a janela da pergunta do motor (`Prompt`, `PromptPill`, `SourceLine`, `useSkipGuard`) | 430 |
 | `table/CenterBand.tsx` | a faixa central: `CenterBand`, `BattleInfo`, `DonBar`, `CoachTipPill`, `AttackArrow` | 342 |
 | `table/CardZoom.tsx` | a carta ampliada e as folhas: `CardZoom`, `CardDetail`, `HoverTip`, `SheetFrame`, `RevealedCards` | 302 |
@@ -127,15 +127,53 @@ Como ficou:
   mesmo reordenado: fora os imports e o cabeçalho de cada arquivo novo, nenhuma linha mudou.
 - Conferido com `npm run typecheck`, os testes do web e os de ponta a ponta, sem alterar nenhum.
 
-### Fase 4 — o `Table` em hooks e zonas
+### Fase 4 — o `Table` em hooks e zonas ✅
 
-O componente `Table` tem ~1.100 linhas de estado e regras de interação e ~750 de JSX. Ele vira:
+A única fase que não é só mover código: o `Table` (1.840 linhas, um componente só) foi para um arquivo próprio e
+perdeu um terço do tamanho para hooks e componentes.
 
-- hooks: avisos e cartas reveladas, a ordem da mão, o que dá para fazer com cada carta (`canPlay`, `canAttackWith`,
-  `highlight`), atalhos de teclado (`onShortcut`), gestos (toque longo e arrastar);
-- componentes por zona do JSX: o canto com os botões, as ferramentas ao lado do deck, a mão, as folhas (lixo, deck,
-  Vida) e o fim de jogo.
+| Arquivo | O que tem | Linhas |
+|---|---|---|
+| `GameScreen.tsx` | as telas de entrada (`GameScreen`, `OnlineGameScreen`, `WatchGameScreen`, `LessonTable`) e os tipos da mesa | 377 |
+| `table/Table.tsx` | o `Table`: o estado da mesa, o que dá para fazer com cada carta (`highlight`, `onCard`, `dropValid`, `onDrop`) e o desenho | 1.284 |
+| `table/useTableGestures.ts` | toque longo e arrastar (carta da mão, atacante, DON!!) | 220 |
+| `table/TableSidePanels.tsx` | os painéis ao lado da mesa: lição, transmissão, Streamer e quem joga | 200 |
+| `table/TableMenu.tsx` | o menu da partida | 191 |
+| `table/useTableShortcuts.ts` | o que cada atalho de teclado faz (`onShortcut`) | 167 |
+| `table/useTableNotices.ts` | o aviso da mesa e as cartas reveladas pelo oponente | 114 |
+| `table/useBotCoach.ts` | as marcações e o relatório do treino contra o Bot do Time | 90 |
+| `table/useOpenHands.ts` | visão do Streamer: as mãos que abrem em leque | 48 |
+| `table/useHandOrder.ts` | a ordem da mão escolhida pelo jogador | 36 |
 
-*Pronto quando:* o `GameScreen.tsx` e cada arquivo novo ficam abaixo de 1.500 linhas, os testes do web e os de ponta
-a ponta (inclusive o `@iphone`) passam sem alteração, e a mesa é conferida à mão no celular e no desktop (arrastar,
-toque longo, atalhos e o modo transmissão não têm teste automático para tudo).
+Como foi feito:
+
+1. **Testes antes.** Arrastar, toque longo e atalhos não tinham teste. O `e2e/table.spec.ts` (5 testes) entrou
+   primeiro e passou no código de antes da divisão; depois, sem mudar uma linha dele, no de depois.
+2. **Mover o `Table`** para `table/Table.tsx`, inteiro, pelo script das outras fases.
+3. **Recortar os blocos** do `Table` por faixa de linhas (o texto de cada bloco foi literal para o hook ou componente
+   novo) e escrever à mão só as assinaturas e as chamadas. Cada hook é chamado no lugar onde o bloco estava.
+
+O que mudou de verdade (o resto é o mesmo texto):
+
+- Cada hook e cada componente recebe por parâmetro o que antes lia direto das variáveis do `Table`. Os efeitos têm as
+  mesmas dependências.
+- `useTableNotices` lê a opção de animações com o próprio `useSettings()` (o `Table` a lia mais abaixo).
+- A ordem de alguns `useState`/`useRef`/`useMemo` entre si mudou (os de um mesmo assunto ficaram juntos no hook). Um
+  efeito mudou de posição: o que fecha os leques do Streamer quando "Ver mãos" desliga roda agora antes do que marca o
+  histórico como visto. Os dois não se falam.
+- `TableMenu` e `TableSidePanels` chamam `useT()` e `useSettings()` por conta própria. O HTML é o mesmo: os painéis
+  saem num fragmento, no mesmo lugar.
+
+Conferência:
+
+- `npm run typecheck`, os 184 testes do web e os 15 de ponta a ponta (os 10 de antes, sem alteração, e os 5 novos).
+- O HTML da mesa das 8 primeiras lições do tutorial com mesa (situações fixas), no desktop e no iPhone emulado, é
+  idêntico byte a byte antes e depois (16 snapshots; no desktop com o painel da lição, no celular com o treinador
+  flutuante).
+
+O que não tem conferência automática e vale olhar à mão: o arrasto com o dedo num celular de verdade (deslizar pela
+mão ergue a carta; puxar para cima joga), a visão do Streamer (os leques das mãos e o painel de partidas e decklist),
+a tela de transmissão e o painel do treinador do Bot do Time.
+
+Ficou de fora, por não precisar para o limite de linhas: o bloco do fim de jogo (`GameResult`, a decklist e o relato)
+e os botões do canto e ao lado do deck continuam no `Table`.

@@ -1749,7 +1749,9 @@ de 2 minutos), desistir pelo menu da mesa, abrir os boosters do Selado e as part
 **Partida rápida** (fila, a mão do oponente escondida, o turno passando de um para o outro, recarregar a página no meio
 e voltar para a mesma sala, desistência) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe), e
 um **torneio** do começo ao fim (o organizador cria, os jogadores se inscrevem pelo link de convite, a rodada abre, a
-partida é jogada na sala do torneio, o resultado entra sozinho e o torneio termina com a classificação). As
+partida é jogada na sala do torneio, o resultado entra sozinho e o torneio termina com a classificação). A mesa também
+é testada com o mouse e o teclado (`e2e/table.spec.ts`): arrastar um DON!! até o Líder e de volta, segurar o clique numa
+carta, reordenar a mão, arrastar uma carta para o campo, atacar arrastando o Líder e os atalhos de teclado. As
 contas de teste são criadas direto no banco temporário, com as funções do servidor (`e2e/support/account-cli.ts`): não
 há rota de login de teste. Os testes marcados com `@iphone` rodam também no iPhone 13 com o WebKit, o motor do Safari
 (onde os boosters abertos já saíram do lugar), entre eles a inscrição num torneio pelo celular.
