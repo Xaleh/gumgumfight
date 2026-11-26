@@ -36,7 +36,8 @@ quando o item fica pronto e o campo **Feito em**, com a data e o link do PR.
 10. **Arte e marca.** Nada de material da Bandai ou da Toei fora das imagens das cartas que o projeto já usa. Cosméticos
     e artes geradas são originais.
 11. **Produção.** O PR vai para a `main`, mas o merge na `main` publica em produção e fica com o dono do projeto.
-    Para testar antes, publique a branch na homologação pelo workflow **CI e deploy** (Run workflow).
+    Não há servidor de homologação: antes do merge, valem os testes do CI no PR (unidade e ponta a ponta) e o teste
+    local (`npm run dev`).
 
 ## Fase A — Base para evoluir com segurança
 
@@ -267,8 +268,7 @@ Como trabalhar:
 7. No docs/roadmap.md, marque o item como [x] (ou, se foi dividido, anote a fase concluída na linha "Progresso"
    do item) e preencha "Feito em" com a data e o link do PR.
 8. Faça commit, dê push e abra o PR para a main com um resumo do que mudou e de como testar.
-   NÃO faça merge na main (ela publica em produção). Se der, publique a branch na homologação
-   pelo workflow "CI e deploy" (Run workflow).
+   NÃO faça merge na main (ela publica em produção).
 9. Trello (quadro "GumGum Fight", card cujo título começa pelo ID do item, ex.: "B1 · "):
    - ao começar a implementar (depois do plano), mova o card para "Em execução";
    - ao abrir o PR, mova o card para "Em teste/Validação" e comente nele o link do PR, o que ficou
