@@ -1,5 +1,5 @@
 // Atalhos de teclado da mesa (opção "Atalhos de teclado", desligada por padrão): que tecla vira que atalho e
-// quando o teclado é da mesa. O que cada atalho faz fica em `GameScreen.tsx` (`onShortcut`); a lista para
+// quando o teclado é da mesa. O que cada atalho faz fica em `components/table/useTableShortcuts.ts` (`onShortcut`); a lista para
 // quem joga, em `components/ShortcutsHelp.tsx`.
 
 import { useEffect, useRef } from 'react';

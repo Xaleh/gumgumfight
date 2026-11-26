@@ -115,3 +115,14 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   organizador vê o inscrito). A partida do torneio no iPhone fica de fora enquanto a queda da mesa no WebKit (acima)
   não for resolvida.
 - Com as três fases, o A1 fica `[x]`.
+
+### Depois do A1 — a mesa com o mouse e o teclado
+
+- `table.spec.ts` (entrou com a fase 4 do A3, antes de dividir o componente `Table`): numa partida contra o bot, arrastar
+  um DON!! até o Líder (anexa) e de volta para a fileira (devolve); segurar o clique numa carta (o toque longo abre a
+  carta ampliada, o Esc fecha); arrastar uma carta dentro da mão (muda a ordem); jogar até ter uma carta que dá para
+  jogar, arrastá-la para o campo e atacar arrastando o Líder até o Líder do oponente; e os atalhos de teclado, ligados
+  nas configurações do menu da partida (1 marca um DON!!, L escolhe o Líder, X anexa, Shift+L o Líder do oponente, D
+  abre o descarte, Esc fecha, Espaço encerra o turno).
+- Antes de arrastar, o teste espera o elemento parar e não ter nada por cima (as cartas e os DON!! chegam voando no
+  começo do turno). Só no desktop: o arrasto com o dedo (deslizar pela mão ergue a carta) continua sem teste.

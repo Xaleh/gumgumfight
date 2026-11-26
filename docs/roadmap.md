@@ -63,7 +63,7 @@ em várias branches ao mesmo tempo.
   *Pronto quando:* um erro forçado no navegador e no servidor aparece no painel, e uma queda simulada gera alerta.
   *Feito em:* 2026-11-25, [PR #235](https://github.com/Xaleh/gumgumfight/pull/235)
 
-- [ ] **A3. Dividir o `engine.ts` e o `GameScreen.tsx`** 🧱
+- [x] **A3. Dividir o `engine.ts` e o `GameScreen.tsx`** 🧱
   `packages/engine/src/engine.ts` (~7 mil linhas) em módulos por fase do turno; `apps/web/src/components/GameScreen.tsx`
   (~3,8 mil linhas) em componentes por zona da mesa. Sem mudar comportamento.
   *Pronto quando:* nenhum dos dois passa de ~1.500 linhas e todos os testes (inclusive os E2E de A1) passam sem alteração.
@@ -73,9 +73,12 @@ em várias branches ao mesmo tempo.
   linhas, vira um despacho e 8 executores por família de efeito em `engine/steps/`; o maior arquivo do motor fica com
   506 linhas) em 2026-11-26, no mesmo [PR #240](https://github.com/Xaleh/gumgumfight/pull/240); fase 3 de 4 (os
   componentes em volta da mesa saem do `GameScreen.tsx` para `apps/web/src/components/table/`; ele cai de 3.860 para
-  2.319 linhas) em 2026-11-26, também no [PR #240](https://github.com/Xaleh/gumgumfight/pull/240). Falta o componente
-  `Table`, de 1.845 linhas (fase 4).
-  *Feito em:* —
+  2.319 linhas) em 2026-11-26, também no [PR #240](https://github.com/Xaleh/gumgumfight/pull/240); fase 4 de 4 (o
+  componente `Table`, de 1.840 linhas, vai para `table/Table.tsx` e perde um terço para hooks de gestos, atalhos e
+  avisos e para os componentes do menu e dos painéis; `GameScreen.tsx` com 377 linhas e `Table.tsx` com 1.284; 5 testes
+  de ponta a ponta novos para arrastar, toque longo e atalhos) em 2026-11-26,
+  [PR #242](https://github.com/Xaleh/gumgumfight/pull/242).
+  *Feito em:* 2026-11-26, [PR #242](https://github.com/Xaleh/gumgumfight/pull/242)
 
 ## Fase B — Treino e aprendizado
 

@@ -35,7 +35,7 @@ Os decks são os iniciais ST01 (Luffy, para quem aprende) e ST03 (Crocodile, par
 | `apps/web/test/{coachTips,terms}.test.ts` | As dicas do treinador e os termos clicáveis. |
 | `apps/server/test/tutorial.test.ts` | Progresso, título, eventos, funil e limite de envios. |
 
-A mesa da lição é a mesma das partidas (`Table` em `GameScreen.tsx`) com a opção `tutorial`: o treinador fica no painel
+A mesa da lição é a mesma das partidas (`Table`, em `components/table/Table.tsx`) com a opção `tutorial`: o treinador fica no painel
 lateral (desktop) ou flutuando em cima/embaixo (celular), as perguntas do motor ficam escondidas nos passos de leitura e
 somem os controles que não fazem sentido numa lição (Auto, desfazer, velocidade, replay, desistir, tela de resultado).
 
