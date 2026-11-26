@@ -1490,7 +1490,8 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     // "Return up to 1 Character … to the owner's hand or (place it at) the bottom of their deck"
-    /^Return (up to \d+ .+?) to the owner's hand or (?:place it at )?the bottom of (?:their|the owner's) deck$/i,
+    // (ST38-015 escreve "its owner's hand").
+    /^Return (up to \d+ .+?) to (?:the|its) owner's hand or (?:place it at )?the bottom of (?:their|(?:the|its) owner's) deck$/i,
     (m) =>
       withTarget(m[1], (target) => ({ do: 'select', target }), true)?.concat([
         {
