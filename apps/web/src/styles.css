@@ -8499,6 +8499,8 @@ tr.clickable:hover td {
   color: #ffb3a1;
   text-shadow: 0 0 16px rgba(255, 90, 60, 0.6);
 }
+/* `blur(0)` e não `none` nos quadros do meio: dois quadros seguidos com `filter: none` numa animação de
+   filter derrubam a página no WebKit de Linux (ver test/keyframes.test.ts). O visual é o mesmo. */
 @keyframes tb-sweep {
   0% {
     transform: translateX(-70%) skewX(-14deg);
@@ -8514,7 +8516,7 @@ tr.clickable:hover td {
   78% {
     transform: none;
     opacity: 1;
-    filter: none;
+    filter: blur(0);
   }
   100% {
     transform: translateX(70%) skewX(14deg);

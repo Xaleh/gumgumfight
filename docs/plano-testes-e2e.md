@@ -41,11 +41,47 @@ do bot e o Safari do iPhone.
   de uma vez, pulando a animação —, 72 cartas reveladas, e os boosters abertos continuam desenhados, dentro da fileira e
   na ordem (no celular, numa linha só): o bug do Safari de novembro (`.sealed-pack` em `styles.css`).
 
-**Conhecido na fase 1:** no WebKit do CI (Linux), a página da mesa às vezes cai (`Target crashed`) logo depois do
-mulligan, no teste de desistir (1 em cada 3 execuções do job, nas primeiras rodadas); a segunda tentativa passa. O
-log agora diz quando a página caiu. Falta saber se é do WebKit de Linux do Playwright ou se acontece também no Safari
-de um iPhone de verdade (a mesa tem muitas camadas com filtro e animação): conferir num aparelho e, se for do app,
-reduzir as camadas da mesa no celular. Até lá, o CI tenta de novo uma vez.
+**Queda da mesa no WebKit de Linux (conhecida na fase 1, resolvida em 2026-11-26).** No projeto `iphone` do CI, a
+página da mesa caía (`Target crashed`) no teste de desistir: 1 em cada 3 execuções do job no começo, depois na primeira
+tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
+
+- **Causa:** a animação da faixa de troca de turno (`tb-sweep` em `styles.css`, a faixa das animações "Completas") ia
+  de `filter: blur(10px)` a `blur(0)`, a `none` (20%), a `none` (78%) e de volta a `blur(10px)`. No WebKit de Linux (WPE,
+  o que o Playwright instala), uma animação de `filter` ou `backdrop-filter` com **dois quadros seguidos em `none`** e
+  uma função de filtro em outro quadro derruba o processo da página. O kernel registra (`dmesg`) `segfault at 0` na
+  thread `ThreadedCompositor` de `libWPEWebKit-2.0.so`, sempre no mesmo endereço (`+0x60a0f8a`): ponteiro nulo no
+  compositor, não falta de memória nem peso das camadas da mesa.
+- **Sem o app:** uma página com um `div` e essa animação cai 4 de 4 vezes no iPhone 13 emulado e 2 de 2 na janela de
+  desktop; com `blur(0)` no lugar de `none`, 0 de 4. Um `none` só entre dois quadros com filtro, ou só dois quadros, não
+  cai.
+- **Por que parecia sorte:** a faixa entra cerca de 0,7 s depois do mulligan e a queda vem cerca de 0,25 s depois, quando
+  a animação chega ao trecho `none → none`. O teste passava quando desistia antes disso. Com 6 s de espera na mesa antes
+  de abrir o menu, caía sempre.
+- **Medido** (WebKit 26.6, build 2359 do Playwright 1.63.0, Ubuntu 24.04, 4 núcleos, sem GPU):
+
+  | Variação                                                       | Quedas          |
+  | -------------------------------------------------------------- | --------------- |
+  | O teste como estava (`--project=iphone -g desistir`)           | 3 de 10, 5 de 6 |
+  | O mesmo fluxo com 6 s de espera na mesa                        | 20 de 20        |
+  | Animações desligadas (`animations: 'off'`)                     | 0 de 20         |
+  | Animações suaves (sem a faixa atravessando a mesa), com espera | 0 de 8          |
+  | Sem a faixa (`.turn-banner { display: none }`), com espera     | 0 de 8          |
+  | Sem `filter` em nenhum elemento, com espera                    | 0 de 8          |
+  | Sem `backdrop-filter` em nenhum elemento                       | 20 de 20        |
+  | `deviceScaleFactor` 1 no lugar de 3, com espera                | 8 de 8          |
+  | Chromium com a emulação do iPhone, com espera                  | 0 de 8          |
+  | **Com a correção:** o teste, 20 vezes seguidas sem nova tentativa | 0 de 20      |
+  | **Com a correção:** o fluxo com e sem a espera                 | 0 de 20, 0 de 20 |
+  | **Com a correção:** partida inteira no Auto, no iPhone 13 emulado | 0 de 2       |
+
+- **Correção:** `filter: blur(0)` no lugar de `none` nos quadros de 20% e 78% do `tb-sweep` (o visual é o mesmo, em
+  qualquer tela). Era a única animação do app com esse formato; `apps/web/test/keyframes.test.ts` reprova o CSS se outra
+  aparecer.
+- **iPhone de verdade:** não foi conferido num aparelho. A thread que cai é do compositor das versões de Linux do WebKit
+  (WPE e GTK); o Safari do iOS usa outro compositor, então esta queda não é esperada lá. Navegadores de Linux com o
+  WebKitGTK (GNOME Web) usam o mesmo compositor e podiam cair no mesmo ponto (não testado).
+- O CI continua com uma nova tentativa (`retries: 1`), mas não por causa disto. `fixtures.ts` segue avisando no log
+  quando uma página cai; numa queda nova, `dmesg | grep segfault` no runner diz a thread e o endereço.
 
 ### Fase 2 — Fila online: fila → partida → fim ✅
 
@@ -61,7 +97,8 @@ reduzir as camadas da mesa no celular. Até lá, o CI tenta de novo uma vez.
   voltam ao menu.
 - `online.spec.ts`, ranqueada: duas contas de teste, a ranqueada fica liberada, os dois entram na fila, um desiste e o
   bounty de quem venceu sobe (`/api/players/me`).
-- Só no desktop por enquanto: no iPhone a mesa usa outro arranjo, e a queda do WebKit (acima) somaria instabilidade.
+- Só no desktop por enquanto: no iPhone a mesa usa outro arranjo. (A queda do WebKit, acima, também pesava; foi
+  resolvida.)
 
 ### Fase 3 — Torneio: criar e jogar ✅
 
