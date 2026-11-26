@@ -55,7 +55,7 @@ Authorization: Bearer <APOIASE_API_SECRET>
 2. Criar a campanha **recorrente** na Apoia.se com as 4 recompensas de [`textos-apoiase.md`](textos-apoiase.md).
 3. Pedir a **chave da API** na Central de Ajuda da Apoia.se (artigo "API Pública da APOIA.se"). Ela chega no e-mail
    principal da campanha: `APOIASE_API_KEY` e `APOIASE_API_SECRET`.
-4. Preencher o `deploy.env` da produção (e o da homologação) e recarregar o pm2: seção 7 de
+4. Preencher o `deploy.env` da produção e recarregar o pm2: seção 7 de
    [`deploy/HOSTINGER.md`](../../deploy/HOSTINGER.md).
 5. Testar: apoiar com o próprio e-mail, entrar no site e tocar em "Já apoio: verificar". Conferir em Administração →
    Apoios recebidos.
