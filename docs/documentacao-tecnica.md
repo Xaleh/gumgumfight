@@ -114,7 +114,13 @@ gumgumfight/
 ├── package.json                 workspaces, scripts (dev, test, typecheck, build:release, cards:import, db:seed)
 ├── tsconfig.base.json
 ├── packages/engine/             motor de regras (TS puro)
-│   ├── src/engine.ts            createGame, applyAction (5.149 linhas)
+│   ├── src/engine/              createGame, applyAction: o motor, um módulo por etapa (index.ts lista todos e reexporta a API)
+│   │   ├── setup, apply, cancel, turn        criação e preparação, ações, cancelar a ação, fluxo de turno
+│   │   ├── stack, triggers, battle           pilha de resolução, efeitos disparados (CR 8-6), batalha e dano
+│   │   ├── effects, exec-step, costs         um passo de efeito por vez, o começo e o despacho de cada passo (execStep), custos
+│   │   ├── steps/                            o que cada passo de efeito faz, por família: power, field, don, hand, deck, life, play, choice
+│   │   ├── removal, zones, defeat, manual    K.O. e substituição, zonas/DON!!/Vida, derrota, ferramentas manuais
+│   │   └── queries, conditions, options, table, messages, constants   consultas (custo, poder, filtros), condições, o que dá para fazer, quem é o oponente, textos, limites
 │   ├── src/types.ts             CardData, GameState, Action, Pending, Frame, DSL de efeitos (1.400 linhas)
 │   ├── src/actions.ts           legalActions, actingPlayer
 │   ├── src/view.ts              viewFor (visão por jogador/espectador), apelidos, actionFromView
@@ -186,7 +192,7 @@ gumgumfight/
 │   ├── src/game/useOnlineGame.ts   canal SSE, reconexão, fila de ações
 │   ├── src/pwa.ts               service worker, convite de instalação, Wake Lock, inscrição nas notificações
 │   ├── src/service-worker.js    fonte do /sw.js (o plugin em vite.config.ts preenche versão e arquivos)
-│   ├── src/components/          Menu, DeckBuilder, GameScreen (2.319 linhas), Board, Watch, Tournaments, Stats, Admin…
+│   ├── src/components/          Menu, DeckBuilder, GameScreen (as telas da partida e a mesa, 2.319 linhas; os componentes em volta dela em table/), Board, Watch, Tournaments, Stats, Admin…
 │   └── public/                  manifest, ícones, marca
 ├── data/
 │   ├── cards/*.json             34 arquivos de cartas provisórias (750 cartas; ST01–ST36 parciais, OP01, OP02)
@@ -218,9 +224,9 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
   usadas), `stack` (frames de efeito/batalha/dano), `pending` (decisão esperada: alvo, bloqueio, counter, carta de
   Vida, confirmação, opção, mulligan, quem começa), `modifiers`, `log`, `winner`, `winReason`, `actionCount`,
   `rng`/`rng128`.
-- **`createGame(config)`** (`engine.ts:59`): recebe `seed` (32 bits) ou `seed128` (4 inteiros), `players` (nome, deck,
+- **`createGame(config)`** (`engine/setup.ts`): recebe `seed` (32 bits) ou `seed128` (4 inteiros), `players` (nome, deck,
   `isBot`), `cards: CardData[]`, `firstPlayer?`, `chooseFirst?`, `legacySetup?`. Embaralha com Fisher–Yates.
-- **`applyAction(prev, action)`** (`engine.ts:998`): clona o estado (sem clonar `defs`), aplica e devolve o novo;
+- **`applyAction(prev, action)`** (`engine/apply.ts`): clona o estado (sem clonar `defs`), aplica e devolve o novo;
   lança `IllegalActionError`. Nunca muda `prev`, então uma ação recusada não deixa rastro.
 - **`legalActions(state, player)`** e **`actingPlayer(state)`** (`actions.ts`): usadas pela UI, pelo bot e pelo servidor.
 - **Ações** (18 tipos): `mulligan`, `playCard`, `attachDon`, `detachDon`, `cancel`, `activate`, `attack`, `endTurn`,
@@ -676,7 +682,7 @@ deck), `status` (estados das cartas), `errors` (erros do servidor), `labels`, `s
   - `LogEntry.key/params/parts` (histórico, seção `log`; a linha secreta tem `secretKey…`, que `view.ts` só entrega ao dono);
     `LogEntry.cards` traz os ids das cartas que a linha cita pelo nome, na ordem do texto (`secretCards` na linha
     secreta): o nome sozinho não diz qual é a carta quando Líder e Personagem têm o mesmo nome, e é por esse campo
-    que o histórico abre a carta certa (`resolveLogCard` em `GameScreen.tsx`);
+    que o histórico abre a carta certa (`resolveLogCard`, usado pelo `table/LogPanel.tsx`);
   - `GameState.winReasonKey/winReasonParams` (motivo do fim de jogo, `log.win*`);
   - `Pending.promptKey/promptParams/promptParts` e `optionKeys/optionParts` (perguntas de efeito, seção `engine`);
   - `Ability.labelKey/labelParams` (rótulos de habilidades roteirizadas);

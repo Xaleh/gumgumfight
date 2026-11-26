@@ -67,6 +67,14 @@ em várias branches ao mesmo tempo.
   `packages/engine/src/engine.ts` (~7 mil linhas) em módulos por fase do turno; `apps/web/src/components/GameScreen.tsx`
   (~3,8 mil linhas) em componentes por zona da mesa. Sem mudar comportamento.
   *Pronto quando:* nenhum dos dois passa de ~1.500 linhas e todos os testes (inclusive os E2E de A1) passam sem alteração.
+  *Plano:* [`plano-divisao-motor-e-mesa.md`](plano-divisao-motor-e-mesa.md) (4 fases).
+  *Progresso:* fase 1 de 4 (`engine.ts` vira a pasta `packages/engine/src/engine/`, 20 módulos por etapa com a mesma
+  API) em 2026-11-26, [PR #240](https://github.com/Xaleh/gumgumfight/pull/240); fase 2 de 4 (o `execStep`, de 2.560
+  linhas, vira um despacho e 8 executores por família de efeito em `engine/steps/`; o maior arquivo do motor fica com
+  506 linhas) em 2026-11-26, no mesmo [PR #240](https://github.com/Xaleh/gumgumfight/pull/240); fase 3 de 4 (os
+  componentes em volta da mesa saem do `GameScreen.tsx` para `apps/web/src/components/table/`; ele cai de 3.860 para
+  2.319 linhas) em 2026-11-26, também no [PR #240](https://github.com/Xaleh/gumgumfight/pull/240). Falta o componente
+  `Table`, de 1.845 linhas (fase 4).
   *Feito em:* —
 
 ## Fase B — Treino e aprendizado

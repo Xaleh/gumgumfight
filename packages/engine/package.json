@@ -11,6 +11,7 @@
     "simulate": "tsx scripts/simulate.ts",
     "simulate:all": "tsx scripts/simulate-all.ts",
     "simulate:yonko": "tsx scripts/simulate-yonko.ts",
+    "fingerprint": "tsx scripts/fingerprint.ts",
     "compare-bots": "tsx scripts/compare-bots.ts",
     "tune-weights": "tsx scripts/tune-weights.ts"
   },

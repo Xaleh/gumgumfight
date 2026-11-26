@@ -16,6 +16,7 @@ Regras oficiais do One Piece Card Game, interações entre cartas e como o motor
 ## Como usar
 
 - **Antes de automatizar uma carta**: procure o tema em `interacoes/` e o efeito em `mapeamento-dsl.md`. Se a primitiva não existe, ela está listada lá como "falta".
+- **`engine.ts` nestes arquivos**: o motor foi dividido em módulos (`packages/engine/src/engine/`, a lista está no `index.ts` da pasta). As funções citadas continuam com o mesmo nome: procure pelo nome, não pela linha.
 - **Antes de mexer no motor**: confira a regra em `01-resumo-das-regras.md` (com o número da seção) e se o caso já está em `divergencias.md`.
 - **Ao escrever testes**: os exemplos de `interacoes/` (carta + pergunta + resposta oficial) são casos de teste prontos. Cite o número da regra ou a fonte no nome do teste.
 - **Ao achar uma regra nova ou um ruling**: acrescente no tema certo com o link da fonte, e, se o motor divergir, em `divergencias.md`.

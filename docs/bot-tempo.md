@@ -287,7 +287,7 @@ Só modificadores que duram além do turno contam. O próprio Personagem congela
 
 | Conceito | Onde está | Teste |
 |---|---|---|
-| Congelar o Personagem virado do oponente | `evaluate.ts`: `frozenFraction`; `engine.ts`: `refreshSkipped` | `congela o Personagem virado do oponente com a habilidade do Líder (Shanks OP17-020)`, `avaliação: Personagem do oponente congelado até o turno seguinte vale menos` |
+| Congelar o Personagem virado do oponente | `evaluate.ts`: `frozenFraction`; `engine/turn.ts`: `refreshSkipped` | `congela o Personagem virado do oponente com a habilidade do Líder (Shanks OP17-020)`, `avaliação: Personagem do oponente congelado até o turno seguinte vale menos` |
 
 ## 7d. Planos de jogo como gabarito
 
@@ -371,7 +371,7 @@ Medida (nível `hard`, decks prontos sorteados, assentos trocados): contra os pe
 ## 9. Como os pesos foram ajustados (e o que não funcionou)
 
 **Busca mais rápida.** O motor copiava o estado com `structuredClone` a cada jogada, incluindo o
-histórico da partida, que cresce o jogo todo. `cloneState` (`engine.ts`) faz a mesma cópia ~4× mais
+histórico da partida, que cresce o jogo todo. `cloneState` (`engine/apply.ts`) faz a mesma cópia ~4× mais
 rápido (preserva objetos compartilhados, como o `structuredClone`), e o planejador simula sem o
 histórico e sem o checkpoint do "cancelar". Uma jogada simulada caiu de ~0,4 ms para ~0,1 ms — o
 servidor também ganha, porque toda ação passa pelo `applyAction`.
@@ -591,7 +591,7 @@ O Bot do Time (`docs/plano-bot-time.md`) joga os decks do meta com um **perfil**
 | Mulligan pelo guia (as cartas que seguram a mão) | `profile.ts`: `keepHand`; `planner.ts`: `planAction` | `perfil de deck: mulligan` |
 | Confronto por Líder adversário: a chance de Counter escondido muda com o deck dele | `profile.ts`: `matchups` em `profileWeights` | `perfil de deck: pesos` |
 | A curva do próximo turno: ter na mão a jogada prevista para o DON!! seguinte vale `nextTurn` | `evaluate.ts`: `nextTurnPlay` | `nextTurn: ter na mão a jogada prevista…` |
-| Cartas da mão reveladas ficam lembradas enquanto estão na mão | `engine.ts`: `log` (reveal) e o começo de `applyAction`; `view.ts`: `visibleCards` | `knownHand: a carta da mão revelada…` |
+| Cartas da mão reveladas ficam lembradas enquanto estão na mão | `engine/messages.ts`: `log` (reveal) e `engine/apply.ts`: o começo de `applyAction`; `view.ts`: `visibleCards` | `knownHand: a carta da mão revelada…` |
 | A explicação de cada decisão (termos que mais mudaram, alternativas), para o painel do treinador | `evaluate.ts`: `evaluateTerms`; `planner.ts`: `explain` | `painel do treinador: explicação das decisões` |
 | Deck de jogador escolhido para o bot (o "G Shanks" da partida #903): joga com o perfil do deck do meta de mesmo Líder | `team/profiles.ts`: `profileFor`; `online/room.ts` e `GET /api/bot/profiles/:id?leader=` | `o bot joga o deck de um jogador com o perfil do deck do meta de mesmo Líder` |
 
