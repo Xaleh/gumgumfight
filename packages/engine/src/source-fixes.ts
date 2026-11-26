@@ -173,6 +173,8 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   // Auditoria das cartas (09/10/2026), conferidas na lista oficial:
   // Marco: a API corta o efeito do [On K.O.] (só fica o custo; "$" = só se o texto terminar assim).
   'OP03-013': [['[On K.O.] You may trash 1 Event from your hand$', '[On K.O.] You may trash 1 Event from your hand: You may play this Character card from your trash rested.']],
+  // Smoker: a impressão original na API traz "1o" (as reimpressões e a lista oficial, "up to 1 of").
+  'OP02-093': [['Give up to 1o of', 'Give up to 1 of']],
   'OP03-112': [['reveal up to 1 {Sanji} or', 'reveal up to 1 [Sanji] or']], // Charlotte Pudding: [Sanji] é nome de carta, não tipo
   // Kouzuki Oden: a API perde o "or Character card" e o efeito vira "Land of Wano E Whitebeard Pirates";
   // o ST32-002 (só Land of Wano) não podia ser jogado (card 84 do Trello, conferido na lista oficial).
