@@ -25,17 +25,14 @@ import { CoachPanel } from '../CoachPanel';
 import { useAuth } from '../../auth';
 import { usePreloadCardImages } from '../../game/preloadImages';
 import { useBoardSize } from '../../hooks/useBoardSize';
-import { buildReport, type CoachMark, feedbackMarks, sameMark } from '../../game/botReport';
+import { feedbackMarks } from '../../game/botReport';
 import { describeReplayAction } from '../../game/replayCue';
 import { audio } from '../../audio';
-import { hasKey, type MessageKey, useT, useTryT } from '../../i18n';
-import { fmtNumber } from '../../i18n/format';
-import { logText } from '../../game/engineText';
+import { useT, useTryT } from '../../i18n';
 import { enteredWithoutRush } from '../../game/freshCharacter';
 import { useMatchAudio } from '../../game/useMatchAudio';
 import { type OnlineGame } from '../../game/useOnlineGame';
-import { type Shortcut, useShortcuts } from '../../game/shortcuts';
-import { PLAYMATS, SettingsControls, useSettings } from '../../settings';
+import { useSettings } from '../../settings';
 import { Board, HandFan, handIsKnown, vars } from '../Board';
 import { WideBoard } from '../WideBoard';
 import { BoardLayoutEditor } from '../BoardLayoutEditor';
@@ -51,7 +48,6 @@ import { ReplayBar } from '../ReplayBar';
 import { PlayHighlight } from '../PlayHighlight';
 import { ReplayCue } from '../ReplayCue';
 import { ReportModal } from '../ReportModal';
-import { DeckListPanel, DeckPanel, MatchesPanel } from '../StreamerPanel';
 import {
   BroadcastTag,
   ChatBar,
@@ -65,44 +61,24 @@ import {
   SpectatorCount,
 } from '../Online';
 import { CallJudgeSheet, JudgePanel, PauseBanner } from '../Judge';
-import { type Drag, type DragKind, type Mode, type Panel, promptText, type Sheet, useMediaQuery } from './shared';
+import { type Drag, type Mode, type Panel, promptText, type Sheet, useMediaQuery } from './shared';
 import { AttackArrow, BattleInfo, CenterBand, CoachTipPill, DonBar } from './CenterBand';
 import { CancelButton, DecisionButton, TargetRequest, targetsOnTable, UndoPill } from './decisions';
 import { Prompt } from './Prompt';
-import { CardDetail, CardZoom, HoverTip, mergeReveals, RevealedCards, type RevealLine, SheetFrame } from './CardZoom';
+import { CardDetail, CardZoom, HoverTip, RevealedCards, SheetFrame } from './CardZoom';
 import { LogPanel } from './LogPanel';
+import { TableMenu } from './TableMenu';
+import { TableSidePanels } from './TableSidePanels';
+import { useBotCoach } from './useBotCoach';
+import { useHandOrder } from './useHandOrder';
+import { useOpenHands } from './useOpenHands';
+import { useTableGestures } from './useTableGestures';
+import { useTableNotices } from './useTableNotices';
+import { useTableShortcuts } from './useTableShortcuts';
 import type { TableBroadcast, TableEmbed, TableGame, TableKind, TableTutorial } from '../GameScreen';
 
 /** Decklist de um jogador no fim da partida: desenhada em canvas, fora do bundle principal (junto com o kit de divulgação). */
 const MatchDeck = lazy(() => import('../MatchDeck'));
-
-/**
- * Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen): pela chave do motor
- * (`LogEntry.key`); linhas sem chave (estados salvos antes das chaves) pelo texto em português.
- */
-const NOTICE_KEYS = new Set([
-  'log.conditionFails',
-  'log.lapsedCondition',
-  'log.lapsedConditionTagged',
-  'log.onKoConditionFails',
-  'log.cannotBlockCannotRest',
-  'log.cannotBlock',
-  'log.cannotBeRestedActive',
-  'log.cannotBeRestedByOpponent',
-  'log.retarget',
-]);
-const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virada|não pode ativar \[Blocker\]|o ataque passa a mirar/;
-const isNotice = (e: { key?: string; text: string }) => (e.key ? NOTICE_KEYS.has(e.key) : NOTICE_RE.test(e.text));
-
-const LONG_PRESS_MS = 420;
-const DRAG_THRESHOLD = 9;
-/** Quanto puxar a carta da mão para cima até ela "sair" (arrastar). */
-const HAND_PULL = 22;
-/** Com o mouse, deslizar a carta da mão para os lados já começa a arrastá-la (reordenar ou jogar). */
-const HAND_SLIDE = 14;
-
-/** Nome de cada nível do bot (o relatório do Bot do Time cita o nível). */
-const BOT_LEVEL_LABEL: Record<BotLevel, MessageKey> = { easy: 'menu.botEasy', normal: 'menu.botNormal', hard: 'menu.botHard', team: 'menu.botTeam' };
 
 /** Para onde o botão de sair da mesa leva: o torneio, o menu ou a tela anterior (ex.: a lista "Assistir"). */
 export type ExitTo = 'tournament' | 'menu' | 'back';
@@ -168,67 +144,7 @@ export function Table({
   const { state, dispatch, human } = game;
   const t = useT();
   const tryT = useTryT();
-  /**
-   * Aviso curto na mesa para as linhas do histórico que explicam por que algo não aconteceu
-   * (condição de efeito que não vale, [Blocker] que não pode bloquear, carta que não pode ser
-   * virada). No celular o histórico fica atrás de um botão, e sem o aviso parece que o jogo ignorou a jogada.
-   */
-  const [notice, setNotice] = useState<string | null>(startNotice ?? null);
-  useEffect(() => {
-    if (!startNotice) return;
-    const t = setTimeout(() => setNotice((n) => (n === startNotice ? null : n)), 10_000);
-    return () => clearTimeout(t);
-  }, [startNotice]);
-  const noticeSeen = useRef(state.log.length);
-  useEffect(() => {
-    // Replay: num pulo, as linhas puladas não viram aviso.
-    if (game.jumped) {
-      noticeSeen.current = state.log.length;
-      return;
-    }
-    if (noticeSeen.current > state.log.length) noticeSeen.current = 0; // desfazer / replay
-    const fresh = state.log.slice(noticeSeen.current);
-    noticeSeen.current = state.log.length;
-    const hit = [...fresh].reverse().find(isNotice);
-    if (!hit) return;
-    setNotice(logText(tryT, hit));
-    const t = setTimeout(() => setNotice(null), 6000);
-    return () => clearTimeout(t);
-  }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  /**
-   * Cartas que o oponente revelou (busca no deck, carta da mão, topo do deck…): aparecem na mesa até o
-   * jogador fechar. Sem isso só o histórico dizia qual carta foi, e a carta some na mão do oponente.
-   * O [Trigger] do oponente também aparece aqui quando as animações estão desligadas.
-   * Não aparece para quem escolheu a carta (já a viu), no tutorial, no replay nem na tela de transmissão
-   * (ninguém fecha). Para quem assiste (o streamer) aparecem as revelações dos dois lados, e somem
-   * sozinhas depois de um tempo.
-   */
-  const [reveals, setReveals] = useState<RevealLine[]>([]);
-  const revealSeen = useRef(state.log.length);
-  useEffect(() => {
-    if (revealSeen.current > state.log.length) {
-      revealSeen.current = state.log.length; // desfazer / replay: nada de avisos antigos
-      setReveals([]);
-      return;
-    }
-    const fresh = state.log.slice(revealSeen.current);
-    revealSeen.current = state.log.length;
-    if (game.jumped || tutorial || broadcast || (human === null && !spectator)) return;
-    const lines = fresh.flatMap((e): RevealLine[] => {
-      if (!e.revealed?.length || e.revealedBy === human) return [];
-      // [Trigger] do oponente: com as animações completas a carta já aparece no centro da mesa.
-      if (e.key === 'log.triggerActivated' && showy) return [];
-      const cards = e.revealed.map((id) => state.defs[id]).filter((d): d is CardDef => Boolean(d));
-      return cards.length ? [{ text: logText(tryT, e), cards, count: 1 }] : [];
-    });
-    if (lines.length) setReveals((r) => mergeReveals(r, lines));
-  }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Quem assiste não precisa clicar: o aviso some sozinho (o streamer pode fechar antes).
-  useEffect(() => {
-    if (!spectator || reveals.length === 0) return;
-    const timer = setTimeout(() => setReveals([]), 12_000);
-    return () => clearTimeout(timer);
-  }, [spectator, reveals]);
+  const { notice, setNotice, reveals, setReveals } = useTableNotices({ game, tryT, startNotice, tutorial: Boolean(tutorial), broadcast: Boolean(broadcast), spectator });
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   // Partida de torneio: "voltar" leva para a página do torneio.
@@ -353,23 +269,7 @@ export function Table({
     setSheet(null);
   };
   const [drag, setDrag] = useState<Drag | null>(null);
-  /**
-   * Visão do Streamer: as mãos abertas no leque (as duas podem ficar abertas ao mesmo tempo) e as que
-   * estão virando de volta antes de sumir.
-   */
-  const [openHands, setOpenHands] = useState<PlayerId[]>([]);
-  const [closingHands, setClosingHands] = useState<PlayerId[]>([]);
-  const openHandsRef = useRef(openHands);
-  openHandsRef.current = openHands;
-  const closeTimers = useRef<Partial<Record<PlayerId, ReturnType<typeof setTimeout>>>>({});
-  const closeHand = useCallback((p: PlayerId) => {
-    setOpenHands((o) => o.filter((x) => x !== p));
-    setClosingHands((c) => (c.includes(p) ? c : [...c, p]));
-    clearTimeout(closeTimers.current[p]);
-    closeTimers.current[p] = setTimeout(() => setClosingHands((c) => c.filter((x) => x !== p)), 480);
-  }, []);
-  const closeHands = useCallback(() => openHandsRef.current.forEach(closeHand), [closeHand]);
-  useEffect(() => () => Object.values(closeTimers.current).forEach(clearTimeout), []);
+  const { openHands, toggleHand, fanPlayers } = useOpenHands(online, spectator);
   // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
   /** Sandbox de regras: a mesma pessoa joga os dois lados (mãos abertas, sem replay nem relato de partida). */
   const sandbox = kind === 'sandbox';
@@ -385,19 +285,6 @@ export function Table({
   // Bot do Time: a nota e as marcações, para quem é do Time, numa partida contra o bot (no navegador ou na sala do servidor).
   const botMatch = kind === 'bot' || online?.room?.queue === 'bot';
   const effectiveBotLevel: BotLevel | undefined = isOnline ? online?.room?.botLevel : botLevel;
-  /** Passos das jogadas do bot marcados como errados (painel do treinador); viram o relatório da partida. */
-  const [marks, setMarks] = useState<CoachMark[]>([]);
-  const toggleMark = useCallback(
-    (index: number, step: number) =>
-      setMarks((list) => (list.some((m) => sameMark(m, { index, step })) ? list.filter((m) => !sameMark(m, { index, step })) : [...list, { index, step }])),
-    [],
-  );
-  const updateMark = useCallback(
-    (index: number, step: number, patch: Partial<Pick<CoachMark, 'alt' | 'why'>>) =>
-      setMarks((list) => list.map((m) => (sameMark(m, { index, step }) ? { ...m, ...patch } : m))),
-    [],
-  );
-  const coachEntries = (isOnline ? online?.coach : game.coach) ?? [];
   const reportCards = useMemo(
     () =>
       Object.values(state.defs)
@@ -421,8 +308,6 @@ export function Table({
     if (sheet === 'log' || shownPanel === 'log' || logSeen > state.log.length) setLogSeen(state.log.length); // desfazer / replay encolhem o log
   }, [sheet, shownPanel, state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const logNew = sheet === 'log' || shownPanel === 'log' ? 0 : Math.max(0, state.log.length - logSeen);
-  /** Ordem da mão escolhida pelo jogador (só exibição). */
-  const [handOrder, setHandOrder] = useState<string[]>([]);
   /** Carta da mão erguida sob o dedo. */
   const [liftedUid, setLifted] = useState<string | null>(null);
 
@@ -459,39 +344,9 @@ export function Table({
   const { user } = useAuth();
   /** Painel do treinador: no treino contra o Bot do Time, para quem é do Time. */
   const coachOn = botMatch && isTeam(user) && effectiveBotLevel === 'team' && human !== null && !watching && kind !== 'replay' && !tutorial;
-  /** O relatório da partida (markdown) com as jogadas marcadas; `rating`/`comment` vêm do bloco do fim da partida. */
-  const buildBotReport = useCallback(
-    (rating = 0, comment = '') => {
-      if (human === null) return '';
-      const botSeat: PlayerId = human === 0 ? 1 : 0;
-      const leaderOf = (p: PlayerId) => {
-        const uid = state.players[p].leader.uid;
-        return { leaderName: state.cards[uid] ? cardDef(state, uid).name : '?', leaderId: state.cards[uid]?.cardId ?? '?' };
-      };
-      const tr = (key: string, params?: Record<string, string | number>) => (hasKey(key) ? t(key, params) : key);
-      return buildReport({
-        entries: coachEntries,
-        marks,
-        tr,
-        describe: (a) => describeReplayAction(state, a, locale).title,
-        termLabel: (key) => tr(`coach.term.${key}`),
-        num: (n) => fmtNumber(n, locale),
-        bot: {
-          deckId: (isOnline ? online?.room?.botDeckId : botDeckId) ?? null,
-          deckName: (isOnline ? online?.room?.botDeckName : botDeckName) ?? null,
-          ...leaderOf(botSeat),
-        },
-        opponent: { name: state.players[human].name, ...leaderOf(human) },
-        result: { turn: state.turn, over: state.phase === 'gameover', ...(state.phase === 'gameover' ? { botWon: state.winner === null ? null : state.winner === botSeat } : {}) },
-        matchId: reportMatch,
-        level: effectiveBotLevel ? t(BOT_LEVEL_LABEL[effectiveBotLevel]) : null,
-        rating,
-        comment,
-      });
-    },
-    [human, state, coachEntries, marks, t, locale, isOnline, online?.room?.botDeckId, online?.room?.botDeckName, botDeckId, botDeckName, reportMatch, effectiveBotLevel],
-  );
-  const coachReport = useMemo(() => (coachOn ? buildBotReport() : ''), [coachOn, buildBotReport]);
+  const { marks, toggleMark, updateMark, coachEntries, buildBotReport, coachReport } = useBotCoach({
+    game, t, locale, isOnline, online, botDeckId, botDeckName, reportMatch, effectiveBotLevel, coachOn,
+  });
   /** Streamer e Admin mandam a partida aberta para a tela de transmissão (menu da partida). */
   const canBroadcast = Boolean(online?.room && !broadcast && !tutorial && user && (user.role === 'streamer' || isAdmin(user.role)));
   const sendToBroadcast = () =>
@@ -505,58 +360,10 @@ export function Table({
       (e: unknown) => game.setError(e instanceof Error ? e.message : String(e)),
     );
 
-  /**
-   * Visão do Streamer: clique na mão minimizada de um jogador abre o leque dela (a do outro continua
-   * como está, para ver as duas juntas); outro clique na mesma mão fecha o leque.
-   * Se o servidor ainda não manda as mãos, o mesmo clique liga "Ver mãos" (a mesa passa a ser a
-   * atrasada) e o leque abre quando as cartas chegarem.
-   */
-  const toggleHand = (p: PlayerId) => {
-    if (openHands.includes(p)) return closeHand(p);
-    clearTimeout(closeTimers.current[p]);
-    setClosingHands((c) => c.filter((x) => x !== p));
-    setOpenHands((o) => [...o, p]);
-    if (online && !online.hands && spectator?.canHands) spectator.onToggleHands();
-  };
-  // "Ver mãos" desligado no canto: os leques abertos viram de volta e somem.
-  const hadHands = useRef(Boolean(online?.hands));
-  useEffect(() => {
-    const has = Boolean(online?.hands);
-    if (hadHands.current && !has) closeHands();
-    hadHands.current = has;
-  }, [online?.hands, closeHands]);
-  /** Os leques na tela: os abertos e os que estão virando de volta. */
-  const fanPlayers = ([0, 1] as PlayerId[]).filter((p) => openHands.includes(p) || closingHands.includes(p));
-
   // As mãos ficam viradas até o vencedor do sorteio escolher quem começa: ver a mão pesaria na escolha.
   const handsSecret = state.pending?.kind === 'chooseFirst';
-  // Mão na ordem do jogador: cartas novas entram no fim.
   const myHand = state.players[bottom].hand;
-  const orderedHand = useMemo(() => {
-    const inHand = new Set(myHand);
-    const kept = handOrder.filter((u) => inHand.has(u));
-    const keptSet = new Set(kept);
-    return [...kept, ...myHand.filter((u) => !keptSet.has(u))];
-  }, [handOrder, myHand]);
-  const reorder = (uid: string, index: number) => {
-    const rest = orderedHand.filter((u) => u !== uid);
-    rest.splice(Math.max(0, Math.min(index, rest.length)), 0, uid);
-    return rest;
-  };
-  /** Ordena a mão por custo (Eventos e Stages depois dos Personagens de mesmo custo) e nome; só exibição. */
-  const sortHand = () => {
-    const rank = (uid: string) => {
-      const d = cardDef(state, uid);
-      return [d.cost ?? 0, d.category === 'character' ? 0 : d.category === 'event' ? 1 : 2, d.name] as const;
-    };
-    setHandOrder(
-      [...myHand].sort((a, b) => {
-        const [ca, ka, na] = rank(a);
-        const [cb, kb, nb] = rank(b);
-        return ca - cb || ka - kb || na.localeCompare(nb);
-      }),
-    );
-  };
+  const { orderedHand, reorder, sortHand, setHandOrder } = useHandOrder(state, myHand);
   const handView = drag?.kind === 'hand' && drag.over === 'hand' && drag.uid && drag.insert !== undefined
     ? reorder(drag.uid, drag.insert)
     : orderedHand;
@@ -863,8 +670,6 @@ export function Table({
 
   /** DON!! marcados (na faixa central): quantos são e onde tocar. */
   const donBar = mode?.kind === 'don' && human !== null ? <DonBar count={mode.picked.length} onCancel={() => setMode(null)} /> : null;
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
 
   // ------------------------------------------------------------ atalhos de teclado
 
@@ -890,163 +695,15 @@ export function Table({
     sheet === 'coach';
   const shortcutsActive = shortcutsOn && !covered;
   shortcutsLive.current = shortcutsActive;
-  /**
-   * Atalhos de teclado (opção "Atalhos de teclado"; a lista para quem joga está em `ShortcutsHelp`).
-   *
-   * As teclas de carta (Q W E R T e L) escolhem a carta sem abri-la; A, H e X agem sobre a carta escolhida (ou a
-   * aberta). Numa escolha de alvo (ataque, efeito, bloqueio, DON!! marcados) a tecla vale como o toque na carta,
-   * e passa para a do oponente quando a sua não é uma opção. Enter, o cancelar do Esc e os números numa lista de
-   * opções e o M ("Ver a mesa") apertam o botão que está na tela (`data-hotkey`), para valerem só quando ele vale e
-   * com as mesmas proteções.
-   */
-  const onShortcut = (s: Shortcut): boolean => {
-    const click = (selector: string) => {
-      const button = gameRef.current?.querySelector<HTMLButtonElement>(`${selector}:not(:disabled)`);
-      button?.click();
-      return Boolean(button);
-    };
-    const top: PlayerId = bottom === 0 ? 1 : 0;
-    const marking = human !== null && myTurnIdle && has((a) => a.type === 'attachDon') ? state.players[human].donActive : 0;
-    const markDons = (count: number) => {
-      audio.play('don-pick', { pitch: Math.min(6, count - 1) });
-      setMode({ kind: 'don', picked: Array.from({ length: count }, (_, i) => i) });
-    };
-    /** A carta sobre a qual o A, o H e o X agem: a aberta, ou a escolhida pela tecla ou pelo clique. */
-    const card = zoom ?? selected;
-    switch (s.kind) {
-      case 'endTurn':
-        if (!myTurnIdle) return false;
-        dispatch({ type: 'endTurn', player: human! });
-        setMode(null);
-        setSelected(null);
-        setZoom(null);
-        setSheet(null);
-        return true;
-      case 'confirm':
-        // Vale para o que está por cima: a carta aberta, a folha da mão ou, sem nada aberto, a pergunta ou a faixa central.
-        if (zoom) return click('.zoom [data-hotkey~="confirm"]');
-        if (sheet) return sheet === 'hand' && click('.sheet [data-hotkey~="confirm"]');
-        return click('[data-hotkey~="confirm"]');
-      case 'cancel':
-        if (zoom || sheet || mode) {
-          setMode(null);
-          setSelected(null);
-          setZoom(null);
-          setSheet(null);
-          return true;
-        }
-        setSelected(null);
-        return click('[data-hotkey~="cancel"]') || selected !== null;
-      case 'trash': {
-        const player = s.opponent ? top : bottom;
-        const open = sheet !== null && typeof sheet === 'object' && sheet.trash === player;
-        setZoom(null);
-        setSheet(open ? null : { trash: player });
-        return true;
-      }
-      case 'number': {
-        if (zoom || sheet) return false;
-        // Pergunta com uma lista de opções (qual DON!! devolver, que efeito usar…): o número escolhe a opção.
-        const options = gameRef.current?.querySelectorAll<HTMLButtonElement>('[data-hotkey~="option"]');
-        if (options?.length) {
-          options[s.n - 1]?.click();
-          return s.n <= options.length;
-        }
-        if (marking === 0) return false;
-        markDons(Math.min(s.n, marking));
-        return true;
-      }
-      case 'attachAll':
-        if (sheet || !myTurnIdle) return false;
-        if (card && canReceiveDon(card)) {
-          attachDons(card, state.players[human!].donActive);
-          setMode(null);
-          setZoom(null);
-          return true;
-        }
-        // Sem carta escolhida: marca todos, e a tecla da carta os anexa.
-        if (marking === 0) return false;
-        markDons(marking);
-        return true;
-      case 'peek':
-        // "Ver a mesa" da pergunta aberta, ou "Voltar à pergunta" quando ela já está recolhida.
-        return !zoom && !sheet && click('[data-hotkey~="peek"]');
-      case 'attack':
-        if (sheet || !card || !canAttackWith(card)) return false;
-        setMode({ kind: 'attack', attacker: card });
-        setZoom(null);
-        return true;
-      case 'ability': {
-        if (sheet) return false;
-        if (zoom) return click('.zoom .ability-plate');
-        if (!selected || !myTurnIdle) return false;
-        const abilities = legal.filter((a) => a.type === 'activate' && a.uid === selected);
-        if (abilities.length === 0) return false;
-        // Mais de uma habilidade: a carta abre para a escolha.
-        if (abilities.length > 1) setZoom(selected);
-        else {
-          dispatch(abilities[0]);
-          setSelected(null);
-        }
-        return true;
-      }
-      case 'card': {
-        if (sheet) return false;
-        const at = (p: PlayerId) => (s.slot === 'leader' ? state.players[p].leader.uid : (state.players[p].characters[s.slot]?.uid ?? null));
-        /** A carta é um dos alvos que o jogo espera agora (de um efeito, do bloqueio, do ataque ou dos DON!! marcados). */
-        const choosable = (uid: string | null): uid is string =>
-          uid !== null &&
-          (((myPending?.kind === 'selectTargets' || myPending?.kind === 'block') && myPending.options.includes(uid)) ||
-            (mode?.kind === 'attack' && has((a) => a.type === 'attack' && a.attacker === mode.attacker && a.target === uid)) ||
-            (mode?.kind === 'don' && canReceiveDon(uid)));
-        const mine = at(bottom);
-        const theirs = at(top);
-        const uid = s.opponent || (choosable(theirs) && !choosable(mine)) ? theirs : mine;
-        if (uid === null) return false;
-        if (choosable(uid)) {
-          setZoom(null);
-          onCard(uid);
-          return true;
-        }
-        // Fora de uma escolha a tecla só escolhe a carta (o toque também sai do modo de ataque); de novo, abre ou fecha a carta.
-        if (mode?.kind === 'attack') setMode(null);
-        setZoom(uid === selected && zoom !== uid ? uid : null);
-        setSelected(uid);
-        return true;
-      }
-    }
-  };
-  useShortcuts(shortcutsActive, human !== null, onShortcut);
+  useTableShortcuts(shortcutsActive, {
+    gameRef, state, human, bottom, myTurnIdle, has, legal, myPending, mode, zoom, selected, sheet,
+    dispatch, setMode, setSelected, setZoom, setSheet, canReceiveDon, canAttackWith, attachDons, onCard,
+  });
 
   // ------------------------------------------------------------ gestos: toque longo e arrastar
 
-  const press = useRef<{
-    x: number;
-    y: number;
-    /** Âncora do toque longo (recomeça quando o dedo anda). */
-    ax: number;
-    ay: number;
-    uid: string | null;
-    kind: DragKind | null;
-    /** Posição na fileira do DON!! ativo pressionado. */
-    don?: number;
-    timer: ReturnType<typeof setTimeout>;
-    moved: boolean;
-    /** Começou na própria mão: deslizar ergue a carta sob o dedo. */
-    hand: boolean;
-    browsed: boolean;
-    /** Mouse: deslizar para os lados na mão arrasta a carta (no toque, folheia). */
-    mouse: boolean;
-  } | null>(null);
-  const dragRef = useRef<Drag | null>(null);
-  const suppressClick = useRef(false);
-  const dropRef = useRef<(d: Drag) => void>(() => undefined);
-  const dropValidRef = useRef(dropValid);
-  dropValidRef.current = dropValid;
-  const onCardRef = useRef(onCard);
-  onCardRef.current = onCard;
-
-  dropRef.current = (d: Drag) => {
+  /** Soltou o que arrastava num destino válido: joga, ataca, anexa ou devolve o DON!!, ou reordena a mão. */
+  const onDrop = (d: Drag) => {
     if (!d.over || !dropValid(d, d.over) || human === null) return;
     if (d.kind === 'hand' && d.over === 'hand') {
       if (d.uid && d.insert !== undefined) setHandOrder(reorder(d.uid, d.insert));
@@ -1065,158 +722,7 @@ export function Table({
     setSelected(null);
   };
 
-  const armLongPress = (uid: string | null) =>
-    setTimeout(() => {
-      const p = press.current;
-      if (!p || !uid || dragRef.current) return;
-      suppressClick.current = true;
-      press.current = null;
-      setLifted(null);
-      setZoom(uid);
-      navigator.vibrate?.(12);
-    }, LONG_PRESS_MS);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    const el = e.target as HTMLElement;
-    // Na mão, a faixa que a carta erguida deixa a descoberto (o `::after` de `.hand-card.peek`) vale como a carta.
-    const inHand = el.matches('[data-hand-uid]') ? el.querySelector<HTMLElement>('[data-uid]') : null;
-    const dragEl = el.closest<HTMLElement>('[data-drag]') ?? (inHand?.dataset.drag ? inHand : null);
-    const cardEl = el.closest<HTMLElement>('[data-uid]') ?? inHand;
-    if (!dragEl && !cardEl) return;
-    const uid = (dragEl ?? cardEl)!.dataset.uid ?? null;
-    const kind = (dragEl?.dataset.drag as DragKind | undefined) ?? null;
-    const don = dragEl?.dataset.don !== undefined ? Number(dragEl.dataset.don) : undefined;
-    const hand = Boolean(cardEl && el.closest('.hand.bottom'));
-    if (press.current) clearTimeout(press.current.timer);
-    if (hand && uid) setLifted(uid);
-    press.current = {
-      x: e.clientX,
-      y: e.clientY,
-      ax: e.clientX,
-      ay: e.clientY,
-      uid,
-      kind,
-      ...(don !== undefined ? { don } : {}),
-      timer: armLongPress(cardEl?.dataset.uid ?? null),
-      moved: false,
-      hand,
-      browsed: false,
-      mouse: e.pointerType === 'mouse',
-    };
-  };
-
-  useEffect(() => {
-    /** Posição na mão sob o dedo, pelas mesmas contas do leque no CSS. */
-    const handSlot = (x: number): number | undefined => {
-      const box = document.querySelector<HTMLElement>('.hand.bottom');
-      const card = box?.querySelector<HTMLElement>('.hand-card');
-      if (!box || !card) return undefined;
-      const n = box.querySelectorAll('.hand-card').length;
-      const w = box.clientWidth;
-      const cw = card.offsetWidth;
-      const step = n > 1 ? Math.min(cw * 0.9, (w - cw - 34) / (n - 1)) : 1;
-      const left = box.getBoundingClientRect().left;
-      return Math.max(0, Math.min(n - 1, Math.round((x - left - w / 2) / step + (n - 1) / 2)));
-    };
-    const findOver = (x: number, y: number, d: Drag): Pick<Drag, 'over' | 'insert'> => {
-      const el = document.elementFromPoint(x, y) as HTMLElement | null;
-      if (!el) return { over: null };
-      if (d.kind === 'hand') {
-        if (el.closest('.bottom-strip, [data-drop="hand"]')) return { over: 'hand', insert: handSlot(x) };
-        return { over: el.closest('[data-drop="field"]') && dropValidRef.current(d, 'field') ? 'field' : null };
-      }
-      if (d.kind === 'attached') {
-        // DON!! anexado volta para a própria fileira de DON!! (a de baixo).
-        return { over: el.closest('.don-row.bottom') && dropValidRef.current(d, 'don') ? 'don' : null };
-      }
-      const uid = el.closest<HTMLElement>('[data-uid]')?.dataset.uid ?? null;
-      return { over: uid && dropValidRef.current(d, uid) ? uid : null };
-    };
-    const startDrag = (p: NonNullable<typeof press.current>, e: PointerEvent) => {
-      clearTimeout(p.timer);
-      const m = modeRef.current;
-      // Arrastar um DON!! marcado leva todos os marcados; um DON!! sem marca vai sozinho.
-      const marked = m?.kind === 'don' ? m.picked : [];
-      const dons = p.kind !== 'don' ? [] : p.don !== undefined && marked.includes(p.don) ? marked : p.don !== undefined ? [p.don] : marked;
-      const count = p.kind === 'don' ? Math.max(1, dons.length) : 1;
-      dragRef.current = { kind: p.kind!, uid: p.uid, x: e.clientX, y: e.clientY, over: null, count, ...(dons.length ? { dons } : {}) };
-      setLifted(null);
-      setZoom(null);
-      setMode(null);
-    };
-    const move = (e: PointerEvent) => {
-      const p = press.current;
-      if (!p) return;
-      if (p.hand && !dragRef.current) {
-        // Na mão: puxar para cima tira a carta; para os lados, ergue a carta sob o dedo (toque) ou, com o
-        // mouse, já arrasta (soltar na própria mão reordena).
-        if (p.kind && (p.y - e.clientY > HAND_PULL || (p.mouse && Math.abs(e.clientX - p.x) > HAND_SLIDE))) startDrag(p, e);
-        else {
-          if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) p.moved = true;
-          if (Math.hypot(e.clientX - p.ax, e.clientY - p.ay) > 8) {
-            clearTimeout(p.timer);
-            p.ax = e.clientX;
-            p.ay = e.clientY;
-            const hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-            const under = hit?.closest('.hand.bottom') ? hit.closest<HTMLElement>('[data-uid]')?.dataset.uid : undefined;
-            if (under && under !== p.uid) {
-              p.uid = under;
-              p.browsed = true;
-              setLifted(under);
-            }
-            p.timer = armLongPress(p.uid);
-          }
-          return;
-        }
-      } else if (!p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) {
-        p.moved = true;
-        clearTimeout(p.timer);
-        if (!p.kind) return;
-        startDrag(p, e);
-      }
-      const d = dragRef.current;
-      if (!d) return;
-      const next = { ...d, x: e.clientX, y: e.clientY, ...findOver(e.clientX, e.clientY, d) };
-      dragRef.current = next;
-      setDrag(next);
-    };
-    const up = () => {
-      const p = press.current;
-      if (p) clearTimeout(p.timer);
-      press.current = null;
-      setLifted(null);
-      const d = dragRef.current;
-      if (d) {
-        dragRef.current = null;
-        setDrag(null);
-        suppressClick.current = true;
-        dropRef.current(d);
-      } else if (p?.hand && p.browsed && p.uid) {
-        // Deslizou pela mão e soltou numa carta: age como um toque nela.
-        suppressClick.current = true;
-        onCardRef.current(p.uid);
-      }
-      // O clique (se houver) chega logo depois do pointerup; depois disso, libera.
-      setTimeout(() => (suppressClick.current = false), 60);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
-    return () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', up);
-    };
-  }, []);
-
-  const onClickCapture = (e: React.MouseEvent) => {
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      e.stopPropagation();
-      e.preventDefault();
-    }
-  };
+  const { onPointerDown, onClickCapture } = useTableGestures({ mode, dropValid, onCard, onDrop, setDrag, setLifted, setZoom, setMode });
 
   // ------------------------------------------------------------ render
 
@@ -1567,125 +1073,29 @@ export function Table({
         )}
 
         {sheet === 'menu' && (
-          <SheetFrame title={t('game.matchSheet')} onClose={() => setSheet(null)}>
-            <div className="menu-grid">
-              {human !== null && !isOnline && !tutorial && (
-                <button className="btn" onClick={game.undo} disabled={!game.canUndo}>
-                  {t('game.undo')}
-                </button>
-              )}
-              {!isOnline && !replay && !tutorial && (
-                <button className="btn" onClick={() => game.setPaused((p) => !p)}>
-                  {game.paused ? t('game.resume') : t('game.pause')}
-                </button>
-              )}
-              <button className="btn" onClick={() => (streamer || (playerPanel && panelLogOn) ? openPanel('log') : setSheet('log'))}>
-                {t('game.logBtn')}
-              </button>
-              {layoutChoice && (
-                <button className="btn" onClick={() => setSheet('layout')}>
-                  {t('game.layoutBtn')}
-                </button>
-              )}
-              {playerPanel && loadOwnDeck && (
-                <button className="btn" onClick={() => openPanel('deck')}>
-                  {t('game.decklistBtn')}
-                </button>
-              )}
-              {streamer && !embed?.layout && (
-                <button className="btn" onClick={() => updateSettings({ streamerLayout: lateral ? 'upright' : 'lateral' })} title={t('game.layoutTitle')}>
-                  {lateral ? t('game.layoutToUpright') : t('game.layoutToLateral')}
-                </button>
-              )}
-              {streamer && spectator?.onSwitchRoom && (
-                <button className="btn" onClick={() => openPanel('matches')}>
-                  {t('game.matchesBtn')}
-                </button>
-              )}
-              {streamer && spectator?.roomId && (
-                <button className="btn" onClick={() => openPanel('deck')}>
-                  {t('game.decklistBtn')}
-                </button>
-              )}
-              {canBroadcast && (
-                <button className="btn" onClick={sendToBroadcast}>
-                  {t('broadcast.sendThis')}
-                </button>
-              )}
-              {sandbox && onRematch && (
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setSheet(null);
-                    onRematch();
-                  }}
-                >
-                  {t('sandbox.restart')}
-                </button>
-              )}
-              {(over || replay) && !tutorial && !sandbox && (
-                <button className="btn" onClick={game.downloadReplay}>
-                  {t('game.downloadReplay')}
-                </button>
-              )}
-              {callJudge && (
-                <button className="btn judge-call" onClick={callJudge}>
-                  {t('judge.call')}
-                </button>
-              )}
-              {human !== null && state.phase === 'main' && !tutorial && !sandbox && (
-                <button
-                  className="btn danger"
-                  onClick={() => {
-                    if (window.confirm(t('game.concedeConfirm'))) {
-                      dispatch({ type: 'concede', player: human });
-                      setSheet(null);
-                    }
-                  }}
-                >
-                  {t('game.concede')}
-                </button>
-              )}
-              <button className="btn" onClick={onExit}>
-                {tutorial ? (tutorial.exitLabel ?? t('tutorial.exitLesson')) : sandbox ? t('sandbox.backToEditor') : toTournament ? t('game.exitToTournament') : exitTo === 'back' ? t('game.exitBack') : t('game.exitToMenu')}
-              </button>
-            </div>
-            {lateral && (
-              <div className="sheet-section">
-                <label className="sheet-label">{t('game.playmat')}</label>
-                <p className="muted small sheet-hint">{t('game.playmatHint')}</p>
-                <div className="seg small playmat-pick">
-                  {PLAYMATS.map((pm) => (
-                    <button key={pm} className={streamerPlaymat === pm ? 'on' : ''} onClick={() => updateSettings({ streamerPlaymat: pm })}>
-                      <span className={`playmat-dot playmat-${pm}`} aria-hidden />
-                      {t(`game.playmat.${pm}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {!isOnline && !replay && !tutorial && (
-              <div className="sheet-section">
-                <label className="sheet-label">{t('game.botSpeed')}</label>
-                <p className="muted small sheet-hint">{t('game.botSpeedHint')}</p>
-                <div className="seg small">
-                  {[0.5, 1, 2, 4].map((v) => (
-                    <button key={v} className={game.speed === v ? 'on' : ''} onClick={() => game.setSpeed(v)}>
-                      {t('game.speedX', { v })}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {(kind === 'bot' || sandbox) && !tutorial && (
-              <label className="check">
-                <input type="checkbox" checked={showBotHand} onChange={(e) => setShowBotHand(e.target.checked)} /> {t('game.showBotHand')}
-              </label>
-            )}
-            <div className="sheet-section">
-              <SettingsControls />
-            </div>
-          </SheetFrame>
+          <TableMenu
+            game={game}
+            kind={kind}
+            tutorial={tutorial}
+            embed={embed}
+            spectator={spectator}
+            onExit={onExit}
+            onRematch={onRematch}
+            exitTo={exitTo}
+            streamer={streamer}
+            lateral={lateral}
+            playerPanel={playerPanel}
+            panelLogOn={panelLogOn}
+            layoutChoice={layoutChoice}
+            hasOwnDeck={Boolean(loadOwnDeck)}
+            canBroadcast={canBroadcast}
+            sendToBroadcast={sendToBroadcast}
+            callJudge={callJudge}
+            showBotHand={showBotHand}
+            setShowBotHand={setShowBotHand}
+            setSheet={setSheet}
+            openPanel={openPanel}
+          />
         )}
 
         {sheet === 'layout' && <BoardLayoutEditor state={state} onClose={() => setSheet(null)} />}
@@ -1825,112 +1235,36 @@ export function Table({
         )}
       </div>
 
-      {wide && tutorial && (
-        <aside className="side-panel lesson-panel">
-          <div className="panel-controls">
-            <button className="btn small" onClick={onExit}>
-              {tutorial.exitLabel ?? t('tutorial.exitLesson')}
-            </button>
-          </div>
-          {tutorial.coach}
-          <CardDetail state={state} uid={detailUid} />
-        </aside>
-      )}
-      {wide && broadcast && (
-        <aside className="side-panel">
-          <LogPanel state={state} />
-        </aside>
-      )}
-      {streamer && panel && (
-        <aside className="side-panel tabbed-panel streamer-panel" aria-label={t('game.panelLabel')}>
-          <div className="panel-tabs">
-            <div className="seg small" role="tablist">
-              <button type="button" role="tab" aria-selected={panel === 'log'} className={panel === 'log' ? 'on' : ''} onClick={() => setPanel('log')}>
-                {t('game.log')}
-              </button>
-              {spectator?.onSwitchRoom && (
-                <button type="button" role="tab" aria-selected={panel === 'matches'} className={panel === 'matches' ? 'on' : ''} onClick={() => setPanel('matches')}>
-                  {t('game.matches')}
-                </button>
-              )}
-              {spectator?.roomId && (
-                <button type="button" role="tab" aria-selected={panel === 'deck'} className={panel === 'deck' ? 'on' : ''} onClick={() => setPanel('deck')}>
-                  {t('game.decklist')}
-                </button>
-              )}
-            </div>
-            <button className="zoom-close static" onClick={() => setPanel(null)} aria-label={t('game.closePanel')} title={t('game.closePanel')}>
-              ✕
-            </button>
-          </div>
-          {panel === 'log' && <LogPanel state={state} onCardZoom={setLogCard} onSearching={onLogSearching} />}
-          {panel === 'matches' && spectator?.onSwitchRoom && <MatchesPanel currentId={spectator.roomId ?? null} onWatch={spectator.onSwitchRoom} />}
-          {panel === 'deck' && spectator?.roomId && <DeckPanel roomId={spectator.roomId} onZoom={setDeckCard} />}
-        </aside>
-      )}
-      {playerPanel && shownPanel && (
-        <aside className="side-panel tabbed-panel player-panel" aria-label={t('game.panelLabel')}>
-          <div className="panel-tabs">
-            <div className="seg small" role="tablist">
-              <button type="button" role="tab" aria-selected={panel !== 'deck' && panel !== 'coach'} className={panel !== 'deck' && panel !== 'coach' ? 'on' : ''} onClick={() => setPanel('log')}>
-                {t('game.log')}
-              </button>
-              {loadOwnDeck && (
-                <button type="button" role="tab" aria-selected={panel === 'deck'} className={panel === 'deck' ? 'on' : ''} onClick={() => setPanel('deck')}>
-                  {t('game.decklist')}
-                </button>
-              )}
-              {coachOn && (
-                <button type="button" role="tab" aria-selected={panel === 'coach'} className={panel === 'coach' ? 'on' : ''} onClick={() => setPanel('coach')}>
-                  {t('coach.panel')}
-                  {coachEntries.length > 0 && <span className="dk-count">{coachEntries.length}</span>}
-                </button>
-              )}
-            </div>
-            <button className="zoom-close static" onClick={() => setPanel(null)} aria-label={t('game.closePanel')} title={t('game.closePanelFull')}>
-              ✕
-            </button>
-          </div>
-          {!bare && (
-            <div className="panel-controls">
-              <button className="btn small" onClick={onExit}>
-                {sandbox ? t('sandbox.backToEditor') : toTournament ? t('game.sideTournament') : exitTo === 'back' ? t('game.sideBack') : t('game.sideMenu')}
-              </button>
-              {callJudge && (
-                <button className="btn small judge-call" onClick={callJudge}>
-                  {t('judge.call')}
-                </button>
-              )}
-              {human !== null && !isOnline && (
-                <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>
-                  {t('game.undo')}
-                </button>
-              )}
-              {/* A velocidade do bot fica só no menu da partida. */}
-              {!isOnline && !replay && (
-                <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
-                  {game.paused ? t('game.resume') : t('game.pause')}
-                </button>
-              )}
-              {(over || replay) && (
-                <button className="btn small" onClick={game.downloadReplay} title={t('game.replayTitle')}>
-                  {t('game.replayBtn')}
-                </button>
-              )}
-            </div>
-          )}
-          {panel === 'deck' && loadOwnDeck ? (
-            <DeckListPanel load={loadOwnDeck} onZoom={setDeckCard} />
-          ) : panel === 'coach' && coachOn ? (
-            <CoachPanel state={state} entries={coachEntries} marks={marks} report={coachReport} onToggle={toggleMark} onUpdate={updateMark} />
-          ) : (
-            <>
-              {(!wideBoard || (layout.hover.show && layout.hover.position === 'panel')) && <CardDetail state={state} uid={detailUid} />}
-              {(!wideBoard || (layout.log.show && layout.log.position === 'panel')) && <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} onSearching={onLogSearching} />}
-            </>
-          )}
-        </aside>
-      )}
+      <TableSidePanels
+        game={game}
+        kind={kind}
+        wide={wide}
+        tutorial={tutorial}
+        broadcast={Boolean(broadcast)}
+        streamer={streamer}
+        playerPanel={playerPanel}
+        panel={panel}
+        shownPanel={shownPanel}
+        setPanel={setPanel}
+        spectator={spectator}
+        onExit={onExit}
+        exitTo={exitTo}
+        bare={bare}
+        callJudge={callJudge}
+        loadOwnDeck={loadOwnDeck}
+        detailUid={detailUid}
+        setLogCard={setLogCard}
+        onLogSearching={onLogSearching}
+        setDeckCard={setDeckCard}
+        coachOn={coachOn}
+        coachEntries={coachEntries}
+        marks={marks}
+        coachReport={coachReport}
+        toggleMark={toggleMark}
+        updateMark={updateMark}
+        wideBoard={wideBoard}
+        layout={layout}
+      />
 
       {replay && (
         <ReplayBar
