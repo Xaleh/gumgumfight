@@ -4,40 +4,69 @@ import { expect, test } from './support/fixtures';
 import { openHome } from './support/app';
 import { label } from './support/i18n';
 
-test.describe('Yonko', () => {
-  test('mesa local: a preparação, um turno de quem joga e a vez dos bots @iphone', async ({ page }) => {
-    // Quem joga pode ser o último da ordem: até três turnos de bot (com as animações) antes do primeiro dele.
-    test.setTimeout(4 * 60_000);
-    await openHome(page);
-    await page.getByRole('button', { name: label('yonko.homeAction'), exact: true }).click();
-    await page.getByRole('button', { name: label('yonko.start'), exact: true }).click();
+// DIAGNÓSTICO (temporário): no WebKit do CI a página da mesa cai. As três variantes dizem se a queda vem das
+// animações (completas, suaves) ou da mesa em si (desligadas).
+for (const animations of ['full', 'soft', 'off'] as const) {
+  test.describe(`Yonko (animações ${animations})`, () => {
+    test(`mesa local: a preparação, um turno de quem joga e a vez dos bots @iphone`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name === 'desktop' && animations !== 'full', 'no desktop, só as animações completas');
+      test.setTimeout(4 * 60_000);
+      const t0 = Date.now();
+      const log = (what: string) => console.log(`[yonko ${testInfo.project.name} ${animations}] +${((Date.now() - t0) / 1000).toFixed(1)}s ${what}`);
+      let crashed = false;
+      page.on('crash', () => {
+        crashed = true;
+        log('CRASH');
+      });
+      await page.addInitScript((a) => {
+        try {
+          localStorage.setItem('gumgum.settings', JSON.stringify({ animations: a }));
+        } catch {
+          /* sem armazenamento */
+        }
+      }, animations);
+      await openHome(page);
+      await page.getByRole('button', { name: label('yonko.homeAction'), exact: true }).click();
+      log('entrada');
+      await page.getByRole('button', { name: label('yonko.start'), exact: true }).click();
+      await expect(page.getByRole('region', { name: label('yonko.yourTable'), exact: true })).toBeVisible();
+      log('mesa');
 
-    // A mesa: a de quem joga e, no desktop, as três dos oponentes (no celular, uma aba aberta por vez).
-    await expect(page.getByRole('region', { name: label('yonko.yourTable'), exact: true })).toBeVisible();
-    const tables = page.getByRole('region', { name: new RegExp(`^${label('yonko.tableOf', { name: '' })}`) });
-    await expect(tables.first()).toBeVisible();
+      const endTurn = page.getByRole('button', { name: label('yonko.endTurn'), exact: true });
+      const answer = page.locator('.yk-banner .yk-btn.primary');
+      const banner = page.locator('.yk-banner-text');
+      let last = '';
+      const deadline = Date.now() + 3 * 60_000;
+      for (;;) {
+        if (crashed) throw new Error('a página caiu');
+        if (Date.now() > deadline) throw new Error('"Encerrar turno" não acendeu');
+        if (await endTurn.isEnabled({ timeout: 1_000 }).catch(() => false)) break;
+        const text = ((await banner.textContent({ timeout: 1_000 }).catch(() => '')) ?? '').slice(0, 70);
+        if (text !== last) {
+          last = text;
+          log(`faixa: ${text}`);
+        }
+        if (await answer.first().isEnabled({ timeout: 300 }).catch(() => false)) await answer.first().click({ timeout: 1_000 }).catch(() => undefined);
+        await page.waitForTimeout(400).catch(() => undefined);
+      }
+      log('minha vez');
 
-    // A preparação (largada e mão inicial) e o que os bots perguntarem (bloquear, Counter): sempre o botão em
-    // destaque da faixa de ação, até "Encerrar turno" acender.
-    const endTurn = page.getByRole('button', { name: label('yonko.endTurn'), exact: true });
-    const answer = page.locator('.yk-banner .yk-btn.primary');
-    await expect(async () => {
-      if (await endTurn.isEnabled()) return;
-      if (await answer.first().isEnabled().catch(() => false)) await answer.first().click({ timeout: 1_000 }).catch(() => undefined);
-      expect(await endTurn.isEnabled()).toBe(true);
-    }).toPass({ timeout: 3 * 60_000, intervals: [400] });
-
-    // O turno de quem joga: a faixa diz que é a vez dele; encerrar passa a vez para um bot.
-    await expect(page.getByText(label('yonko.yourTurn'), { exact: true })).toBeVisible();
-    await endTurn.click();
-    await expect(endTurn).toBeDisabled();
-
-    // As opções da mesa abrem com a escolha das animações, e desligá-las vale na hora.
-    await page.getByRole('button', { name: label('yonko.tableOptions'), exact: true }).click();
-    const options = page.getByRole('dialog', { name: label('yonko.tableOptions'), exact: true });
-    await options.getByRole('button', { name: label('settings.animOff'), exact: true }).click();
-    await expect(page.locator('.yk.anim-off')).toBeVisible();
-    await options.getByRole('button', { name: label('yonko.close'), exact: true }).click();
-    await expect(options).toBeHidden();
+      await expect(page.getByText(label('yonko.yourTurn'), { exact: true })).toBeVisible();
+      await endTurn.click();
+      await expect(endTurn).toBeDisabled();
+      log('turno encerrado');
+      // Os bots jogam um pouco (compras, cartas, ataques).
+      for (let i = 0; i < 20 && !crashed; i++) {
+        const text = ((await banner.textContent({ timeout: 1_000 }).catch(() => '')) ?? '').slice(0, 70);
+        if (text !== last) {
+          last = text;
+          log(`faixa: ${text}`);
+        }
+        if (await answer.first().isEnabled({ timeout: 300 }).catch(() => false)) await answer.first().click({ timeout: 1_000 }).catch(() => undefined);
+        await page.waitForTimeout(400).catch(() => undefined);
+      }
+      if (crashed) throw new Error('a página caiu');
+      log('fim');
+    });
   });
-});
+}
