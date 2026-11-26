@@ -114,7 +114,12 @@ gumgumfight/
 ├── package.json                 workspaces, scripts (dev, test, typecheck, build:release, cards:import, db:seed)
 ├── tsconfig.base.json
 ├── packages/engine/             motor de regras (TS puro)
-│   ├── src/engine.ts            createGame, applyAction (5.149 linhas)
+│   ├── src/engine/              createGame, applyAction: o motor, um módulo por etapa (index.ts lista todos e reexporta a API)
+│   │   ├── setup, apply, cancel, turn        criação e preparação, ações, cancelar a ação, fluxo de turno
+│   │   ├── stack, triggers, battle           pilha de resolução, efeitos disparados (CR 8-6), batalha e dano
+│   │   ├── effects, exec-step, costs         um passo de efeito por vez, o que cada passo faz (execStep), custos
+│   │   ├── removal, zones, defeat, manual    K.O. e substituição, zonas/DON!!/Vida, derrota, ferramentas manuais
+│   │   └── queries, conditions, options, table, messages, constants   consultas (custo, poder, filtros), condições, o que dá para fazer, quem é o oponente, textos, limites
 │   ├── src/types.ts             CardData, GameState, Action, Pending, Frame, DSL de efeitos (1.400 linhas)
 │   ├── src/actions.ts           legalActions, actingPlayer
 │   ├── src/view.ts              viewFor (visão por jogador/espectador), apelidos, actionFromView
@@ -218,9 +223,9 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
   usadas), `stack` (frames de efeito/batalha/dano), `pending` (decisão esperada: alvo, bloqueio, counter, carta de
   Vida, confirmação, opção, mulligan, quem começa), `modifiers`, `log`, `winner`, `winReason`, `actionCount`,
   `rng`/`rng128`.
-- **`createGame(config)`** (`engine.ts:59`): recebe `seed` (32 bits) ou `seed128` (4 inteiros), `players` (nome, deck,
+- **`createGame(config)`** (`engine/setup.ts`): recebe `seed` (32 bits) ou `seed128` (4 inteiros), `players` (nome, deck,
   `isBot`), `cards: CardData[]`, `firstPlayer?`, `chooseFirst?`, `legacySetup?`. Embaralha com Fisher–Yates.
-- **`applyAction(prev, action)`** (`engine.ts:998`): clona o estado (sem clonar `defs`), aplica e devolve o novo;
+- **`applyAction(prev, action)`** (`engine/apply.ts`): clona o estado (sem clonar `defs`), aplica e devolve o novo;
   lança `IllegalActionError`. Nunca muda `prev`, então uma ação recusada não deixa rastro.
 - **`legalActions(state, player)`** e **`actingPlayer(state)`** (`actions.ts`): usadas pela UI, pelo bot e pelo servidor.
 - **Ações** (18 tipos): `mulligan`, `playCard`, `attachDon`, `detachDon`, `cancel`, `activate`, `attack`, `endTurn`,

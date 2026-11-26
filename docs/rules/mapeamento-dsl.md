@@ -1,7 +1,7 @@
 # Mapeamento das interações para a DSL
 
 Como cada interação do [catálogo](interacoes/README.md) é (ou não) expressa pela DSL de efeitos do motor:
-`packages/engine/src/types.ts` (tipos), `cards/parser.ts` (leitor do texto oficial), `cards/scripts.ts` (scripts à mão) e `engine.ts` (execução). Levantamento feito lendo o código em 07/10/2026; as linhas citadas são desse momento.
+`packages/engine/src/types.ts` (tipos), `cards/parser.ts` (leitor do texto oficial), `cards/scripts.ts` (scripts à mão) e `engine.ts` (execução). Levantamento feito lendo o código em 07/10/2026; as linhas citadas são desse momento. Depois disso o `engine.ts` foi dividido em módulos (`packages/engine/src/engine/`): as funções continuam com o mesmo nome.
 
 Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe, mas com diferença de regra (ver [divergencias.md](divergencias.md)) · **Falta** = não há primitiva.
 

@@ -1416,6 +1416,11 @@ data/decks        Listas dos decks
 - Efeitos, batalhas e dano são *frames* numa pilha. Quando um jogador precisa decidir algo (alvo, bloqueio,
   counter, trigger), o motor para em `state.pending` até a próxima ação.
 - `legalActions(estado, jogador)` lista as ações possíveis (usada pela interface e pelo bot).
+- O código do `applyAction` fica em `src/engine/`, um módulo por etapa: preparação (`setup`), ações (`apply`), fluxo de
+  turno (`turn`), pilha de resolução (`stack`), efeitos disparados (`triggers`), batalha e dano (`battle`), passos de
+  efeito (`effects`, `exec-step`), custos (`costs`), K.O. e substituição (`removal`), zonas (`zones`), além das consultas
+  (`queries`, `conditions`, `options`). O `src/engine/index.ts` lista todos e reexporta a API; quem usa o motor importa
+  de `@gumgum/engine` e não vê a divisão ([plano](docs/plano-divisao-motor-e-mesa.md)).
 - Os efeitos das cartas são **dados**, escritos com uma DSL em `src/cards/scripts.ts`:
 
 ```ts
