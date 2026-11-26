@@ -100,8 +100,8 @@ ssh -i gumgum_deploy gumgum@<IP-DA-VPS> 'echo ok'
 
 ## 4. Secrets no GitHub
 
-A VPS da Hostinger é a **produção** (branch `main`); o servidor antigo (`gumgumfight.duckdns.org`) fica como
-**homologação** (branch `hmg`). Cada um tem os seus secrets num *Environment* do GitHub.
+A VPS da Hostinger é a **produção** (branch `main`), o único servidor que o workflow publica. Os secrets dela ficam
+num *Environment* do GitHub.
 
 GitHub → repositório → **Settings → Environments → New environment** → nome `production` → **Add environment secret**:
 
@@ -112,19 +112,17 @@ GitHub → repositório → **Settings → Environments → New environment** �
 | `DEPLOY_SSH_KEY`     | conteúdo inteiro do arquivo `gumgum_deploy` (chave **privada**)       |
 | `DEPLOY_KNOWN_HOSTS` | a linha impressa pelo script, ou a saída de `ssh-keyscan -t ed25519 <IP-DA-VPS>` |
 
-Sempre em **Secrets** (nunca em Variables). Crie também o Environment `homologacao`: se os secrets do servidor
-antigo já estão em *Repository secrets*, não precisa cadastrar nada nele (os do repositório valem como padrão e
-os do Environment `production` têm prioridade na `main`). Opcional, em **Variables**: `GOOGLE_CLIENT_ID` (login
-com Google) e `ADMIN_EMAILS` (contas que viram Admin) — veja o README.
+Sempre em **Secrets** (nunca em Variables). Opcional, em **Variables**: `GOOGLE_CLIENT_ID` (login com Google) e
+`ADMIN_EMAILS` (contas que viram Admin) — veja o README.
 
 ## 5. Primeiro deploy
 
 GitHub → **Actions → "CI e deploy" → Run workflow** (branch `main`), com `import_sets` = `ST-01 ST-02` para já
-importar as cartas reais (o banco da VPS nova começa vazio; o da homologação não é copiado). O workflow testa o
+importar as cartas reais (o banco da VPS nova começa vazio). O workflow testa o
 pacote, envia por SSH, ativa no pm2, confere `/api/health` e, por fim, acessa `https://gumgumfight.app/api/health`.
 
-Daí em diante o fluxo é: branch de trabalho → merge na `hmg` (deploy em `gumgumfight.duckdns.org`) → testou →
-merge na `main` (deploy em `gumgumfight.app`).
+Daí em diante o fluxo é: branch de trabalho → pull request (os testes rodam no PR) → merge na `main` (deploy em
+`gumgumfight.app`).
 
 Se o último passo ("Verifica o site público") falhar, o app está no ar na VPS mas o HTTPS não: rode o
 `bootstrap-hostinger.sh` de novo e leia o aviso do certbot.
@@ -196,7 +194,7 @@ ver "API para parceiros" no `README.md`). Dois ajustes na VPS:
    vírgula) em `PARTNER_IPS` no `deploy.env` e rode o bootstrap de novo (`SKIP_UPGRADE=1 bash
    /root/bootstrap-hostinger.sh`), que regenera `/etc/nginx/conf.d/gumgumfight-limits.conf`. A partir daí, o limite
    que vale para esse IP é o do app: 120 requisições por minuto por token. Isso só se aplica onde o Nginx roda no
-   host (a produção): na homologação com Nginx Proxy Manager (Docker), o `setup-vm.sh` não configura limite por IP,
+   host (a produção): num servidor com Nginx Proxy Manager (Docker), o `setup-vm.sh` não configura limite por IP,
    então não há o que liberar.
 
 3. **Replay embutido** (iframe no site do parceiro): coloque o endereço do site dele (só a origem, sem caminho; mais

@@ -40,7 +40,7 @@ O GumGum Fight é um simulador do **One Piece Card Game** que roda no navegador.
 | **Backend (API)** | Fastify + SQLite. Cartas, decks, contas, estatísticas, salas online, torneios. Em produção também entrega a interface compilada. | Um único processo Node na VPS, atrás do Nginx. |
 | **Frontend** | React + Vite. Menu, construtor de decks, mesa de jogo, espectador, estatísticas, torneios, administração. | Navegador (SPA instalável como PWA: service worker com cache da casca e notificações). |
 | **Importador de cartas** | Busca as cartas oficiais e os spoilers numa cadeia de fontes com prioridade (`CARD_SOURCES` / `SPOILER_SOURCES`: optcgapi.com, optcgleaks.com, cardkaizoku.com); normaliza e grava no SQLite. | CLI no servidor + sincronização periódica dentro do próprio processo da API. |
-| **Deploy** | GitHub Actions monta um pacote autocontido, envia por SSH, ativa no pm2 com rollback automático. | GitHub + VPS (Hostinger, produção) + servidor de homologação. |
+| **Deploy** | GitHub Actions monta um pacote autocontido, envia por SSH, ativa no pm2 com rollback automático. | GitHub + VPS (Hostinger, produção). |
 
 Princípios que explicam várias decisões do código:
 
@@ -1768,8 +1768,8 @@ push/PR em qualquer branch ──▶ job "test": npm ci → typecheck → npm te
                            └─▶ job "e2e" (em paralelo): npm ci → playwright install chromium webkit → npm run e2e
                                            → artefato e2e-report (relatório HTML e traces) só quando falha
 push na main ────────────────▶ job "deploy", depois de "test" e "e2e" (environment production,  https://gumgumfight.app)
-push na hmg ─────────────────▶ job "deploy" (environment homologacao, https://gumgumfight.duckdns.org)
-"Run workflow" em outro branch ▶ deploy na homologação (input import_sets opcional)
+"Run workflow" na main ──────▶ o mesmo deploy (input import_sets opcional)
+"Run workflow" em outro branch ▶ só "test" e "e2e": nada é publicado
 ```
 
 Testes de ponta a ponta (`e2e/`, Playwright, plano em [`plano-testes-e2e.md`](plano-testes-e2e.md)): o `webServer` do
@@ -1784,7 +1784,7 @@ cria a conta e a sessão no banco temporário com `upsertGoogleUser`/`createSess
 Deploy: `scp` do `.tgz` para `~/apps/gumgumfight/releases/<sha>`, `remote-deploy.sh`: grava `GOOGLE_CLIENT_ID`/
 `ADMIN_EMAILS` em `shared/deploy.env`, troca o symlink `current` (atomicamente, `mv -T`), `pm2 startOrReload`,
 espera `/api/health` até 30 s; **se falhar volta o symlink e recarrega a versão anterior**; mantém 5 releases;
-importa `IMPORT_SETS` se pedido; o workflow então confere `https://<site>/api/health`. Secrets por environment:
+importa `IMPORT_SETS` se pedido; o workflow então confere `https://<site>/api/health`. Secrets do environment `production`:
 `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`. Variables: `GOOGLE_CLIENT_ID`, `ADMIN_EMAILS`.
 
 ### Produção (VPS Hostinger)
@@ -1825,11 +1825,12 @@ importa `IMPORT_SETS` se pedido; o workflow então confere `https://<site>/api/h
   tempo fora e a issue fechada. *Run workflow* com uma `url` que falha simula a queda. Complementa o
   `gumgum-watchdog` da VPS (que reinicia o Nginx, mas não avisa ninguém).
 
-### Homologação
+### Servidor que já roda outros apps (alternativa)
 
-Servidor que já roda outros apps (`deploy/setup-vm.sh`): detecta Nginx no host ou Nginx Proxy Manager em Docker,
-instala Node 22 via nvm sem trocar o padrão, cria site separado, `proxy_read_timeout 60s`. Mesmo layout de pastas e
-`deploy.env`. Banco próprio (dados de homologação não vão para produção).
+Não há ambiente de homologação: o workflow só publica a `main` na produção. O `deploy/setup-vm.sh` continua no
+repositório para quem for instalar o app num servidor compartilhado: detecta Nginx no host ou Nginx Proxy Manager em
+Docker, instala Node 22 via nvm sem trocar o padrão, cria site separado, `proxy_read_timeout 60s`. Mesmo layout de
+pastas e `deploy.env`.
 
 ### Dependências externas em tempo de execução
 

@@ -1,10 +1,9 @@
 name: CI e deploy
 
 # Todo push/PR roda os testes e monta o pacote.
-# Dois ambientes (Settings → Environments), cada um com os seus secrets DEPLOY_*:
-#   main → "production"  (https://gumgumfight.app)          — a VPS da Hostinger
-#   hmg  → "homologacao" (https://gumgumfight.duckdns.org)  — o servidor de testes
-# "Run workflow" em qualquer outro branch publica esse branch na homologação (até o próximo push na hmg).
+# Só a main publica: push na main (ou "Run workflow" na main) faz o deploy na produção, https://gumgumfight.app
+# (a VPS da Hostinger), com os secrets DEPLOY_* do Environment "production" (Settings → Environments).
+# "Run workflow" em outro branch só roda os testes: nada é publicado.
 on:
   push:
     branches: ['**']
@@ -12,22 +11,20 @@ on:
   workflow_dispatch:
     inputs:
       import_sets:
-        description: 'Coleções para importar após o deploy, pela cadeia CARD_SOURCES (ex.: ST-01 ST-02, P, --all ou --images). Vazio = não importa.'
+        description: 'Coleções para importar após o deploy, pela cadeia CARD_SOURCES (ex.: ST-01 ST-02, P, --all ou --images). Vazio = não importa. Só vale na main (os outros branches não publicam).'
         required: false
         default: ''
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   # Nunca cancela um run que pode estar no meio de um deploy.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/hmg' && github.event_name != 'workflow_dispatch' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
 env:
-  # main → produção; qualquer outro branch → homologação
-  DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'homologacao' }}
-  SITE_URL: ${{ github.ref == 'refs/heads/main' && 'https://gumgumfight.app' || 'https://gumgumfight.duckdns.org' }}
+  SITE_URL: https://gumgumfight.app
 
 jobs:
   test:
@@ -104,20 +101,20 @@ jobs:
           retention-days: 7
 
   deploy:
-    name: Deploy (${{ github.ref == 'refs/heads/main' && 'produção' || 'homologação' }})
+    name: Deploy (produção)
     # Só publica com os testes de unidade e os de ponta a ponta passando.
     needs: [test, e2e]
-    # Push na main ou na hmg, ou "Run workflow" em qualquer branch (vai para a homologação, exceto na main).
+    # Só a main publica: push, ou "Run workflow" na main. Nenhum outro branch chega à produção.
     if: >-
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/hmg'))
-      || github.event_name == 'workflow_dispatch'
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    # Os secrets/variables do Environment valem sobre os do repositório: cada servidor tem os seus.
+    # Os secrets/variables do Environment valem sobre os do repositório.
     environment:
-      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'homologacao' }}
-      url: ${{ github.ref == 'refs/heads/main' && 'https://gumgumfight.app' || 'https://gumgumfight.duckdns.org' }}
+      name: production
+      url: https://gumgumfight.app
     concurrency:
-      group: deploy-${{ github.ref == 'refs/heads/main' && 'production' || 'homologacao' }}
+      group: deploy-production
       cancel-in-progress: false
     env:
       REMOTE_DIR: apps/gumgumfight/releases/${{ github.sha }}
@@ -145,7 +142,7 @@ jobs:
             [ -n "${!var}" ] || missing="$missing ${pair#*:}"
           done
           if [ -n "$missing" ]; then
-            echo "::warning::Deploy pulado: o workflow não encontrou:$missing. Cadastre em Settings → Environments → $DEPLOY_ENV → Environment secrets (ou em Repository secrets, que valem para os dois ambientes)."
+            echo "::warning::Deploy pulado: o workflow não encontrou:$missing. Cadastre em Settings → Environments → production → Environment secrets (ou em Repository secrets)."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"

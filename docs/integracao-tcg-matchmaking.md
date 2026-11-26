@@ -224,8 +224,7 @@ Logpose API ──(sync a cada N h: /stats, /stats/{fila}, URL assinada)──�
   honesto.
 - **Dependência de terceiro**: tudo é opcional e desligado sem a chave; com a API fora, a tela continua
   com o último instantâneo e um aviso. Nenhuma outra parte do site depende disso.
-- **Crédito e combinado**: confirmar com o Matheus o texto do crédito, o intervalo de busca (6 h) e se a
-  chave pode ficar na homologação também (senão, só produção).
+- **Crédito e combinado**: confirmar com o Matheus o texto do crédito e o intervalo de busca (6 h).
 
 ## 6. Ordem de implementação
 
