@@ -2061,7 +2061,7 @@ export default {
   'game.playmat.green': 'Grün',
   'game.playmat.white': 'Weiß',
   'game.playmatLogo': 'Logo auf der Spielmatte',
-  'game.playmatLogoHint': 'In der Mitte der Spielmatte, anstelle des Uai-Uai-no-Mi-Logos. Es erscheint nur auf deinem Bildschirm (dem, den du überträgst): andere Zuschauer sehen weiterhin das Standardlogo. Ein PNG mit transparentem Hintergrund sieht am besten aus.',
+  'game.playmatLogoHint': 'In der Mitte der Spielmatte, anstelle des Uai-Uai-no-Mi-Logos. Es erscheint nur auf deinem Bildschirm (dem, den du überträgst): andere Zuschauer sehen weiterhin das Standardlogo. Lade ein PNG, WebP oder JPEG hoch (die App verkleinert das Bild vor dem Senden); ein PNG mit transparentem Hintergrund sieht am besten aus.',
   'game.playmatLogoUpload': 'Logo hochladen',
   'game.playmatLogoChange': 'Logo ändern',
   'game.playmatLogoRemove': 'Standardlogo verwenden',

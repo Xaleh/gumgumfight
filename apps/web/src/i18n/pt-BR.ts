@@ -2062,7 +2062,7 @@ const ptBR = {
   'game.playmat.green': 'Verde',
   'game.playmat.white': 'Branco',
   'game.playmatLogo': 'Logo no playmat',
-  'game.playmatLogoHint': 'No centro do playmat, no lugar da logo do Uai Uai no Mi. Só aparece na sua tela (a que você transmite): os outros espectadores continuam vendo a padrão. PNG com fundo transparente fica melhor.',
+  'game.playmatLogoHint': 'No centro do playmat, no lugar da logo do Uai Uai no Mi. Só aparece na sua tela (a que você transmite): os outros espectadores continuam vendo a padrão. Envie PNG, WebP ou JPEG (o app reduz a imagem antes de enviar); PNG com fundo transparente fica melhor.',
   'game.playmatLogoUpload': 'Enviar logo',
   'game.playmatLogoChange': 'Trocar logo',
   'game.playmatLogoRemove': 'Usar a logo padrão',

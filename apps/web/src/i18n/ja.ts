@@ -2059,7 +2059,7 @@ export default {
   'game.playmat.green': '緑',
   'game.playmat.white': '白',
   'game.playmatLogo': 'プレイマットのロゴ',
-  'game.playmatLogoHint': 'プレイマット中央の Uai Uai no Mi のロゴの代わりに表示されます。あなたの画面（配信する画面）にだけ表示され、ほかの観戦者には標準のロゴのままです。背景が透明なPNGがおすすめです。',
+  'game.playmatLogoHint': 'プレイマット中央の Uai Uai no Mi のロゴの代わりに表示されます。あなたの画面（配信する画面）にだけ表示され、ほかの観戦者には標準のロゴのままです。PNG・WebP・JPEGに対応（送信前にアプリが画像を縮小します）。背景が透明なPNGがおすすめです。',
   'game.playmatLogoUpload': 'ロゴをアップロード',
   'game.playmatLogoChange': 'ロゴを変更',
   'game.playmatLogoRemove': '標準のロゴに戻す',

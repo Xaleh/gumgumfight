@@ -2061,7 +2061,7 @@ export default {
   'game.playmat.green': 'Verde',
   'game.playmat.white': 'Blanco',
   'game.playmatLogo': 'Logo en el tapete',
-  'game.playmatLogoHint': 'En el centro del tapete, en lugar del logo de Uai Uai no Mi. Solo aparece en tu pantalla (la que transmites): los demás espectadores siguen viendo el logo por defecto. Un PNG con fondo transparente queda mejor.',
+  'game.playmatLogoHint': 'En el centro del tapete, en lugar del logo de Uai Uai no Mi. Solo aparece en tu pantalla (la que transmites): los demás espectadores siguen viendo el logo por defecto. Sube un PNG, WebP o JPEG (la app reduce la imagen antes de enviarla); un PNG con fondo transparente queda mejor.',
   'game.playmatLogoUpload': 'Subir logo',
   'game.playmatLogoChange': 'Cambiar logo',
   'game.playmatLogoRemove': 'Usar el logo por defecto',

@@ -2061,7 +2061,7 @@ export default {
   'game.playmat.green': 'Green',
   'game.playmat.white': 'White',
   'game.playmatLogo': 'Playmat logo',
-  'game.playmatLogoHint': 'In the centre of the playmat, in place of the Uai Uai no Mi logo. It only shows on your screen (the one you stream): other spectators keep seeing the default. A PNG with a transparent background looks best.',
+  'game.playmatLogoHint': 'In the centre of the playmat, in place of the Uai Uai no Mi logo. It only shows on your screen (the one you stream): other spectators keep seeing the default. Upload a PNG, WebP or JPEG (the app shrinks the image before sending); a PNG with a transparent background looks best.',
   'game.playmatLogoUpload': 'Upload logo',
   'game.playmatLogoChange': 'Change logo',
   'game.playmatLogoRemove': 'Use the default logo',
