@@ -342,6 +342,11 @@ export function Table({
     [clipInitial, clipScript, noClip, bottom],
   );
   const { user } = useAuth();
+  /**
+   * Mesa lateral: a logo de quem transmite (perfis Streamer e Admin) no centro do playmat, no lugar da padrão.
+   * Vale só para a tela desta conta; o replay embutido num app parceiro fica sempre com a padrão.
+   */
+  const playmatLogo = lateral && !embed ? (user?.playmatLogo ?? null) : null;
   /** Painel do treinador: no treino contra o Bot do Time, para quem é do Time. */
   const coachOn = botMatch && isTeam(user) && effectiveBotLevel === 'team' && human !== null && !watching && kind !== 'replay' && !tutorial;
   const { marks, toggleMark, updateMark, coachEntries, buildBotReport, coachReport } = useBotCoach({
@@ -868,11 +873,12 @@ export function Table({
         broadcast ? 'broadcast' : '',
         streamer ? 'streamer' : '',
         lateral ? `lateral playmat-${streamerPlaymat}` : '',
+        playmatLogo ? 'custom-logo' : '',
         streamer && panel ? 'with-panel' : '',
         playerPanel && !shownPanel ? 'no-panel' : '',
         wideBoard ? 'wide-board' : '',
       ].join(' ')}
-      style={wideBoard ? vars({ '--panel-w': `${panelWidth(layout)}px` }) : undefined}
+      style={wideBoard ? vars({ '--panel-w': `${panelWidth(layout)}px` }) : playmatLogo ? vars({ '--lat-logo': `url("${playmatLogo}")` }) : undefined}
       ref={gameRef}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}

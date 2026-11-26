@@ -1045,6 +1045,10 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
   foto do Google. O navegador recorta o centro e reduz para 256×256 JPEG antes de enviar; o servidor aceita JPEG, PNG
   ou WebP (até 256 KB, tipo conferido pelos primeiros bytes) e guarda a imagem em `users.custom_picture`. Só o
   próprio usuário e os admins a veem (`/api/users/:id/picture`). "Usar a foto do Google" volta para a original.
+- **Logo no playmat** (perfis Streamer e Admin): assistindo a uma partida na mesa lateral, o menu da partida tem
+  "Logo no playmat" para trocar a logo do Uai Uai no Mi, no centro do playmat, pela logo de quem transmite. Ela fica
+  guardada na conta (`users.playmat_logo`, até 512 KB) e aparece só na tela de quem enviou; os outros espectadores
+  continuam vendo a padrão. "Usar a logo padrão" desfaz.
 - **Sair** apaga a sessão. Os decks continuam na conta (no navegador, aparecem como "da comunidade" até entrar de novo).
 - Código: `apps/server/src/auth/` (verificação do token, sessões e rotas) e `apps/web/src/auth.tsx` (botão e estado).
 

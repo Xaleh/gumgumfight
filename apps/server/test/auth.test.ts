@@ -367,4 +367,61 @@ describe('foto da conta', () => {
     expect(list[0]).toMatchObject({ picture: pic, customPicture: true });
     expect((await a.inject({ url: pic, headers: admin.cookie })).statusCode).toBe(200);
   });
+
+  it('logo do playmat: só quem transmite envia, só ele (e o admin) vê, e some com o perfil', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const admin = await login(a);
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    const zoroId = zoro.res.json().user.id as string;
+    const url = '/api/auth/me/playmat-logo';
+    const put = (image: unknown, headers: Record<string, string> = zoro.cookie) => a.inject({ method: 'PUT', url, headers, payload: { image } });
+    const role = (r: string) => a.inject({ method: 'PUT', url: `/api/admin/users/${zoroId}/role`, headers: admin.cookie, payload: { role: r } });
+    const me = async () => (await a.inject({ url: '/api/auth/me', headers: zoro.cookie })).json().user;
+
+    // Sem sessão e com perfil Player: não envia nem tira.
+    expect((await a.inject({ method: 'PUT', url, payload: { image: png } })).statusCode).toBe(401);
+    expect((await put(png)).json().errorCode).toBe('playmatLogoForbidden');
+    expect((await a.inject({ method: 'DELETE', url, headers: zoro.cookie })).statusCode).toBe(403);
+    expect(zoro.res.json().user.playmatLogo).toBeNull();
+
+    await role('streamer');
+    expect((await put('https://example.test/x.png')).json().errorCode).toBe('pictureInvalid');
+    expect((await put(`data:image/png;base64,${Buffer.from('<svg onload=alert(1)>').toString('base64')}`)).json().errorCode).toBe('pictureInvalid');
+    expect((await put(`data:image/png;base64,${Buffer.alloc(600 * 1024, 0xff).toString('base64')}`)).statusCode).toBe(413);
+
+    const saved = await put(png);
+    expect(saved.statusCode).toBe(200);
+    const logo = saved.json().user.playmatLogo as string;
+    expect(logo).toMatch(new RegExp(`^/api/users/${zoroId}/playmat-logo\\?v=\\d+$`));
+    // A foto da conta não muda com a logo.
+    expect(saved.json().user.customPicture).toBe(false);
+
+    const img = await a.inject({ url: logo, headers: zoro.cookie });
+    expect(img.statusCode).toBe(200);
+    expect(img.headers['content-type']).toBe('image/png');
+    expect(img.rawPayload.equals(Buffer.from(PNG, 'base64'))).toBe(true);
+    // Só o dono e o admin: sem sessão ou de outra conta, a logo não aparece.
+    expect((await a.inject({ url: logo })).statusCode).toBe(404);
+    const usopp = await login(a, { sub: '3003', email: 'usopp@example.com', name: 'Usopp' });
+    expect((await a.inject({ url: logo, headers: usopp.cookie })).statusCode).toBe(404);
+    expect((await a.inject({ url: logo, headers: admin.cookie })).statusCode).toBe(200);
+
+    // Trocar muda o endereço (o navegador não reaproveita a imagem velha).
+    const second = (await put(png)).json().user.playmatLogo as string;
+    expect(second).not.toBe(logo);
+
+    // Perdeu o perfil: a logo deixa de valer; com o perfil de volta, ela volta.
+    await role('player');
+    expect((await me()).playmatLogo).toBeNull();
+    expect((await a.inject({ url: second, headers: zoro.cookie })).statusCode).toBe(404);
+    await role('streamer');
+    expect((await me()).playmatLogo).toBe(second);
+
+    const removed = await a.inject({ method: 'DELETE', url, headers: zoro.cookie });
+    expect(removed.json().user.playmatLogo).toBeNull();
+    expect((await a.inject({ url: second, headers: zoro.cookie })).statusCode).toBe(404);
+
+    // O admin também transmite: pode ter a própria logo.
+    expect((await put(png, admin.cookie)).json().user.playmatLogo).toMatch(/\/playmat-logo\?v=\d+$/);
+  });
 });

@@ -999,6 +999,15 @@ function migrateAuth(db: DB) {
       ALTER TABLE users ADD COLUMN custom_picture_at INTEGER;
     `);
   }
+  // Logo de quem transmite (perfis Streamer e Admin) no centro do playmat da mesa lateral, no lugar da logo
+  // padrão e só na tela dele: a imagem, o tipo e a versão (ms).
+  if (!userCols.includes('playmat_logo')) {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN playmat_logo BLOB;
+      ALTER TABLE users ADD COLUMN playmat_logo_type TEXT;
+      ALTER TABLE users ADD COLUMN playmat_logo_at INTEGER;
+    `);
+  }
   // Modo transmissão (streamer): o link secreto da fonte do OBS e a partida escolhida para a live.
   db.exec(`
     CREATE TABLE IF NOT EXISTS broadcasts (
