@@ -351,7 +351,7 @@ const ANIMATION_LABEL: Record<Animations, MessageKey> = { full: 'settings.animFu
 const ANIMATION_TITLE: Record<Animations, MessageKey> = { full: 'settings.animFullTitle', soft: 'settings.animSoftTitle', off: 'settings.animOffTitle' };
 
 /** Animações: completas, suaves ou desligadas. */
-function AnimationsSeg() {
+export function AnimationsSeg() {
   const s = useSettings();
   const t = useT();
   return (
@@ -384,7 +384,7 @@ export function Switch({ on, disabled, label, onChange }: { on: boolean; disable
  * Volume de um canal: botão de mudo (🔊/🔇) e barra de 0 a 100. O botão guarda o último volume
  * para o som voltar como estava; com tudo em zero, volta ao padrão.
  */
-function VolumeControl({ kind }: { kind: 'sfxVolume' | 'musicVolume' }) {
+export function VolumeControl({ kind }: { kind: 'sfxVolume' | 'musicVolume' }) {
   const s = useSettings();
   const t = useT();
   const label = t(kind === 'sfxVolume' ? 'settings.sfxLabel' : 'settings.musicLabel');

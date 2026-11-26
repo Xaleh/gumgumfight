@@ -169,6 +169,9 @@ const PAIRS: [Zone, Zone][] = [
 const MAX_MOVES = 16;
 const MAX_DON = 12;
 
+/** Os lugares da mesa: dois no jogo normal, três ou quatro no Yonko. */
+const seats = (state: GameState): PlayerId[] => state.players.map((ps) => ps.id);
+
 function spots(state: GameState): Map<string, Spot> {
   const m = new Map<string, Spot>();
   for (const ps of state.players) {
@@ -362,7 +365,7 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
   // A carta do [Trigger] em destaque faz o próprio caminho (da Vida ao destino).
   const own = spot?.tone === 'trigger' ? spot.uid : null;
   for (const [uid, t] of b) if (!a.has(uid) && uid !== own) push(added, key(t), uid);
-  for (const p of [0, 1] as PlayerId[]) {
+  for (const p of seats(next)) {
     for (const [fz, tz] of PAIRS) {
       const r = removed.get(`${p}:${fz}`);
       const ad = added.get(`${p}:${tz}`);
@@ -387,7 +390,7 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
     );
     const showcaseMove = showy.length === 1 && arena && !opts.calm ? showy[0] : null;
     // Cartas de Vida novas: cada voo pousa numa delas (escondida até lá).
-    const lifeSlots = ([0, 1] as PlayerId[]).map((p) => {
+    const lifeSlots = seats(next).map((p) => {
       const els = Array.from(root.querySelectorAll<HTMLElement>(`[data-anchor="life-${p}"] .life-card`));
       return { els: els.slice(Math.min(prev.players[p].life.length, els.length)), next: 0 };
     });
@@ -591,7 +594,7 @@ function findEl(root: Element, zone: Zone, uid: string): Element | null {
 /** DON!!: do deck de DON!! para a área de custo, da área para as cartas e de volta. */
 function donPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes, root: Element, tempo: number, out: Planned[]) {
   let count = 0;
-  for (const p of [0, 1] as PlayerId[]) {
+  for (const p of seats(next)) {
     const a = prev.players[p];
     const b = next.players[p];
     const attached = (ps: typeof a) => {
@@ -681,7 +684,7 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
     out.push({ id: nextId++, kind: 'label', at: box, text: label, tone, delay: delay + 40, duration: 750 });
   };
   const lifeTargets = new Set<string>();
-  for (const p of [0, 1] as PlayerId[]) {
+  for (const p of seats(next)) {
     const lost = prev.players[p].life.length - next.players[p].life.length;
     if (lost <= 0) continue;
     const uid = next.players[p].leader.uid;
@@ -714,7 +717,22 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
  */
 export function useBoardMotion(
   state: GameState,
-  { enabled, tempo, lastAction, lang, calm }: { enabled: boolean; tempo: number; lastAction?: Action; lang: Locale; calm?: boolean },
+  {
+    enabled,
+    tempo,
+    lastAction,
+    lang,
+    calm,
+    root: rootSelector = '.mat',
+  }: {
+    enabled: boolean;
+    tempo: number;
+    lastAction?: Action;
+    lang: Locale;
+    calm?: boolean;
+    /** O elemento que contém a mesa inteira (zonas, mãos e âncoras): `.mat` no jogo de dois, `.yk` no Yonko. */
+    root?: string;
+  },
 ): { layer: ReactNode; busy: boolean } {
   const [items, setItems] = useState<Item[]>([]);
   const optsRef = useRef<PlanOptions>({ lastAction, lang, calm });
@@ -724,7 +742,7 @@ export function useBoardMotion(
 
   // Ainda na renderização: o DOM mostra o estado anterior. Mede onde cada carta está.
   if (last.current !== state) {
-    if (last.current && enabled) transition.current = { prev: last.current, next: state, boxes: capture(document.querySelector('.mat')) };
+    if (last.current && enabled) transition.current = { prev: last.current, next: state, boxes: capture(document.querySelector(rootSelector)) };
     else transition.current = null;
     last.current = state;
   }
@@ -732,11 +750,11 @@ export function useBoardMotion(
   useLayoutEffect(() => {
     const t = transition.current;
     transition.current = null;
-    const root = document.querySelector('.mat');
+    const root = document.querySelector(rootSelector);
     if (!t || t.next !== state || !root) return;
     const planned = plan(t.prev, t.next, t.boxes, capture(root), root, tempo, optsRef.current);
     if (planned.length) setItems((cur) => [...cur, ...planned]);
-  }, [state, tempo]);
+  }, [state, tempo, rootSelector]);
 
   // Mesa mudada sem animação (pulo no replay, animações desligadas): o que ainda voava some junto.
   useLayoutEffect(() => {

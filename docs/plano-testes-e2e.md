@@ -126,3 +126,33 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   abre o descarte, Esc fecha, Espaço encerra o turno).
 - Antes de arrastar, o teste espera o elemento parar e não ter nada por cima (as cartas e os DON!! chegam voando no
   começo do turno). Só no desktop: o arrasto com o dedo (deslizar pela mão ergue a carta) continua sem teste.
+
+### Depois do A1 — a mesa do Yonko
+
+- `yonko.spec.ts` (`@iphone`): a mesa local do Yonko, da tela inicial ao primeiro turno de quem joga. A preparação
+  (largada e mão inicial) e as perguntas dos bots são respondidas pelo botão em destaque da faixa de ação até
+  "Encerrar turno" acender; o turno passa para um bot; e as opções da mesa abrem com a escolha das animações, que
+  desligadas valem na hora (a mesa leva `anim-off`). Entrou com o redesenho da mesa (playmats, animações de voo).
+- No `desktop` a partida corre com as animações completas e o jogador as desliga no fim. No `iphone` ele as desliga
+  ainda na preparação, antes do primeiro turno, por causa da queda do WebKit descrita abaixo.
+
+**A queda da mesa no WebKit do CI tem causa (26/11/2026):** é a **faixa animada de troca de turno** das animações
+completas (`.turn-banner.sweep` em `styles.css`: `tb-sweep` anima `filter: blur()` numa faixa com `backdrop-filter`).
+Foi isolada no PR do redesenho do Yonko, com variantes do teste rodando só no WebKit do CI:
+
+| Variante (WebKit do CI; as que caem, caíram nas duas tentativas) | Resultado |
+|---|---|
+| Yonko, animações completas | cai (a página trava ~1 s depois de uma troca de turno e cai ~21 s depois) |
+| Yonko, animações suaves | passa |
+| Yonko, animações desligadas | passa |
+| Yonko, completas com `.turn-banner { display: none }` | passa |
+| Yonko, completas sem animação nem transição de CSS | passa |
+| Yonko, completas com `.motion-layer { display: none }` (sem as cartas voando) | cai |
+| Yonko, completas sem os enfeites da mesa nova (brilho, pulso, pontinhos) | cai |
+| **Mesa de dois**, completas, 40 s de Auto | cai (aos ~31 s, nas duas tentativas) |
+
+Ou seja: não é da mesa do Yonko nem das cartas voando, e a mesa de dois cai do mesmo jeito. É o que está por trás
+do "Conhecido na fase 1" (a queda "logo depois do mulligan" é a primeira faixa de turno). Continua sem resposta se
+isso acontece num iPhone de verdade ou só no WebKit de Linux do Playwright, que desenha sem placa de vídeo. Falta
+descobrir qual das duas propriedades derruba (o `backdrop-filter` ou o `filter` animado), trocar por algo que o
+WebKit aguente e, então, levar para o `iphone` os testes de partida que hoje ficam só no `desktop`.

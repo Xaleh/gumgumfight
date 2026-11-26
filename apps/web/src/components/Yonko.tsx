@@ -11,8 +11,9 @@ import type { YonkoSetup } from '../game/useYonkoGame';
 import { useT } from '../i18n';
 import { DeckPicker } from './DeckPicker';
 import { Icon } from './Icons';
+import { LeaderArt } from './LeaderArt';
 import { usableForYonko, whyNotYonko } from './YonkoOnline';
-import { MANUAL_RULES, RulesPanel } from './YonkoRules';
+import { MANUAL_RULES, RulesPanel, YonkoHero } from './YonkoRules';
 
 const DECK_KEY = 'gumgum.yonko.deck';
 const RULES_KEY = 'gumgum.yonko.rules';
@@ -202,20 +203,30 @@ export function Yonko({
 
   return (
     <div className="yk-lobby">
-      <header className="builder-header">
-        <button className="btn small" onClick={onExit}>
-          {t('common.back')}
-        </button>
-        <h2>{t('yonko.title')}</h2>
-      </header>
-      <div className="yk-lobby-wrap">
-        <div className="yk-lobby-head">
-          <div>
-            <div className="yk-kicker">{t('yonko.lobbyKicker')}</div>
-            <h1 className="yk-h1">{t('yonko.lobbyTitle')}</h1>
+      <YonkoHero
+        kicker={t('yonko.lobbyKicker')}
+        sub={t('yonko.homeDesc')}
+        back={t('common.back')}
+        onBack={onExit}
+        aside={
+          // Os quatro lugares em volta da bússola: quem joga embaixo, os três bots da mesa local nos outros.
+          <div className="yk-round" aria-hidden="true">
+            {[mine, ...bots].slice(0, SEATS).map((d, i) => (
+              <span key={d?.id ?? i} className={['yk-round-seat', `p${i}`].join(' ')}>
+                <LeaderArt name={d?.leaderName ?? d?.name ?? '?'} image={d?.leaderImage} colors={d?.colors} />
+                <b>{i === 0 ? t('yonko.you') : t('yonko.botName', { n: i })}</b>
+              </span>
+            ))}
           </div>
+        }
+      >
+        <div className="yk-hero-chips">
+          <span>{t('yonko.homeChipPlayers')}</span>
+          <span>{t('yonko.homeChipDeck')}</span>
+          <span>{t('yonko.homeChipBots')}</span>
         </div>
-
+      </YonkoHero>
+      <div className="yk-lobby-wrap">
         {error && (
           <div className="error" onClick={() => setError(null)}>
             {error}
@@ -235,9 +246,13 @@ export function Yonko({
 
         <section className="yk-panel yk-deck">
           <div className="yk-deck-info">
-            <span className="yk-avatar" data-c={mine?.colors[0] ?? 'red'}>
-              <Icon name="deck" size={28} />
-            </span>
+            {mine ? (
+              <LeaderArt name={mine.leaderName ?? mine.name} image={mine.leaderImage} colors={mine.colors} />
+            ) : (
+              <span className="yk-avatar" data-c="red">
+                <Icon name="deck" size={28} />
+              </span>
+            )}
             <div>
               <div className="yk-kicker">{t('yonko.yourDeck')}</div>
               <b className="yk-deck-name">{mine ? mine.name : decks ? t('yonko.noDeck') : t('common.loading')}</b>
@@ -255,7 +270,10 @@ export function Yonko({
         </section>
 
         <div className="yk-modes">
-          <section className="yk-panel yk-mode">
+          <section className="yk-panel yk-mode online">
+            <span className="yk-mode-icon" aria-hidden="true">
+              <Icon name="swords" size={22} />
+            </span>
             <div className="yk-kicker">{t('yonko.onlineKicker')}</div>
             <h3>{t('yonko.onlineTitle')}</h3>
             <p className="muted">{t('yonko.onlineDesc')}</p>
@@ -290,7 +308,10 @@ export function Yonko({
             </form>
           </section>
 
-          <section className="yk-panel yk-mode">
+          <section className="yk-panel yk-mode local">
+            <span className="yk-mode-icon" aria-hidden="true">
+              <Icon name="bot" size={22} />
+            </span>
             <div className="yk-kicker">{t('yonko.localKicker')}</div>
             <h3>{t('yonko.localTitle')}</h3>
             <p className="muted">{t('yonko.localDesc')}</p>

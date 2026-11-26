@@ -414,6 +414,12 @@ pessoa e três bots simples (`game/useYonkoGame.ts`). O README (seção "Yonko")
 **Ficou de fora desta versão:** arrastar cartas, animações de voo e som; ver o descarte carta a carta; dar o valor
 de Counter a outra carta que não a atacada; desfazer além do "cancelar" do motor; replay e estatísticas.
 
+**Redesenho da mesa (26/11/2026):** a mesa ganhou a cara da mesa de dois. Cada lugar virou um playmat na cor do
+Líder (Vida empilhada, deck, descarte e DON!! em cartas), a ordem dos turnos foi para a barra de cima, a faixa de
+ação mostra a batalha (poder contra poder) e a mão ficou em leque. As animações de voo e o som, que tinham ficado
+de fora, entraram pelo `useBoardMotion` e pelo `useMatchAudio` da mesa de dois, sempre seguindo a opção
+"Animações" do jogador; o descarte agora abre carta a carta. No celular a mesa cabe na tela sem rolar.
+
 ### Fora da v1
 
 Mesa de 3, fila pública, torneio de Yonko, alianças formais, 2 contra 2 e bot competitivo.

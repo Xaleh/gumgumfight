@@ -9,7 +9,7 @@ import { useYonkoOnline } from '../game/useYonkoOnline';
 import { type Translate, useT, useTryT } from '../i18n';
 import { DeckPicker } from './DeckPicker';
 import { Icon } from './Icons';
-import { RulesPanel } from './YonkoRules';
+import { RulesPanel, YonkoHero } from './YonkoRules';
 import { type SeatStatus, YonkoTable } from './YonkoTable';
 
 /** "21:10" (minutos e segundos). */
@@ -207,18 +207,11 @@ function WaitingRoom({ online, room, seat, onExit, onBuildDecks }: { online: Onl
 
   return (
     <div className="yk-lobby">
-      <header className="builder-header">
-        <button className="btn small" onClick={leave}>
-          {t('yonko.leaveTable')}
-        </button>
-        <h2>{t('yonko.title')}</h2>
-      </header>
-      <div className="yk-lobby-wrap">
-        <div className="yk-lobby-head">
-          <div>
-            <div className="yk-kicker">{t('yonko.onlineKicker')}</div>
-            <h1 className="yk-h1">{t('yonko.lobbyTitle')}</h1>
-          </div>
+      <YonkoHero
+        kicker={t('yonko.onlineKicker')}
+        back={t('yonko.leaveTable')}
+        onBack={leave}
+        aside={
           <div className="yk-code">
             <span className="yk-kicker">{t('yonko.codeLabel')}</span>
             <b>{room.code}</b>
@@ -226,8 +219,9 @@ function WaitingRoom({ online, room, seat, onExit, onBuildDecks }: { online: Onl
               {copied ? t('yonko.copied') : t('yonko.copyLink')}
             </button>
           </div>
-        </div>
-
+        }
+      />
+      <div className="yk-lobby-wrap">
         {online.error && (
           <div className="error" onClick={() => online.setError(null)}>
             {online.error}

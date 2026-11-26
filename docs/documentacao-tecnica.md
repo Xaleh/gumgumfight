@@ -459,9 +459,15 @@ nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`
 - **Telas** (`apps/web`): `components/Yonko.tsx` (a sala) monta o `GameConfig` com `yonkoDeckFrom` (deck de teste de
   60 a partir de um deck comum) e as regras escolhidas; `game/useYonkoGame.ts` roda a partida no navegador
   (`createGame`/`applyAction`), faz os bots jogarem com `chooseSimpleBotAction` sobre a visão do lugar deles e
-  entrega à mesa a visão de quem joga (`viewFor`); `components/YonkoTable.tsx` é a mesa, por clique, sem as
-  animações de `Motion.tsx`. Os estilos ficam no fim de `styles.css` (prefixo `.yk-`), sempre no tema escuro; os
-  textos em `i18n/yonko/`.
+  entrega à mesa a visão de quem joga (`viewFor`); `components/YonkoTable.tsx` é a mesa, por clique. Cada lugar é um
+  playmat na cor do Líder, com as zonas marcadas do mesmo jeito que na mesa de dois (`.field-card`, `.pile`,
+  `[data-hand-uid]` e as âncoras `data-anchor` de Vida, deck, descarte, mão, DON!! e `arena`): é isso que deixa a
+  mesa usar `useBoardMotion` (`Motion.tsx`, com `root: '.yk'`) e `useMatchAudio`, que valem para qualquer número de
+  lugares. A opção "Animações" (`full`/`soft`/`off`) vira a classe `anim-*` da mesa: `off` desliga o
+  `useBoardMotion`, a faixa de troca de turno e toda animação e transição do CSS; os enfeites que se repetem só
+  existem em `anim-full`. Os bots da mesa local esperam as animações (`motionWait`). O tamanho das cartas sai do
+  tabuleiro (`useBoardSize`: `--cw` na mesa de quem joga, `--ow` nas dos oponentes). Os estilos ficam no fim de
+  `styles.css` (prefixo `.yk-`), sempre no tema escuro; os textos em `i18n/yonko/`.
 - **Diagnóstico**: `setOpponentProbe` avisa quando um passo consulta "o oponente" sem um fixado (um tipo de passo que
   `eachOpponent` ainda não conhece). `scripts/simulate-yonko.ts` usa isso e confere os invariantes por jogador.
 

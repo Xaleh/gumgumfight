@@ -1,9 +1,11 @@
-// Painel "Regras da mesa" do Yonko, comum à mesa local e à sala online: Vida extra, largada e recompensa por
-// eliminação. O selo diz se a mesa está no manual do formato (docs/regras-yonko.md) ou em regra da casa.
+// Peças comuns à entrada do Yonko e à sala online: o cabeçalho (`YonkoHero`) e o painel "Regras da mesa" (Vida
+// extra, largada e recompensa por eliminação). O selo do painel diz se a mesa está no manual do formato
+// (docs/regras-yonko.md) ou em regra da casa.
 
 import { type TableRules, YONKO_TABLE } from '@gumgum/engine';
 import type { ReactNode } from 'react';
 import { useT } from '../i18n';
+import { Icon } from './Icons';
 
 /** As regras do manual (sem recompensa por eliminação). */
 export const MANUAL_RULES: TableRules = { ...YONKO_TABLE, eliminationDraw: 0 };
@@ -74,6 +76,31 @@ export function RulesPanel({ rules, editable, onChange, onBuildDecks }: { rules:
           {t('yonko.buildDecks')}
         </button>
       </Option>
+    </section>
+  );
+}
+
+/**
+ * Cabeçalho da entrada e da sala do Yonko: a faixa azul-marinho da home, com o botão de voltar, o título e,
+ * ao lado, o que a tela tiver para mostrar (os quatro lugares da mesa, o código da sala).
+ */
+export function YonkoHero({ kicker, sub, back, onBack, aside, children }: { kicker: string; sub?: string; back: string; onBack: () => void; aside?: ReactNode; children?: ReactNode }) {
+  const t = useT();
+  return (
+    <section className="yk-hero">
+      <div className="yk-hero-inner">
+        <div className="yk-hero-text">
+          <button type="button" className="hero-link yk-hero-back" onClick={onBack}>
+            <Icon name="chevron" size={16} />
+            {back}
+          </button>
+          <div className="hero-kicker">{kicker}</div>
+          <h1 className="hero-title">{t('yonko.lobbyTitle')}</h1>
+          {sub && <p className="hero-sub">{sub}</p>}
+          {children}
+        </div>
+        {aside}
+      </div>
     </section>
   );
 }
