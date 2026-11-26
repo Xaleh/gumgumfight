@@ -66,6 +66,10 @@ em várias branches ao mesmo tempo.
   `packages/engine/src/engine.ts` (~7 mil linhas) em módulos por fase do turno; `apps/web/src/components/GameScreen.tsx`
   (~3,8 mil linhas) em componentes por zona da mesa. Sem mudar comportamento.
   *Pronto quando:* nenhum dos dois passa de ~1.500 linhas e todos os testes (inclusive os E2E de A1) passam sem alteração.
+  *Plano:* [`plano-divisao-motor-e-mesa.md`](plano-divisao-motor-e-mesa.md) (4 fases).
+  *Progresso:* fase 1 de 4 (`engine.ts` vira a pasta `packages/engine/src/engine/`, 20 módulos por etapa com a mesma
+  API; o `execStep`, de 2.560 linhas, segue inteiro em `exec-step.ts` até a fase 2) em 2026-11-26,
+  [PR #240](https://github.com/Xaleh/gumgumfight/pull/240).
   *Feito em:* —
 
 ## Fase B — Treino e aprendizado
