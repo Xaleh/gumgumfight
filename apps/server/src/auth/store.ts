@@ -44,6 +44,11 @@ export interface User {
   picture: string | null;
   /** O usuário enviou a própria foto (pode voltar para a do Google). */
   customPicture: boolean;
+  /**
+   * Logo de quem transmite, no centro do playmat da mesa lateral (URL do servidor): aparece no lugar da logo
+   * padrão, só na tela desta conta. null sem logo enviada ou sem o perfil que transmite (Streamer, Admin, Dev).
+   */
+  playmatLogo: string | null;
   role: Role;
   /** Plano de apoio ativo agora (null = sem plano ou vencido). */
   supporterTier: SupporterTier | null;
@@ -79,6 +84,7 @@ type UserRow = {
   name: string | null;
   picture: string | null;
   custom_picture_at: number | null;
+  playmat_logo_at: number | null;
   role: string;
   supporter_tier: string | null;
   supporter_until: string | null;
@@ -86,9 +92,10 @@ type UserRow = {
   supporter_public: number;
   team: number;
 };
-const USER_COLS = 'id, email, name, picture, custom_picture_at, role, supporter_tier, supporter_until, supporter_source, supporter_public, team';
+const USER_COLS = 'id, email, name, picture, custom_picture_at, playmat_logo_at, role, supporter_tier, supporter_until, supporter_source, supporter_public, team';
 /** Endereço da foto enviada; a versão no endereço deixa o navegador guardar a imagem para sempre. */
 const customPictureUrl = (id: string, version: number) => `/api/users/${encodeURIComponent(id)}/picture?v=${version}`;
+const playmatLogoUrl = (id: string, version: number) => `/api/users/${encodeURIComponent(id)}/playmat-logo?v=${version}`;
 
 /** Plano que vale agora: o gravado, se não venceu. */
 const activeTier = (r: Pick<UserRow, 'supporter_tier' | 'supporter_until'>, now = Date.now()): SupporterTier | null =>
@@ -100,6 +107,8 @@ const toUser = (r: UserRow): User => ({
   name: r.name,
   picture: r.custom_picture_at ? customPictureUrl(r.id, r.custom_picture_at) : r.picture,
   customPicture: r.custom_picture_at != null,
+  // Quem perde o perfil deixa de ver a logo (ela fica guardada, para o caso de o perfil voltar).
+  playmatLogo: r.playmat_logo_at && isRole(r.role) && seesHands(r.role) ? playmatLogoUrl(r.id, r.playmat_logo_at) : null,
   role: isRole(r.role) ? r.role : 'player',
   supporterTier: activeTier(r),
   supporterUntil: r.supporter_until,
@@ -164,6 +173,25 @@ const lastPictureVersion = (db: DB, id: string) =>
 
 export function getCustomPicture(db: DB, id: string): { data: Uint8Array; type: string } | null {
   const r = db.prepare('SELECT custom_picture AS data, custom_picture_type AS type FROM users WHERE id = ? AND custom_picture IS NOT NULL').get(id) as
+    | { data: Uint8Array; type: string }
+    | undefined;
+  return r ?? null;
+}
+
+/** Grava a logo do playmat de quem transmite (`logo` = null volta para a logo padrão). */
+export function setPlaymatLogo(db: DB, id: string, logo: { data: Uint8Array; type: PictureType } | null): boolean {
+  const last = (db.prepare('SELECT playmat_logo_at AS v FROM users WHERE id = ?').get(id) as { v: number | null } | undefined)?.v ?? 0;
+  const res = logo
+    ? db
+        .prepare('UPDATE users SET playmat_logo = ?, playmat_logo_type = ?, playmat_logo_at = ? WHERE id = ?')
+        // A versão sempre cresce, mesmo com duas trocas no mesmo milissegundo.
+        .run(logo.data, logo.type, Math.max(Date.now(), last + 1), id)
+    : db.prepare('UPDATE users SET playmat_logo = NULL, playmat_logo_type = NULL, playmat_logo_at = NULL WHERE id = ?').run(id);
+  return Number(res.changes) > 0;
+}
+
+export function getPlaymatLogo(db: DB, id: string): { data: Uint8Array; type: string } | null {
+  const r = db.prepare('SELECT playmat_logo AS data, playmat_logo_type AS type FROM users WHERE id = ? AND playmat_logo IS NOT NULL').get(id) as
     | { data: Uint8Array; type: string }
     | undefined;
   return r ?? null;

@@ -13159,6 +13159,11 @@ a.sponsor-card:hover {
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
   z-index: 1;
 }
+/* a logo de quem transmite no lugar da padrão (`--lat-logo`, só na tela dele): como veio, numa caixa mais larga */
+.game.custom-logo .lat-center::before {
+  width: calc(var(--cw) * 1.5);
+  background-image: var(--lat-logo);
+}
 .lat-center > .turn-chip {
   grid-row: 1;
   grid-column: 1;
@@ -13317,6 +13322,32 @@ a.sponsor-card:hover {
   -webkit-mask: url('./assets/uaiuai-no-mi-gold.png') center / contain no-repeat;
   mask: url('./assets/uaiuai-no-mi-gold.png') center / contain no-repeat;
   filter: none;
+}
+/* a logo de quem transmite fica com as cores dela também no branco */
+.playmat-white.custom-logo .lat-center::before {
+  background: var(--lat-logo) center / contain no-repeat;
+  -webkit-mask: none;
+  mask: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+}
+/* menu da partida: enviar, trocar ou tirar a logo do playmat */
+.playmat-logo {
+  margin-top: 10px;
+}
+.playmat-logo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.playmat-logo-thumb {
+  width: 56px;
+  height: 40px;
+  object-fit: contain;
+  padding: 4px;
+  border-radius: 8px;
+  /* fundo do playmat azul, para a logo clara ou transparente aparecer na miniatura */
+  background: #12304b;
 }
 .lat-scene .slot-empty,
 .lat-scene .lat-donback.empty {

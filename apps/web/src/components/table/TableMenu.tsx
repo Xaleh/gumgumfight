@@ -1,8 +1,11 @@
 // O menu da partida (a folha que o botão do canto abre): desfazer, pausar, histórico, layout, decklist, replay,
 // chamar o Judge, desistir, sair, e as opções da mesa (playmat, velocidade do bot, mão do bot, configurações).
 
-import type { LiveRoom } from '../../api';
+import { useRef, useState } from 'react';
+import { isAdmin, type LiveRoom } from '../../api';
+import { useAuth } from '../../auth';
 import { useT } from '../../i18n';
+import { playmatLogo } from '../../picture';
 import { PLAYMATS, SettingsControls, useSettings } from '../../settings';
 import type { TableEmbed, TableGame, TableKind, TableTutorial } from '../GameScreen';
 import { SheetFrame } from './CardZoom';
@@ -163,6 +166,7 @@ export function TableMenu({
               </button>
             ))}
           </div>
+          {!embed && <PlaymatLogoField />}
         </div>
       )}
       {!isOnline && !replay && !tutorial && (
@@ -187,5 +191,69 @@ export function TableMenu({
         <SettingsControls />
       </div>
     </SheetFrame>
+  );
+}
+
+/**
+ * A logo de quem transmite (perfis Streamer e Admin) no centro do playmat da mesa lateral, no lugar da padrão:
+ * enviar, trocar ou voltar para a padrão. Fica guardada na conta e só aparece na tela de quem enviou.
+ */
+function PlaymatLogoField() {
+  const t = useT();
+  const { user, changePlaymatLogo } = useAuth();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!user || !(user.role === 'streamer' || isAdmin(user.role))) return null;
+  const run = async (work: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await work();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const onFile = (file: File) =>
+    run(async () => {
+      const image = await playmatLogo(file).catch(() => {
+        throw new Error(t('account.photoUnreadable'));
+      });
+      await changePlaymatLogo(image);
+    });
+  return (
+    <div className="playmat-logo">
+      <label className="sheet-label">{t('game.playmatLogo')}</label>
+      <p className="muted small sheet-hint">{t('game.playmatLogoHint')}</p>
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/webp,image/jpeg"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void onFile(file);
+        }}
+      />
+      <div className="playmat-logo-row">
+        {user.playmatLogo && <img className="playmat-logo-thumb" src={user.playmatLogo} alt="" />}
+        <button type="button" className="btn small" disabled={busy} onClick={() => input.current?.click()}>
+          {busy ? t('account.photoSaving') : user.playmatLogo ? t('game.playmatLogoChange') : t('game.playmatLogoUpload')}
+        </button>
+        {user.playmatLogo && !busy && (
+          <button type="button" className="btn small" onClick={() => void run(() => changePlaymatLogo(null))}>
+            {t('game.playmatLogoRemove')}
+          </button>
+        )}
+      </div>
+      {error && (
+        <span className="warn small" role="alert">
+          {error}
+        </span>
+      )}
+    </div>
   );
 }

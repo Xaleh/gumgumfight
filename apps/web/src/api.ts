@@ -609,6 +609,11 @@ export interface User {
   picture: string | null;
   /** O usuário enviou a própria foto (pode voltar para a do Google). */
   customPicture: boolean;
+  /**
+   * Logo de quem transmite (perfis Streamer, Admin e Dev) no centro do playmat da mesa lateral, no lugar
+   * da logo padrão: só esta conta a vê. null = a logo padrão.
+   */
+  playmatLogo: string | null;
   role: Role;
   /** Plano de apoio ativo (null = sem plano). */
   supporter: SupporterState | null;
@@ -800,6 +805,10 @@ export const api = {
   setPicture: (image: string) => send<{ user: User }>('PUT', '/api/auth/me/picture', { image }),
   /** Remove a foto enviada: volta a valer a do Google. */
   removePicture: () => send<{ user: User }>('DELETE', '/api/auth/me/picture'),
+  /** Logo de quem transmite no playmat da mesa lateral (data URL já reduzida; ver `picture.ts`). */
+  setPlaymatLogo: (image: string) => send<{ user: User }>('PUT', '/api/auth/me/playmat-logo', { image }),
+  /** Tira a logo enviada: o playmat volta a mostrar a padrão. */
+  removePlaymatLogo: () => send<{ user: User }>('DELETE', '/api/auth/me/playmat-logo'),
   decks: () => get<DeckSummary[]>('/api/decks'),
   deck: (id: string) =>
     get<{ deck: DeckList & { kind: DeckSummary['kind']; mine: boolean }; cards: ApiCard[]; summary: DeckSummary }>(

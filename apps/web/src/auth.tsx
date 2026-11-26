@@ -66,6 +66,8 @@ interface AuthCtx {
   refresh: () => Promise<void>;
   /** Troca a foto da conta (data URL) ou, com null, volta para a do Google. Lança o erro do servidor. */
   changePicture: (image: string | null) => Promise<void>;
+  /** Troca a logo do playmat de quem transmite (data URL) ou, com null, volta para a padrão. Lança o erro do servidor. */
+  changePlaymatLogo: (image: string | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx | null>(null);
@@ -127,6 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(r.user);
   };
 
+  const changePlaymatLogo = async (image: string | null) => {
+    const r = image ? await api.setPlaymatLogo(image) : await api.removePlaymatLogo();
+    setUser(r.user);
+  };
+
   const signOut = async () => {
     await api.logout().catch(() => undefined);
     window.google?.accounts.id.disableAutoSelect();
@@ -135,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ready, user, clientId, config, notice, error, signIn, signOut, refresh, changePicture }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ ready, user, clientId, config, notice, error, signIn, signOut, refresh, changePicture, changePlaymatLogo }}>{children}</AuthContext.Provider>
   );
 }
 

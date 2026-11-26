@@ -872,7 +872,7 @@ baixadas quando tocam) + `public/`.
 | `card_engine_text_history` | `id` | Cada gravação (`action = set`, com o texto) e remoção (`remove`) do texto para o motor, com quem e quando | idem |
 | `card_gaps` | `card_id` | Cartas ⚙ (efeito parcial ou manual): `text_key` (hash do texto quando entrou), `first_seen`, `reviewed_at` (null = nova para o Dev). Na criação da tabela, as ⚙ que o banco já tinha entram como vistas | `recordCardGaps` (ao subir o servidor, na sincronização dos spoilers e no `cards:import`), `POST /api/dev/card-gaps/reviewed` |
 | `decks` | `id` (`st01-luffy`, `u-xxxxxxxx`) | `name`, `leader`, **`cards` (JSON `[{id,count}]`)**, `kind` (`builtin`/`user`), `owner_hash`, `updated_at` | seed (builtin), `POST/PUT /api/decks` |
-| `users` | `id` (`u-` + 12 hex) | `google_sub` (único), `email`, `name`, `picture`, `role` (`player/streamer/organizer/admin/dev`), `created_at`, `last_login_at` | login Google, admin |
+| `users` | `id` (`u-` + 12 hex) | `google_sub` (único), `email`, `name`, `picture`, `role` (`player/streamer/organizer/admin/dev`), `playmat_logo` + `playmat_logo_type` + `playmat_logo_at` (logo de quem transmite no playmat; a versão em ms entra no endereço), `created_at`, `last_login_at` | login Google, admin |
 | `sessions` | `token_hash` | `user_id`, `created_at`, `expires_at` (60 dias) | login/logout |
 | `broadcasts` | `user_id` | `key` (único: segredo do link do OBS, guardado como está para o streamer copiar de novo), `room_id` (partida na transmissão), opções `delay_s` (0–600), `hands_players`, `hands_own`, `delay_tournaments`, `chat` (0/1), `rev` (sobe a cada troca), `updated_at` | `/api/broadcast/*` |
 | `players` | `id` (`p-` + 12 hex) | `owner_hash` (único: `sha256(navegador)` ou `user:<id>`), `name` (público, "Pirata XXXX"), `bounty` (Beries), `ranked_games` | primeira partida/consulta, ranqueada, `PUT /api/players/me` |
@@ -1395,6 +1395,14 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   ritmo da mesa atrasada sem voltar para a sala velha. O perfil do dono é conferido a cada pedido. A mesa em modo
   transmissão (`Table` com `broadcast`) esconde menus, botões e avisos de erro, esconde o chat se `chat` estiver
   desligado e mostra `PlayHighlight`: a carta de `playCard`, `counter` ou `activate`, grande, por 2,8 s.
+- **Logo de quem transmite no playmat** (mesa lateral da visão do Streamer): o centro do playmat mostra a logo do
+  Uai Uai no Mi (`.lat-center::before`). Os perfis Streamer, Admin e Dev trocam por uma logo própria no menu da
+  partida (Playmat → Logo no playmat, `PlaymatLogoField` em `table/TableMenu.tsx`): o navegador reduz a imagem
+  (`playmatLogo` em `picture.ts`: até 512 px no maior lado, PNG ou WebP com a transparência) e
+  `PUT /api/auth/me/playmat-logo` guarda em `users.playmat_logo` (JPEG, PNG ou WebP, até 512 KB, tipo conferido
+  pelos primeiros bytes). A logo é da conta e **só aparece na tela dela**: `User.playmatLogo` vem em `/api/auth/me`
+  (null sem logo ou sem o perfil; a imagem fica guardada se o perfil voltar) e a `Table` põe a classe `custom-logo`
+  e a variável `--lat-logo` na mesa lateral. Os outros espectadores e o replay embutido seguem com a padrão.
 - **Espectador no app**: amplia cartas à vista, abre o descarte e o histórico; o botão **Chat** da faixa do espectador
   silencia o chat dos jogadores só para ele (`localStorage.gumgum.watchChatOff`).
 - Limite **100 espectadores por sala** (429 acima). Espectadores não se identificam: entram só como número.
@@ -2089,6 +2097,8 @@ Quem chama, na coluna da direita:
 | POST | `/api/auth/logout` | Sai (apaga a sessão) | Sessão |
 | PUT · DELETE | `/api/auth/me/picture` | Troca a foto da conta (`{ image }` data URL) / volta para a do Google | Sessão |
 | GET | `/api/users/:id/picture` | Foto enviada por um usuário | Dono ou Admin |
+| PUT · DELETE | `/api/auth/me/playmat-logo` | Logo de quem transmite no playmat da mesa lateral (`{ image }` data URL) / volta para a padrão | Streamer |
+| GET | `/api/users/:id/playmat-logo` | Logo do playmat enviada por um usuário | Dono (com o perfil que transmite) ou Admin |
 | GET | `/api/admin/users?q=` | Contas e perfis | Admin |
 | PUT | `/api/admin/users/:id/role` | Muda o perfil (`{ role }`; a si mesmo, só para `dev`) | Admin |
 | PUT | `/api/admin/users/:id/supporter` | Plano de apoio dado à mão (`{ tier, until }`) | Admin |

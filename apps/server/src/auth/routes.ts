@@ -12,14 +12,18 @@ import {
   createSession,
   deleteSession,
   getCustomPicture,
+  getPlaymatLogo,
   getUser,
   isAdmin,
   isRole,
   listUsers,
+  type PictureType,
   pictureType,
+  seesHands,
   SESSION_DAYS,
   sessionUser,
   setCustomPicture,
+  setPlaymatLogo,
   setUserRole,
   setUserTeam,
   upsertGoogleUser,
@@ -66,6 +70,7 @@ const publicUser = (u: User) => ({
   email: u.email,
   picture: u.picture,
   customPicture: u.customPicture,
+  playmatLogo: u.playmatLogo,
   role: u.role,
   supporter: u.supporterTier ? { tier: u.supporterTier, until: u.supporterUntil, source: u.supporterSource, public: u.supporterPublic } : null,
   team: u.team,
@@ -73,6 +78,22 @@ const publicUser = (u: User) => ({
 
 /** Maior foto aceita (o navegador já manda a imagem reduzida, com poucas dezenas de KB). */
 export const MAX_PICTURE_BYTES = 256 * 1024;
+/** Maior logo do playmat aceita (o navegador manda a imagem reduzida, com fundo transparente). */
+export const MAX_PLAYMAT_LOGO_BYTES = 512 * 1024;
+
+/**
+ * Imagem enviada como data URL (JPEG, PNG ou WebP; o tipo vem dos primeiros bytes, não do que o
+ * navegador diz), ou a resposta de erro (400 imagem inválida, 413 grande demais).
+ */
+function readImage(image: unknown, maxBytes: number): { data: Buffer; type: PictureType } | { code: 400 | 413; body: ReturnType<typeof fail> } {
+  const invalid = { code: 400 as const, body: fail('pictureInvalid', 'Imagem inválida. Use JPG, PNG ou WebP.') };
+  const m = typeof image === 'string' ? /^data:image\/[a-z+.-]+;base64,([A-Za-z0-9+/]+={0,2})$/.exec(image) : null;
+  if (!m) return invalid;
+  if (m[1].length > Math.ceil(maxBytes / 3) * 4) return { code: 413, body: fail('pictureTooBig', 'Imagem grande demais.') };
+  const data = Buffer.from(m[1], 'base64');
+  const type = pictureType(data);
+  return type ? { data, type } : invalid;
+}
 
 export function registerAuth(app: FastifyInstance, { db, clientId, keys, browserHash, adminEmails = [], afterLogin = [] }: Deps) {
   const cache = new WeakMap<FastifyRequest, User | null>();
@@ -153,16 +174,9 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
   app.put<{ Body: { image?: unknown } }>('/api/auth/me/picture', async (req, reply) => {
     const u = viewer(req);
     if (!u) return reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
-    const image = req.body?.image;
-    const m = typeof image === 'string' ? /^data:image\/[a-z+.-]+;base64,([A-Za-z0-9+/]+={0,2})$/.exec(image) : null;
-    if (!m) return reply.code(400).send(fail('pictureInvalid', 'Imagem inválida. Use JPG, PNG ou WebP.'));
-    if (m[1].length > Math.ceil(MAX_PICTURE_BYTES / 3) * 4) {
-      return reply.code(413).send(fail('pictureTooBig', 'Imagem grande demais.'));
-    }
-    const data = Buffer.from(m[1], 'base64');
-    const type = pictureType(data);
-    if (!type) return reply.code(400).send(fail('pictureInvalid', 'Imagem inválida. Use JPG, PNG ou WebP.'));
-    setCustomPicture(db, u.id, { data, type });
+    const image = readImage(req.body?.image, MAX_PICTURE_BYTES);
+    if ('code' in image) return reply.code(image.code).send(image.body);
+    setCustomPicture(db, u.id, image);
     return { user: publicUser(getUser(db, u.id)!) };
   });
 
@@ -185,6 +199,57 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
       .header('cache-control', 'private, max-age=31536000, immutable')
       .header('x-content-type-options', 'nosniff')
       .send(Buffer.from(pic.data));
+  });
+
+  // ---------------------------------------------------------------- logo do playmat (quem transmite)
+
+  /** Conta que transmite (Streamer, Admin ou Dev), ou responde 401/403. */
+  const broadcaster = (req: FastifyRequest, reply: FastifyReply): User | null => {
+    const u = viewer(req);
+    if (!u) {
+      void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+      return null;
+    }
+    if (!seesHands(u.role)) {
+      void reply.code(403).send(fail('playmatLogoForbidden', 'A logo no playmat é só para os perfis Streamer e Admin.'));
+      return null;
+    }
+    return u;
+  };
+
+  /**
+   * Põe a logo de quem transmite no centro do playmat da mesa lateral, no lugar da logo padrão. Vale só
+   * para a tela desta conta: os outros espectadores continuam vendo a padrão. `image`: data URL (PNG,
+   * WebP ou JPEG) que o navegador já reduziu.
+   */
+  app.put<{ Body: { image?: unknown } }>('/api/auth/me/playmat-logo', async (req, reply) => {
+    const u = broadcaster(req, reply);
+    if (!u) return reply;
+    const image = readImage(req.body?.image, MAX_PLAYMAT_LOGO_BYTES);
+    if ('code' in image) return reply.code(image.code).send(image.body);
+    setPlaymatLogo(db, u.id, image);
+    return { user: publicUser(getUser(db, u.id)!) };
+  });
+
+  /** Tira a logo enviada: o playmat volta a mostrar a padrão. */
+  app.delete('/api/auth/me/playmat-logo', async (req, reply) => {
+    const u = broadcaster(req, reply);
+    if (!u) return reply;
+    setPlaymatLogo(db, u.id, null);
+    return { user: publicUser(getUser(db, u.id)!) };
+  });
+
+  /** A logo enviada; só o dono (enquanto tem o perfil que transmite) e os admins a veem. */
+  app.get<{ Params: { id: string } }>('/api/users/:id/playmat-logo', async (req, reply) => {
+    const u = viewer(req);
+    const logo = u && ((u.id === req.params.id && seesHands(u.role)) || isAdmin(u.role)) ? getPlaymatLogo(db, req.params.id) : null;
+    if (!logo) return reply.code(404).send(fail('notFound', 'Não encontrado'));
+    // O endereço muda a cada troca (?v=), então a imagem pode ficar no cache do navegador.
+    return reply
+      .header('content-type', logo.type)
+      .header('cache-control', 'private, max-age=31536000, immutable')
+      .header('x-content-type-options', 'nosniff')
+      .send(Buffer.from(logo.data));
   });
 
   // ---------------------------------------------------------------- perfis (só admin)

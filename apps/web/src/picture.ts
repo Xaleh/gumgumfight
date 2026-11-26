@@ -63,3 +63,43 @@ export async function prizePhoto(file: File, maxBytes = 480 * 1024): Promise<str
     URL.revokeObjectURL(url);
   }
 }
+
+/** Maior lado da logo do playmat, em pixels (na mesa ela ocupa bem menos; sobra para telas de alta densidade). */
+const LOGO_SIDES = [512, 384, 256];
+
+/** Bytes de uma data URL em base64 (4 caracteres para cada 3 bytes). */
+const dataUrlBytes = (data: string) => (data.length - data.indexOf(',') - 1) * 0.75;
+
+/**
+ * Data URL da logo do playmat: inteira (sem recorte), com a transparência mantida e reduzida para caber
+ * em `maxBytes` (o limite do servidor é 512 KB). PNG enquanto couber; se não, WebP e depois um lado menor.
+ */
+export async function playmatLogo(file: File, maxBytes = 480 * 1024): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const { naturalWidth: w, naturalHeight: h } = img;
+    if (!w || !h) throw new Error('imagem vazia');
+    let last = '';
+    for (const side of LOGO_SIDES) {
+      const scale = Math.min(1, side / Math.max(w, h));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h * scale));
+      const ctx = canvas.getContext('2d')!;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // Onde o navegador não gera WebP (Safari), `toDataURL` devolve PNG de novo.
+      for (const data of [canvas.toDataURL('image/png'), canvas.toDataURL('image/webp', 0.9)]) {
+        if (dataUrlBytes(data) <= maxBytes) return data;
+        last = data;
+      }
+    }
+    // Não coube nem no menor lado: o servidor responde que a imagem é grande demais.
+    return last;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
