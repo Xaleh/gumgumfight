@@ -192,7 +192,7 @@ gumgumfight/
 │   ├── src/game/useOnlineGame.ts   canal SSE, reconexão, fila de ações
 │   ├── src/pwa.ts               service worker, convite de instalação, Wake Lock, inscrição nas notificações
 │   ├── src/service-worker.js    fonte do /sw.js (o plugin em vite.config.ts preenche versão e arquivos)
-│   ├── src/components/          Menu, DeckBuilder, GameScreen (2.319 linhas), Board, Watch, Tournaments, Stats, Admin…
+│   ├── src/components/          Menu, DeckBuilder, GameScreen (as telas da partida e a mesa, 2.319 linhas; os componentes em volta dela em table/), Board, Watch, Tournaments, Stats, Admin…
 │   └── public/                  manifest, ícones, marca
 ├── data/
 │   ├── cards/*.json             34 arquivos de cartas provisórias (750 cartas; ST01–ST36 parciais, OP01, OP02)
@@ -682,7 +682,7 @@ deck), `status` (estados das cartas), `errors` (erros do servidor), `labels`, `s
   - `LogEntry.key/params/parts` (histórico, seção `log`; a linha secreta tem `secretKey…`, que `view.ts` só entrega ao dono);
     `LogEntry.cards` traz os ids das cartas que a linha cita pelo nome, na ordem do texto (`secretCards` na linha
     secreta): o nome sozinho não diz qual é a carta quando Líder e Personagem têm o mesmo nome, e é por esse campo
-    que o histórico abre a carta certa (`resolveLogCard` em `GameScreen.tsx`);
+    que o histórico abre a carta certa (`resolveLogCard`, usado pelo `table/LogPanel.tsx`);
   - `GameState.winReasonKey/winReasonParams` (motivo do fim de jogo, `log.win*`);
   - `Pending.promptKey/promptParams/promptParts` e `optionKeys/optionParts` (perguntas de efeito, seção `engine`);
   - `Ability.labelKey/labelParams` (rótulos de habilidades roteirizadas);

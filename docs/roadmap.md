@@ -71,8 +71,10 @@ em várias branches ao mesmo tempo.
   *Progresso:* fase 1 de 4 (`engine.ts` vira a pasta `packages/engine/src/engine/`, 20 módulos por etapa com a mesma
   API) em 2026-11-26, [PR #240](https://github.com/Xaleh/gumgumfight/pull/240); fase 2 de 4 (o `execStep`, de 2.560
   linhas, vira um despacho e 8 executores por família de efeito em `engine/steps/`; o maior arquivo do motor fica com
-  506 linhas) em 2026-11-26, no mesmo [PR #240](https://github.com/Xaleh/gumgumfight/pull/240). Falta o
-  `GameScreen.tsx` (fases 3 e 4).
+  506 linhas) em 2026-11-26, no mesmo [PR #240](https://github.com/Xaleh/gumgumfight/pull/240); fase 3 de 4 (os
+  componentes em volta da mesa saem do `GameScreen.tsx` para `apps/web/src/components/table/`; ele cai de 3.860 para
+  2.319 linhas) em 2026-11-26, também no [PR #240](https://github.com/Xaleh/gumgumfight/pull/240). Falta o componente
+  `Table`, de 1.845 linhas (fase 4).
   *Feito em:* —
 
 ## Fase B — Treino e aprendizado

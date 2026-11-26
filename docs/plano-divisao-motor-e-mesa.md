@@ -102,21 +102,30 @@ Feito pelo mesmo caminho da fase 1 (script pelo AST; cada `case` foi inteiro, co
 conferência: o texto é o mesmo reordenado, nenhum teste alterado, e o `npm run fingerprint` dá os mesmos hashes do
 motor de antes da fase 1. O maior arquivo do motor agora é o `apply.ts`, com 506 linhas.
 
-### Fase 3 — `GameScreen.tsx`: o que fica em volta da mesa
+### Fase 3 — `GameScreen.tsx`: o que fica em volta da mesa ✅
 
-Os componentes que já são funções separadas dentro do arquivo saem para `apps/web/src/components/table/`, um arquivo
-por zona da tela:
+Os componentes que já eram funções separadas dentro do arquivo saíram para `apps/web/src/components/table/`:
 
-- a pergunta do motor e os botões de decisão (`Prompt`, `PromptPill`, `DecisionButton`, `defenseDecision`,
-  `targetsDecision`, `TargetRequest`, `CancelButton`, `UndoPill`, `useSkipGuard`);
-- a faixa central e a batalha (`CenterBand`, `DonBar`, `BattleInfo`, `AttackArrow`);
-- a carta ampliada (`CardZoom`, `CardDetail`, `HoverTip`, `SheetFrame`, `RevealedCards`);
-- o histórico (`LogPanel`, `LogText`, `downloadReplay`);
-- as telas de entrada (`GameScreen`, `OnlineGameScreen`, `WatchGameScreen`, `LessonTable`) ficam no `GameScreen.tsx`,
-  que continua exportando os mesmos nomes.
+| Arquivo | O que tem | Linhas |
+|---|---|---|
+| `GameScreen.tsx` | as telas de entrada (`GameScreen`, `OnlineGameScreen`, `WatchGameScreen`, `LessonTable`), os tipos da mesa (`TableGame`, `TableEmbed`…) e o `Table` (**ainda inteiro: fase 4**) | 2.319 |
+| `table/Prompt.tsx` | a janela da pergunta do motor (`Prompt`, `PromptPill`, `SourceLine`, `useSkipGuard`) | 430 |
+| `table/CenterBand.tsx` | a faixa central: `CenterBand`, `BattleInfo`, `DonBar`, `CoachTipPill`, `AttackArrow` | 342 |
+| `table/CardZoom.tsx` | a carta ampliada e as folhas: `CardZoom`, `CardDetail`, `HoverTip`, `SheetFrame`, `RevealedCards` | 302 |
+| `table/decisions.tsx` | as decisões na faixa central: `DecisionButton`, `TargetRequest`, `CancelButton`, `UndoPill`, `targetsOnTable` | 275 |
+| `table/LogPanel.tsx` | o histórico: `LogPanel`, `LogText` | 189 |
+| `table/shared.ts` | tipos e ajudantes divididos com o `Table`: `Mode`, `Drag`, `Sheet`, `Panel`, `promptText`, `orderText`, `useMediaQuery` | 77 |
 
-*Pronto quando:* o `GameScreen.tsx` fica com as telas de entrada e o `Table` (~2.400 linhas) e os testes do web e os
-de ponta a ponta passam sem alteração.
+Como ficou:
+
+- O `GameScreen.tsx` exporta os mesmos nomes de antes; quem importa dele (`App.tsx`, `Lesson.tsx`, `DailyChallenge.tsx`,
+  `DailyEditor.tsx`, `Broadcast.tsx`, `ReplayEmbed.tsx`) não mudou. O `downloadReplay` ficou nele: quem o usa são as
+  telas de entrada.
+- Os arquivos de `table/` só pegam **tipos** do `GameScreen.tsx`; valores vão sempre do `table/` para o `GameScreen`.
+  Assim não há ciclo de carga entre eles (o script recusa o contrário).
+- Feito pelo mesmo caminho do motor (script pelo AST, cada declaração inteira com o comentário dela). O texto é o
+  mesmo reordenado: fora os imports e o cabeçalho de cada arquivo novo, nenhuma linha mudou.
+- Conferido com `npm run typecheck`, os testes do web e os de ponta a ponta, sem alterar nenhum.
 
 ### Fase 4 — o `Table` em hooks e zonas
 
