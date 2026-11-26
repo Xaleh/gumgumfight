@@ -1,4 +1,4 @@
-// Tipos e ajudantes que a mesa (`Table`, em ../GameScreen.tsx) e os componentes em volta dela dividem: o modo da
+// Tipos e ajudantes que a mesa (`Table`, em ./Table.tsx) e os componentes em volta dela dividem: o modo da
 // mesa, o arrasto, as folhas e os painéis abertos, e o texto das perguntas do motor no idioma da interface.
 
 import { cardDef, type GameState, type MsgList, type MsgParts, type PlayerId } from '@gumgum/engine';
@@ -32,7 +32,7 @@ export type Sheet = null | 'menu' | 'log' | 'hand' | 'coach' | 'layout' | { tras
 /** Painel lateral no desktop: do Streamer (histórico, partidas, decklists) ou de quem joga (histórico, a própria decklist). */
 export type Panel = null | 'log' | 'matches' | 'deck' | 'coach';
 
-type TryT = ReturnType<typeof useTryT>;
+export type TryT = ReturnType<typeof useTryT>;
 /** Campos que o motor passa a mandar junto das perguntas e das habilidades: a chave do texto no dicionário e os parâmetros. */
 interface Keyed {
   promptKey?: string;
