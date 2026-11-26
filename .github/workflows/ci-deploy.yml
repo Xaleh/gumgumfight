@@ -1,6 +1,7 @@
 name: CI e deploy
 
-# Todo push/PR roda os testes e monta o pacote.
+# Todo push/PR roda os testes e monta o pacote. Os testes de ponta a ponta rodam uma vez por mudança, no PR
+# (e no "Run workflow"): o push do branch e o push na main não os repetem.
 # Só a main publica: push na main (ou "Run workflow" na main) faz o deploy na produção, https://gumgumfight.app
 # (a VPS da Hostinger), com os secrets DEPLOY_* do Environment "production" (Settings → Environments).
 # "Run workflow" em outro branch só roda os testes: nada é publicado.
@@ -69,6 +70,9 @@ jobs:
 
   e2e:
     name: Testes de ponta a ponta (Playwright)
+    # No PR (e no "Run workflow"), não no push: o mesmo commit já passou por aqui antes do merge, e uma falha
+    # intermitente destes testes não pode segurar o deploy da main.
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -102,8 +106,9 @@ jobs:
 
   deploy:
     name: Deploy (produção)
-    # Só publica com os testes de unidade e os de ponta a ponta passando.
-    needs: [test, e2e]
+    # Só publica com os testes de unidade e o smoke test do pacote passando. Os de ponta a ponta valem no PR,
+    # antes do merge (ver o job e2e): um push direto na main, sem PR, chega à produção sem eles.
+    needs: [test]
     # Só a main publica: push, ou "Run workflow" na main. Nenhum outro branch chega à produção.
     if: >-
       github.ref == 'refs/heads/main'

@@ -14,7 +14,9 @@ do bot e o Safari do iPhone.
 - Cada execução sobe o servidor com um banco SQLite novo (`e2e/.tmp/<porta>/e2e.db`) e sem nada de fora (sem imagens das
   cartas, spoilers, meta global ou notificações). Um navegador limpo por teste.
 - Um erro não tratado na página reprova o teste (`e2e/support/fixtures.ts`), mesmo que a tela continue de pé.
-- O CI (**CI e deploy**) roda tudo em Chromium e WebKit; o deploy só sai com os testes de ponta a ponta passando.
+- O CI (**CI e deploy**) roda tudo em Chromium e WebKit no pull request, uma vez por mudança (desde 2026-11-26 não
+  roda mais no push do branch nem de novo na `main`). O deploy da `main` espera só os testes de unidade e o smoke test
+  do pacote: os de ponta a ponta valem antes do merge, no PR.
 
 ## Como funciona
 

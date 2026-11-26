@@ -1779,12 +1779,16 @@ Total 5,1 MB. Roda com `node release/server/index.mjs` em qualquer máquina com 
 push/PR em qualquer branch ──▶ job "test": npm ci → typecheck → npm test → build:release → smoke test
                                            (sobe o pacote, /api/health, /api/decks, index.html, import --dry-run)
                                            → artefato gumgumfight-<sha>.tgz (7 dias)
-                           └─▶ job "e2e" (em paralelo): npm ci → playwright install chromium webkit → npm run e2e
+PR e "Run workflow" ──────────▶ job "e2e" (em paralelo): npm ci → playwright install chromium webkit → npm run e2e
                                            → artefato e2e-report (relatório HTML e traces) só quando falha
-push na main ────────────────▶ job "deploy", depois de "test" e "e2e" (environment production,  https://gumgumfight.app)
+push na main ────────────────▶ job "deploy", depois de "test" (environment production,  https://gumgumfight.app)
 "Run workflow" na main ──────▶ o mesmo deploy (input import_sets opcional)
 "Run workflow" em outro branch ▶ só "test" e "e2e": nada é publicado
 ```
+
+O job "e2e" roda uma vez por mudança, no pull request: o push do branch e o push na `main` não o repetem, e o deploy
+não espera por ele (uma falha intermitente dos testes de ponta a ponta não segura a produção). O que isso custa: um
+push direto na `main`, sem PR, é publicado só com os testes de unidade e o smoke test do pacote.
 
 Testes de ponta a ponta (`e2e/`, Playwright, plano em [`plano-testes-e2e.md`](plano-testes-e2e.md)): o `webServer` do
 `e2e/playwright.config.ts` roda `e2e/serve.ts`, que sobe o mesmo `apps/server/src/index.ts` com um banco SQLite novo em

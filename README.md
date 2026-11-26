@@ -102,7 +102,8 @@ O workflow `.github/workflows/ci-deploy.yml` roda os testes em todo push e publi
 | `main`   | `production`         | https://gumgumfight.app            | VPS da Hostinger (`deploy/bootstrap-hostinger.sh`) |
 
 **Fluxo:** cada branch de trabalho vira um pull request para a **`main`**; os testes de unidade e os de ponta a ponta
-rodam no PR, e o merge na `main` (push) faz o deploy na produção. Não há servidor de homologação: nenhum outro
+rodam no PR, e o merge na `main` (push) faz o deploy na produção assim que os testes de unidade e o smoke test do
+pacote passam (os de ponta a ponta não rodam de novo na `main`; um push direto, sem PR, é publicado sem eles). Não há servidor de homologação: nenhum outro
 branch é publicado ("Run workflow" fora da `main` só roda os testes). Em cada deploy o workflow:
 
 1. Monta o pacote e o testa (sobe o servidor e consulta a API) antes de enviar.
@@ -1757,8 +1758,9 @@ npm run e2e -- --project=iphone            # só o iPhone; -g "boosters" filtra 
 ```
 
 Sem o WebKit instalado, o projeto `iphone` roda no Chromium com a tela e o toque do iPhone (e avisa). A porta padrão é
-3410 (`E2E_PORT` muda). No workflow **CI e deploy**, o job "Testes de ponta a ponta" roda em Chromium e WebKit, guarda o
-relatório e os traces quando falha, e o deploy só sai com ele passando. Os textos dos testes vêm do dicionário pt-BR
+3410 (`E2E_PORT` muda). No workflow **CI e deploy**, o job "Testes de ponta a ponta" roda em Chromium e WebKit no pull request
+(e no "Run workflow"), uma vez por mudança, e guarda o relatório e os traces quando falha. Ele não roda no push e o
+deploy da `main` não espera por ele. Os textos dos testes vêm do dicionário pt-BR
 pela chave, e um erro não tratado na página reprova o teste. O plano e o que ficou de fora estão em
 [`docs/plano-testes-e2e.md`](docs/plano-testes-e2e.md).
 
