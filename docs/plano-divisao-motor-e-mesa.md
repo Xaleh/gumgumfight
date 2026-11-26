@@ -17,7 +17,8 @@ sem conflito e para achar as coisas pelo nome do arquivo. **Nada muda no jogo ne
   importando do mesmo lugar e recebendo exatamente os mesmos nomes.
 - **Motor: prova de equivalência.** Além dos testes, as mesmas partidas (sementes fixas, bot contra bot, com ações
   aleatórias no meio, mesa de 2 e de 4) são jogadas no motor de antes e no de depois, e o estado final de cada uma tem
-  que sair idêntico, byte a byte.
+  que sair idêntico, byte a byte. É o `npm run fingerprint -w @gumgum/engine` (`packages/engine/scripts/fingerprint.ts`):
+  rode na `main` e na branch e compare os hashes.
 - **Os módulos se importam entre si** (o motor é recursivo: um efeito causa um K.O., que dispara outro efeito). Isso só
   funciona se nenhum módulo rodar, na carga, código que dependa de outro: no topo de cada arquivo ficam só declarações
   (funções, tipos e constantes literais).
@@ -62,8 +63,9 @@ A única mudança de código: `stepEffect` escrevia em `probeStep`, uma variáve
 (`setOpponentProbe`). Um módulo não escreve em variável de outro, então a escrita virou a função `markProbeStep`, em
 `table.ts`, com a mesma conta.
 
-Conferência: 929 testes do motor, os do servidor e os do web sem alteração; 640 partidas simuladas (92 mil ações) e
-6 partidas com o bot com busca (relógio e sorteio fixos) com o mesmo resultado no motor de antes e no de depois.
+Conferência: 929 testes do motor, 510 do servidor, 184 do web e os 10 de ponta a ponta, sem alteração; 640 partidas
+simuladas (92 mil ações) e 6 partidas com o bot com busca (relógio e sorteio fixos) com o mesmo hash no motor de antes
+e no de depois (`npm run fingerprint`, que entrou nesta fase para as próximas usarem).
 
 ### Fase 2 — `execStep` por família de efeito
 

@@ -1734,6 +1734,7 @@ Mozilla, Microsoft ou Apple). As chaves nascem sozinhas no banco; não há nada 
 ```bash
 npm test                                   # regras, tradução, importador, API, 200 partidas bot x bot, as lições do tutorial e os desafios do dia
 npm run simulate -w @gumgum/engine -- 500  # estatísticas de N partidas bot x bot
+npm run fingerprint -w @gumgum/engine      # hash de 640 partidas com sementes fixas: igual antes e depois de mover código do motor
 npm run typecheck
 npm run e2e                                # testes de ponta a ponta no navegador (Playwright)
 ```
