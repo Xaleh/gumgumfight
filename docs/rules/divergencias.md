@@ -54,6 +54,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-42 | Auditoria das cartas, rodada 2 (OP01 a OP09): 24 cartas com efeito lido ou executado errado, mais as regras de DV-41 (**corrigido**) | texto das cartas | alto | C17 |
 | DV-43 | Auditoria das cartas, rodada 3 (starter decks, promos e spoilers EB05/OP18): 19 cartas, as 20 com atributos juntos e 3 pendências de DV-41 (**corrigido**) | texto das cartas | alto | C17 |
 | DV-46 | "If X, A. Then, B.": o B acontecia com o "if" falho (**corrigido**) | 4-10-2 | médio | — |
+| DV-48 | "Will not become active in … next Refresh Phase": o freeze acabava antes da Renovação com turno extra ou na mesa de Yonko, e o de DON!! pegava DON!! que não estava virado (**corrigido**) | 6-2-3, 6-2-4, texto das cartas | médio | — |
 
 ## Cards de correção no Trello
 
@@ -494,6 +495,17 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Regra: Q&A OP01-073 Doflamingo (também OP17-050 e OP15-066): todas as cartas vão para o topo ou todas para o fundo, na ordem escolhida; não se divide (CR 1-3-7). O passo `arrangeTop` (Kuma ST03-010, Doflamingo OP01-073, Streusen OP17-050 e "place the rest at the top or bottom" depois de revelar e jogar) permitia qualquer divisão.
 - Correção: o passo pergunta primeiro **"Ficam no topo ou vão para o fundo do deck?"** (`option`, com as cartas à mostra e os botões "Topo do deck" / "Fundo do deck", como já fazia "reveal 1 card … place it at the top or bottom") e, com 2 ou mais cartas, a ordem (as não escolhidas mantêm a ordem; botão "Manter a ordem"). Olhar o deck torna a jogada não cancelável. Replays até a versão 13: a escolha gravada com todas as cartas vira "fundo"; outra vira "topo" (`upgradeReplayActions`, versão 14).
 - Testes: `packages/engine/test/arrange-top.test.ts` (leitor da Streusen, topo, fundo, "Manter a ordem", 1 carta no deck, conversão de replays), `st03.test.ts` (Kuma, topo e fundo) e `parsed-engine.test.ts` (busca com o resto no topo ou no fundo).
+
+**DV-48. "Will not become active in your (opponent's) next Refresh Phase": freeze perdido antes da Renovação e freeze de DON!! a mais** — médio — **corrigido**
+- Pedido do dono do projeto (27/11/2026): conferir se todo freeze dura exatamente o tempo certo, e o Líder Monkey.D.Luffy OP18-022 com o Zoro & Sogeking OP18-027.
+- Regra: o efeito vale para a próxima Fase de Renovação do dono da carta, uma só, seja ela em que turno for. "Rested DON!! cards" são os DON!! virados da área de custo na hora do efeito; DON!! dado a uma carta não é ativado nem virado por efeito (Q&A de regras, em [interacoes/07-stage-e-don.md](interacoes/07-stage-e-don.md)) e volta virado no Refresh (6-2-3) antes de tudo ficar ativo (6-2-4).
+- O que estava errado:
+  - O modificador `skipRefresh` tinha fim por contagem de turnos ("até o fim do próximo turno"). Com um turno extra (OP05-119) entre o efeito e a Renovação do dono, sumia antes dela: a carta desvirava. Na mesa com mais de dois jogadores, o freeze posto no turno do próprio dono (Buggy OP18-032 [On K.O.]) sumia quando começava o turno de quem congelou, antes da Renovação do dono.
+  - O freeze de DON!! com dois jogadores guardava só "N DON!! do oponente" sem olhar quantos estavam virados: sem DON!! virado na hora, congelava um que virasse depois ou um DON!! dado que voltava no Refresh; "up to 2" com 1 virado congelava 2; dois efeitos contavam o mesmo DON!! duas vezes.
+- Correção: `addSkipRefresh` (o modificador não acaba por turno; só a Renovação do dono o consome, e a saída do campo o apaga) e `addDonSkipRefresh` (conta só DON!! virados da área de custo ainda não congelados); `refreshDrawDon` mede os DON!! virados antes de devolver os dados.
+- Conferido e conforme: freeze no turno de quem congela e no turno do dono, dois freezes na mesma carta, carta que chega ativa na Renovação (o freeze acaba ali), Líder e Stage; OP18-022 (congelado mesmo passando a vez em pé: se o oponente virar o Líder, ele não desvira); OP18-027 (poder base 7000 só no turno do oponente, com o Líder ativo e 3 ou mais DON!!; some na hora em que o Personagem sai, também no meio de um ataque).
+- Limite conhecido: os DON!! não têm identidade no motor. Se o oponente tirar um DON!! virado da área de custo (DON!! −1, dar a uma carta) e virar outro antes da Renovação, o motor mantém a quantidade congelada.
+- Testes: `packages/engine/test/freeze.test.ts`.
 
 ---
 
