@@ -63,6 +63,7 @@ const tutorialPtBR = {
   'tutorial.stepOf': 'Passo {n} de {total}',
   'tutorial.coach': 'Treinador',
   'tutorial.collapse': 'Recolher ou abrir o treinador',
+  'tutorial.pagePull': 'Puxe a ponta para virar a página',
   'tutorial.next': 'Próximo',
   'tutorial.finish': 'Concluir lição',
   'tutorial.retry': 'Tentar de novo',

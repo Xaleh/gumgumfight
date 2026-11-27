@@ -60,6 +60,7 @@ export default {
   'tutorial.stepOf': 'ステップ {n}/{total}',
   'tutorial.coach': 'コーチ',
   'tutorial.collapse': 'コーチをたたむ／開く',
+  'tutorial.pagePull': 'ページの端を引いてめくる',
   'tutorial.next': '次へ',
   'tutorial.finish': 'レッスン完了',
   'tutorial.retry': 'もう一度',

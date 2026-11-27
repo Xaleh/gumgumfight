@@ -60,6 +60,7 @@ export default {
   'tutorial.stepOf': 'Étape {n} sur {total}',
   'tutorial.coach': 'Coach',
   'tutorial.collapse': 'Replier ou ouvrir le coach',
+  'tutorial.pagePull': 'Tirez le coin pour tourner la page',
   'tutorial.next': 'Suivant',
   'tutorial.finish': 'Terminer la leçon',
   'tutorial.retry': 'Réessayer',

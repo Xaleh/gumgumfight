@@ -129,6 +129,14 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
 - Antes de arrastar, o teste espera o elemento parar e não ter nada por cima (as cartas e os DON!! chegam voando no
   começo do turno). Só no desktop: o arrasto com o dedo (deslizar pela mão ergue a carta) continua sem teste.
 
+### Depois do A1 — o gibi do tutorial
+
+- `tutorial.spec.ts`: a lição das palavras-chave (sem mesa). No `desktop`, o livro aberto: a página vira pelo botão
+  "Próximo", uma puxada curta na ponta devolve a folha, uma puxada longa passa a página e a ponta da esquerda volta. No
+  `iphone` (`@iphone`), a página única vira pelo botão sem estourar a largura da tela. Com as animações suaves e com as
+  desligadas, a página troca sem a camada da dobra e sem pontas para puxar.
+- O arrasto é com o mouse; o dedo (toque) na ponta continua sem teste.
+
 ### Depois do A1 — a mesa do Yonko
 
 - `yonko.spec.ts` (`@iphone`): a mesa local do Yonko, da tela inicial ao primeiro turno de quem joga. A preparação

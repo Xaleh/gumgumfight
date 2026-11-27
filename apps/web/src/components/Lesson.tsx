@@ -1,8 +1,8 @@
-// Tela de uma lição do tutorial: a mesa com o treinador ou, nas lições sem mesa, um painel
-// (carta de exemplo, anatomia da carta, curva do deck) ao lado do treinador.
+// Tela de uma lição do tutorial: a mesa com o treinador ou, nas lições sem mesa, um gibi
+// (carta de exemplo, anatomia da carta, curva do deck numa página, o treinador na outra) que se folheia.
 
 import { type CardData, type GameState } from '@gumgum/engine';
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { lessonById, lessonNumber, ME, type Lesson as LessonDef, type LessonStep, type TutorialData } from '../game/tutorial/lessons';
 import { useTutorialProgress } from '../game/tutorial/progress';
 import { type LessonRun, useLesson, useTutorialData } from '../game/tutorial/useLesson';
@@ -13,6 +13,7 @@ import { StaticCard } from './CardView';
 import { Coach, Spotlight, useLessonText } from './Coach';
 import { LessonTable, type TableGame } from './GameScreen';
 import { Icon } from './Icons';
+import { type BookPage, PageBook, type PageBookHandle } from './PageBook';
 
 const noop = () => undefined;
 
@@ -112,21 +113,12 @@ function LessonRunner({
     if (run.finished) complete(lesson.id);
   }, [run.finished, complete, lesson.id]);
   useLessonEvents(lesson.id, run);
-  const t = useT();
-  // A lição de montar deck termina com o atalho para o construtor.
-  const builderButton =
-    lesson.id === 'deck' && run.step?.id === 'builder' ? (
-      <button type="button" className="btn coach-extra" onClick={onBuildDecks}>
-        <Icon name="deck" size={18} />
-        {t('tutorial.openBuilder')}
-      </button>
-    ) : null;
 
   if (lesson.board) {
     if (!run.state) return null;
     return <BoardLesson lesson={lesson} run={run} state={run.state} onHub={onHub} onLesson={onLesson} />;
   }
-  return <PanelLesson lesson={lesson} run={run} data={data} onHub={onHub} onLesson={onLesson} extra={builderButton} />;
+  return <PanelLesson lesson={lesson} run={run} data={data} onHub={onHub} onLesson={onLesson} onBuildDecks={onBuildDecks} />;
 }
 
 function BoardLesson({
@@ -176,31 +168,81 @@ function BoardLesson({
 
 // ------------------------------------------------------------------ lições sem mesa
 
+type AnatomyKind = (typeof ANATOMY_CARDS)[number]['kind'];
+
 function PanelLesson({
   lesson,
   run,
   data,
   onHub,
   onLesson,
-  extra,
+  onBuildDecks,
 }: {
   lesson: LessonDef;
   run: LessonRun;
   data: Omit<TutorialData, 'names'>;
   onHub: () => void;
   onLesson: (id: string) => void;
-  extra: ReactNode;
+  onBuildDecks: () => void;
 }) {
   const t = useT();
   const lt = useLessonText();
   const [found, setFound] = useState<string[]>([]);
-  const step = run.step;
+  // O que está aberto na anatomia da carta fica aqui: a cópia da página usada na virada mostra o mesmo.
+  const [kind, setKind] = useState<AnatomyKind>('character');
+  const [sel, setSel] = useState<Part | null>(null);
+  const book = useRef<PageBookHandle>(null);
   const anatomy = lesson.view === 'anatomy';
-  const visual = run.finished ? null : anatomy ? (
-    <CardAnatomy cards={data.cards} found={found} onFound={(p) => setFound((f) => (f.includes(p) ? f : [...f, p]))} />
-  ) : step ? (
-    <StepVisual step={step} data={data} />
-  ) : null;
+  const total = lesson.steps.length;
+
+  /** A página do passo `i` (`total` = a de lição concluída). `live`: a de verdade; senão, a cópia para a virada. */
+  const page = (i: number, live: boolean): BookPage => {
+    const finished = i >= total;
+    const step = finished ? undefined : lesson.steps[i];
+    const shown: LessonRun = live
+      ? { ...run, next: () => (book.current ? book.current.turn(1, run.next) : run.next()), back: () => (book.current ? book.current.turn(-1, run.back) : run.back()) }
+      : { ...run, index: Math.min(i, total - 1), step: lesson.steps[Math.min(i, total - 1)], finished, answer: null, nudge: 0, failed: false, canNext: !finished && !step?.quiz };
+    const pick = live
+      ? (p: Part) => {
+          setSel(p);
+          setFound((f) => (f.includes(p) ? f : [...f, p]));
+        }
+      : noop;
+    const left = finished ? null : anatomy ? (
+      <CardAnatomy cards={data.cards} found={found} kind={kind} sel={sel} onKind={live ? setKind : noop} onPick={pick} />
+    ) : step && stepHasVisual(step, data) ? (
+      <StepVisual step={step} data={data} />
+    ) : null;
+    // A lição de montar deck termina com o atalho para o construtor.
+    const extra =
+      lesson.id === 'deck' && step?.id === 'builder' ? (
+        <button type="button" className="btn coach-extra" onClick={onBuildDecks}>
+          <Icon name="deck" size={18} />
+          {t('tutorial.openBuilder')}
+        </button>
+      ) : null;
+    const right = (
+      <Coach
+        lesson={lesson}
+        run={shown}
+        onHub={onHub}
+        onLesson={onLesson}
+        nextBlocked={anatomy && step?.id === 'discover' && found.length < ANATOMY_PARTS.length}
+        extra={extra}
+        preview={!live}
+      />
+    );
+    return { left, right };
+  };
+  /** Para onde a ponta puxada leva: só para onde os botões do treinador também levariam. */
+  const peek = (dir: 1 | -1): BookPage | null => {
+    if (run.finished) return null;
+    if (dir < 0) return run.index > 0 ? page(run.index - 1, false) : null;
+    const blocked = anatomy && run.step?.id === 'discover' && found.length < ANATOMY_PARTS.length;
+    return run.canNext && !blocked ? page(run.index + 1, false) : null;
+  };
+  const current = page(run.finished ? total : run.index, true);
+
   return (
     <div className="lesson-page">
       <header className="builder-header lesson-header">
@@ -210,19 +252,37 @@ function PanelLesson({
         <h2>{t('tutorial.lessonN', { n: lessonNumber(lesson.id), name: lt(`tutorial.${lesson.id}.name`) })}</h2>
         {anatomy && !run.finished && <span className="muted small">{t('tutorial.card.found', { n: found.length, total: ANATOMY_PARTS.length })}</span>}
       </header>
-      <main className={['lesson-panel-main', visual ? '' : 'solo'].join(' ')}>
-        {visual && <div className="lesson-visual">{visual}</div>}
-        <Coach
-          lesson={lesson}
-          run={run}
-          onHub={onHub}
-          onLesson={onLesson}
-          nextBlocked={anatomy && step?.id === 'discover' && found.length < ANATOMY_PARTS.length}
-          extra={extra}
+      <main className="lesson-book">
+        <PageBook
+          ref={book}
+          pageKey={run.finished ? 'done' : (run.step?.id ?? '')}
+          left={current.left}
+          right={current.right}
+          plate={<LessonPlate lesson={lesson} />}
+          peek={peek}
+          onTurn={(dir) => (dir > 0 ? run.next() : run.back())}
+          pullHint={t('tutorial.pagePull')}
         />
       </main>
     </div>
   );
+}
+
+/** Folha de rosto da lição: a página da esquerda do livro aberto quando o passo não tem figura. */
+function LessonPlate({ lesson }: { lesson: LessonDef }) {
+  const lt = useLessonText();
+  return (
+    <div className="lesson-plate" aria-hidden="true">
+      <span className="lesson-plate-kicker">{lt(`tutorial.ch${lesson.chapter}.kicker`)}</span>
+      <b className="lesson-plate-n">{lessonNumber(lesson.id)}</b>
+      <span className="lesson-plate-name">{lt(`tutorial.${lesson.id}.name`)}</span>
+    </div>
+  );
+}
+
+/** O passo tem figura (carta de exemplo, regras do deck, curva)? */
+function stepHasVisual(step: LessonStep, data: Omit<TutorialData, 'names'>) {
+  return Boolean(step.extra) || (step.card !== undefined && data.cards.some((c) => c.id === step.card));
 }
 
 const cardSize = (w: number) => ({ ['--cw' as string]: `${w}px`, ['--ch' as string]: `${Math.round(w * 1.396)}px` }) as CSSProperties;
@@ -318,26 +378,35 @@ const ANATOMY_CARDS: Array<{ kind: 'character' | 'event' | 'stage' | 'leader'; i
   { kind: 'leader', id: 'ST01-001' },
 ];
 
-function CardAnatomy({ cards, found, onFound }: { cards: CardData[]; found: string[]; onFound: (p: Part) => void }) {
+function CardAnatomy({
+  cards,
+  found,
+  kind,
+  sel,
+  onKind,
+  onPick,
+}: {
+  cards: CardData[];
+  found: string[];
+  kind: AnatomyKind;
+  sel: Part | null;
+  onKind: (k: AnatomyKind) => void;
+  onPick: (p: Part) => void;
+}) {
   const t = useT();
   const lt = useLessonText();
   const { locale } = useSettings();
-  const [kind, setKind] = useState<(typeof ANATOMY_CARDS)[number]['kind']>('character');
-  const [sel, setSel] = useState<Part | null>(null);
   const card = cards.find((c) => c.id === ANATOMY_CARDS.find((k) => k.kind === kind)!.id);
   if (!card) return null;
   const text = cardText(card, locale);
-  const pick = (p: Part) => {
-    setSel(p);
-    onFound(p);
-  };
+  const pick = onPick;
   const cls = (p: Part) => ['part', sel === p ? 'on' : found.includes(p) ? 'seen' : ''].join(' ');
   const color = card.colors[0] ?? 'red';
   return (
     <div className="anatomy">
       <div className="seg anatomy-tabs" role="group" aria-label={t('tutorial.card.kinds')}>
         {ANATOMY_CARDS.map((k) => (
-          <button key={k.kind} type="button" className={kind === k.kind ? 'on' : ''} aria-pressed={kind === k.kind} onClick={() => setKind(k.kind)}>
+          <button key={k.kind} type="button" className={kind === k.kind ? 'on' : ''} aria-pressed={kind === k.kind} onClick={() => onKind(k.kind)}>
             {lt(`tutorial.card.kind.${k.kind}`)}
           </button>
         ))}

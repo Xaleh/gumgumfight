@@ -22,6 +22,7 @@ export function Coach({
   onLesson,
   nextBlocked,
   extra,
+  preview,
 }: {
   lesson: Lesson;
   run: LessonRun;
@@ -31,6 +32,8 @@ export function Coach({
   nextBlocked?: boolean;
   /** Conteúdo a mais no fim do treinador (ex.: botão para o construtor de decks). */
   extra?: ReactNode;
+  /** Cópia escondida de outro passo, só para a virada de página (PageBook): não pega o foco nem fala. */
+  preview?: boolean;
 }) {
   const t = useT();
   const lt = useLessonText();
@@ -43,8 +46,8 @@ export function Coach({
   const ref = useRef<HTMLDivElement>(null);
   // A cada passo, o foco vai para o treinador (leitor de tela e teclado acompanham).
   useEffect(() => {
-    ref.current?.focus({ preventScroll: true });
-  }, [index, finished]);
+    if (!preview) ref.current?.focus({ preventScroll: true });
+  }, [index, finished, preview]);
   // No celular o treinador flutua sobre a mesa: nos passos de ação ele começa recolhido (só o
   // título e o que fazer), para não cobrir as cartas; os de leitura começam abertos.
   const floating = !useWideScreen() && Boolean(lesson.board);
@@ -79,7 +82,7 @@ export function Coach({
 
   if (finished) {
     return (
-      <div className={['coach', 'finished', collapsed ? 'collapsed' : ''].join(' ')} ref={ref} tabIndex={-1} role="region" aria-live="polite" aria-label={t('tutorial.coach')}>
+      <div className={['coach', 'finished', collapsed ? 'collapsed' : ''].join(' ')} ref={ref} tabIndex={-1} role="region" aria-live={preview ? 'off' : 'polite'} aria-label={t('tutorial.coach')}>
         {head}
         <div className="coach-badge" aria-hidden="true">
           <Icon name="check" size={30} stroke={3} />
@@ -119,7 +122,7 @@ export function Coach({
   const last = index + 1 >= total;
 
   return (
-    <div className={['coach', collapsed ? 'collapsed' : ''].join(' ')} ref={ref} tabIndex={-1} role="region" aria-live="polite" aria-label={t('tutorial.coach')}>
+    <div className={['coach', collapsed ? 'collapsed' : ''].join(' ')} ref={ref} tabIndex={-1} role="region" aria-live={preview ? 'off' : 'polite'} aria-label={t('tutorial.coach')}>
       {head}
       <h3 className="coach-title">{lt(`${base}.title`)}</h3>
       <p className="coach-body">{body}</p>
