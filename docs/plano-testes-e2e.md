@@ -98,6 +98,10 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   referências escondidas do `view.ts` (`~…`) e o verso das cartas. O turno passa de um navegador para o outro; o segundo
   recarrega a página e volta para a mesma sala ainda com o turno; ele desiste e os dois veem o fim (vitória e derrota) e
   voltam ao menu.
+- `online.spec.ts`, espera pela fila (27/11/2026, junto com a busca minimizada): o cartão de dicas troca pelo botão, a
+  mão de teste do deck da fila sorteia 5 e compra a sexta, a busca minimizada continua nas estatísticas, o construtor
+  pergunta "Sair da fila?" (ficar mantém a busca; sair esvazia a fila no servidor) e a partida que chega leva quem
+  estava nas estatísticas para a mesa.
 - `online.spec.ts`, ranqueada: duas contas de teste, a ranqueada fica liberada, os dois entram na fila, um desiste e o
   bounty de quem venceu sobe (`/api/players/me`).
 - Os dois são `@iphone` desde 2026-11-27. Ficavam só no desktop por causa do arranjo da mesa no celular e da queda do

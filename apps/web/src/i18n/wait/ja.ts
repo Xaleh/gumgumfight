@@ -1,0 +1,45 @@
+// Espera por oponente (日本語): a busca minimizada, o cartão de dicas e a mão de teste com o deck da fila.
+
+import type waitPtBR from './pt-BR';
+
+const wait = {
+  'wait.minimize': '最小化',
+  'wait.minimizeHint': '統計、大会、観戦、レッスンを見ている間もマッチングは続きます。',
+  'wait.pill': '対戦相手を探しています',
+  'wait.pillOpen': '対戦相手を探しています（{time}）。マッチング画面を開く。',
+  'wait.handTest': 'テスト手札',
+  'wait.handTestTitle': 'テスト手札 · {deck}',
+  'wait.handSearching': '対戦相手を探しています · {time}',
+  'wait.handFailed': 'デッキを読み込めませんでした。',
+  'wait.inQueueNote': 'マッチング待ちです。ほかの対戦を始めるには検索をキャンセルしてください。',
+  'wait.leaveTitle': 'マッチング待ちをやめますか？',
+  'wait.leaveText': '対戦相手を探しています。この画面を開くとマッチング待ちから外れます。',
+  'wait.leaveStay': '待ち続ける',
+  'wait.leaveGo': '待ちをやめて開く',
+  'wait.stopped': '対戦相手の検索が止まりました：{reason}',
+  // ---- cartão de dicas ----
+  'wait.tipsLabel': '待っている間に',
+  'wait.kickerRule': 'ルールのヒント',
+  'wait.kickerMeta': '今週のメタ',
+  'wait.kickerDeck': 'あなたのデッキ',
+  'wait.next': '次のヒント',
+  'wait.metaTop': '直近7日間でよく使われたリーダー：{list}。',
+  'wait.deckRecord': '{name}でほかのプレイヤーと{games|#戦}して{wins}勝（{pct}%）。',
+  'wait.matchupBest': '{name}でいちばん相性のよい相手：{opp}（{games|#戦}で勝率{pct}%）。',
+  'wait.matchupWorst': '{name}でいちばん苦手な相手：{opp}（{games|#戦}で勝率{pct}%）。',
+  'wait.tip.firstTurn': '先攻は最初のターンにカードを引けず、そのターンのDON!!は1枚だけです。',
+  'wait.tip.noFirstAttack': 'どちらのプレイヤーも、自分の最初のターンにはアタックできません。',
+  'wait.tip.rush': 'キャラクターは登場したターンにはアタックできません（[Rush]を持つ場合を除く）。',
+  'wait.tip.rested': 'アタックできる相手のキャラクターはレスト状態のものだけです。リーダーにはいつでもアタックできます。',
+  'wait.tip.tie': 'パワーが同じならアタックは成功します。対象のパワーに並べば十分です。',
+  'wait.tip.blockThenCounter': '防御には順番があります。先に[Blocker]、次にCounterです。Counterを使ったあとはブロックできません。',
+  'wait.tip.don': '付与したDON!!のパワー+1000は自分のターン中だけで、次の自分のターンの開始時にコストエリアへ戻ります。',
+  'wait.tip.mulligan': 'マリガンは全部かゼロかです。5枚すべてを戻してシャッフルし、5枚を引き直します。できるのは1回だけです。',
+  'wait.tip.zeroLife': 'ライフが0でもまだ負けではありません。ライフがない状態でリーダーがダメージを受けると敗北します。',
+  'wait.tip.deckOut': 'デッキが0枚になったプレイヤーは敗北します。',
+  'wait.tip.trigger': '[Trigger]を持つライフのカードがダメージで手札に加わるとき、公開して代わりに[Trigger]を発動できます。',
+  'wait.tip.doubleBanish': '[Double Attack]はライフに2ダメージを与えます。[Banish]ではライフのカードがトラッシュに置かれ、[Trigger]は発動しません。',
+  'wait.tip.fiveCharacters': 'キャラクターは最大5枚です。6枚目を出すときは1枚をトラッシュに置きます。これはK.O.になりません。',
+} satisfies Record<keyof typeof waitPtBR, string>;
+
+export default wait;

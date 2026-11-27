@@ -1,0 +1,45 @@
+// Espera por oponente (English): a busca minimizada, o cartão de dicas e a mão de teste com o deck da fila.
+
+import type waitPtBR from './pt-BR';
+
+const wait = {
+  'wait.minimize': 'Minimize',
+  'wait.minimizeHint': 'The search keeps going while you look at stats, tournaments, live matches and the lessons.',
+  'wait.pill': 'Finding opponent',
+  'wait.pillOpen': 'Finding an opponent for {time}. Open the search.',
+  'wait.handTest': 'Test hand',
+  'wait.handTestTitle': 'Test hand · {deck}',
+  'wait.handSearching': 'Finding opponent · {time}',
+  'wait.handFailed': 'Could not load the deck right now.',
+  'wait.inQueueNote': 'You are in the queue. Cancel the search to play something else.',
+  'wait.leaveTitle': 'Leave the queue?',
+  'wait.leaveText': 'You are searching for an opponent. Opening this screen takes you out of the queue.',
+  'wait.leaveStay': 'Stay in the queue',
+  'wait.leaveGo': 'Leave the queue and open',
+  'wait.stopped': 'The search for an opponent stopped: {reason}',
+  // ---- cartão de dicas ----
+  'wait.tipsLabel': 'While you wait',
+  'wait.kickerRule': 'Rules tip',
+  'wait.kickerMeta': 'Meta of the week',
+  'wait.kickerDeck': 'Your deck',
+  'wait.next': 'Next tip',
+  'wait.metaTop': 'Most played Leaders in the last 7 days: {list}.',
+  'wait.deckRecord': 'With {name}, you won {wins} of {games|# match|# matches} against other players ({pct}%).',
+  'wait.matchupBest': 'Your best matchup with {name}: against {opp}, a {pct}% win rate over {games|# match|# matches}.',
+  'wait.matchupWorst': 'Your toughest matchup with {name}: against {opp}, a {pct}% win rate over {games|# match|# matches}.',
+  'wait.tip.firstTurn': 'The player who goes first does not draw on the first turn and gets only 1 DON!! on it.',
+  'wait.tip.noFirstAttack': 'Neither player can attack on their own first turn.',
+  'wait.tip.rush': 'A Character cannot attack on the turn it enters play, unless it has [Rush].',
+  'wait.tip.rested': "You can only attack your opponent's rested Characters. The Leader can always be attacked.",
+  'wait.tip.tie': "On a power tie the attack goes through: matching the target's power is enough.",
+  'wait.tip.blockThenCounter': 'Defense has an order: [Blocker] first, then Counter. Once you use a Counter you can no longer block.',
+  'wait.tip.don': 'An attached DON!! gives +1000 power only on your turn and goes back to the cost area at the start of your next turn.',
+  'wait.tip.mulligan': 'The mulligan is all or nothing: you return all 5 cards, shuffle and draw 5 new ones, only once.',
+  'wait.tip.zeroLife': 'At 0 Life you are still in the game: you lose when your Leader takes damage with no Life left.',
+  'wait.tip.deckOut': 'A player with 0 cards left in their deck loses the game.',
+  'wait.tip.trigger': 'When a Life card with [Trigger] would go to your hand from damage, you may reveal it and activate the [Trigger] instead.',
+  'wait.tip.doubleBanish': '[Double Attack] deals 2 damage to Life. With [Banish], the Life card goes to the trash and its [Trigger] does not activate.',
+  'wait.tip.fiveCharacters': 'You can have at most 5 Characters. When you play a sixth, one of them goes to the trash, and that does not count as a K.O.',
+} satisfies Record<keyof typeof waitPtBR, string>;
+
+export default wait;

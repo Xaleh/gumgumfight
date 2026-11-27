@@ -1,0 +1,44 @@
+// Espera por oponente (português do Brasil, referência das chaves): a busca minimizada que acompanha o jogador pelo
+// app, o cartão de dicas que gira na janela de espera e a mão de teste com o deck da fila.
+
+const waitPtBR = {
+  'wait.minimize': 'Minimizar',
+  'wait.minimizeHint': 'A busca continua enquanto você vê estatísticas, torneios, partidas ao vivo e as lições.',
+  'wait.pill': 'Procurando oponente',
+  'wait.pillOpen': 'Procurando oponente há {time}. Abrir a busca.',
+  'wait.handTest': 'Mão de teste',
+  'wait.handTestTitle': 'Mão de teste · {deck}',
+  'wait.handSearching': 'Procurando oponente · {time}',
+  'wait.handFailed': 'Não deu para carregar o deck agora.',
+  'wait.inQueueNote': 'Você está na fila. Cancele a busca para jogar outra coisa.',
+  'wait.leaveTitle': 'Sair da fila?',
+  'wait.leaveText': 'Você está procurando oponente. Abrir esta tela tira você da fila.',
+  'wait.leaveStay': 'Continuar na fila',
+  'wait.leaveGo': 'Sair da fila e abrir',
+  'wait.stopped': 'A busca por oponente parou: {reason}',
+  // ---- cartão de dicas ----
+  'wait.tipsLabel': 'Enquanto você espera',
+  'wait.kickerRule': 'Dica de regra',
+  'wait.kickerMeta': 'Meta da semana',
+  'wait.kickerDeck': 'Seu deck',
+  'wait.next': 'Próxima dica',
+  'wait.metaTop': 'Líderes mais jogados nos últimos 7 dias: {list}.',
+  'wait.deckRecord': 'Com {name}, você venceu {wins} de {games|# partida|# partidas} contra outros jogadores ({pct}%).',
+  'wait.matchupBest': 'Seu melhor confronto com {name}: contra {opp}, com {pct}% de vitórias em {games|# partida|# partidas}.',
+  'wait.matchupWorst': 'Seu confronto mais difícil com {name}: contra {opp}, com {pct}% de vitórias em {games|# partida|# partidas}.',
+  'wait.tip.firstTurn': 'Quem começa não compra carta no primeiro turno e recebe só 1 DON!! nele.',
+  'wait.tip.noFirstAttack': 'Nenhum dos dois jogadores ataca no seu primeiro turno.',
+  'wait.tip.rush': 'Um Personagem não ataca no turno em que entra em jogo, a não ser que tenha [Rush].',
+  'wait.tip.rested': 'Só dá para atacar Personagens do oponente que estão em repouso. O Líder pode ser atacado sempre.',
+  'wait.tip.tie': 'No empate de poder o ataque passa: basta igualar o poder do alvo.',
+  'wait.tip.blockThenCounter': 'A defesa tem ordem: primeiro o [Blocker], depois o Counter. Depois de usar um Counter não dá mais para bloquear.',
+  'wait.tip.don': 'DON!! anexado dá +1000 de poder só no seu turno e volta para a área de custo no começo do seu próximo turno.',
+  'wait.tip.mulligan': 'O mulligan é tudo ou nada: você devolve as 5 cartas, embaralha e compra outras 5, uma única vez.',
+  'wait.tip.zeroLife': 'Com 0 de Vida você ainda está no jogo: a derrota vem quando o seu Líder leva dano sem Vida para tirar.',
+  'wait.tip.deckOut': 'Quem fica com 0 cartas no deck perde a partida.',
+  'wait.tip.trigger': 'Quando uma carta da Vida com [Trigger] iria para a sua mão por dano, você pode revelar a carta e ativar o [Trigger] no lugar.',
+  'wait.tip.doubleBanish': '[Double Attack] causa 2 de dano na Vida. Com [Banish], a carta de Vida vai para o descarte e o [Trigger] não ativa.',
+  'wait.tip.fiveCharacters': 'Você tem no máximo 5 Personagens. Ao jogar o sexto, um deles vai para o descarte, e isso não conta como K.O.',
+} as const;
+
+export default waitPtBR;

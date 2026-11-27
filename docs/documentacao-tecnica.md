@@ -787,6 +787,37 @@ mostra relógio local (`clock.remaining` − tempo desde o último snapshot, des
 partida não acabou, espera 3 s, consulta `/api/online/active` (jogador) ou `/api/online/rooms/:id` (espectador) e
 reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do protocolo na seção 11.
 
+### Espera por oponente (fila e sala privada)
+
+O estado da fila mora na raiz do app, não na tela inicial: `MainApp` (`App.tsx`) chama `useQueue`
+(`components/OnlineMenu.tsx`) e entrega a busca aos componentes por contexto (`QueueProvider` / `useAppQueue`, em
+`components/QueueDock.tsx`). As telas ficam num componente à parte (`Pages`, com `memo`), para a consulta à fila (a cada
+1,5 s) não redesenhar a tela aberta; só quem lê o contexto (a tela inicial) redesenha.
+
+- **`QueueDock`** desenha a busca por cima de qualquer tela, em três formas: a janela "Procurando oponente" (com o
+  cartão de dicas, "Mão de teste", "Minimizar" e "Cancelar"), a pílula minimizada (embaixo; no alto e só com o tempo
+  nas telas de mesa, `queuePillOnTop`) e a folha da mão de teste. Trocar de tela minimiza.
+- **Quais telas mantêm a fila** (`queueScreens.ts`, `queuePolicy`): `keep` nas telas de navegar (`menu`, `stats`,
+  `profile`, `learn`, `tournaments`, `watch-list`, `watch` e `game` em modo replay); `leave` em `online` e
+  `yonko-online` (o jogador já tem um lugar numa sala, e o servidor tirou o bilhete: `lobby.leaveQueue`); `ask` em todas
+  as outras, inclusive uma tela nova ainda sem regra. O `setScreen` que as telas recebem passa por essa política: em
+  `ask`, a tela pedida fica guardada até o "Sair da fila e abrir" (`QueueLeaveConfirm`).
+- **Partida encontrada**: o `onEnter` do `useQueue` toca o efeito `turn`, vibra (`navigator.vibrate`, onde existe) e
+  abre a tela `online`. A recusa do servidor que encerra a busca aparece junto dos modos na tela inicial e, nas outras
+  telas, num aviso (`QueueStopped`).
+- **Cartão de dicas** (`components/WaitTips.tsx`, lógica em `waitTips.ts`): duas dicas de regra (`RULE_TIPS`, textos
+  em `i18n/wait`, embaralhadas a cada espera) e um item de dados, em ciclo. Os dados vêm de duas consultas feitas uma
+  vez ao abrir o cartão: `GET /api/stats?days=7` (os 3 Líderes mais jogados) e `GET /api/stats?mine=1&leader=&opponent=human`
+  (o histórico com o Líder do deck: o total a partir de 5 partidas, e o melhor e o pior confronto entre os que têm 3
+  ou mais). Sem resposta, o cartão fica só com as dicas.
+- **Mão de teste** (`components/WaitHandTest.tsx`): o `HandTestPanel` do construtor com o deck da espera
+  (`GET /api/decks/:id`). Simulação local, sem relação com a mão da partida.
+- **Sala privada à espera** (`OnlineWaiting`, em `Online.tsx`): o mesmo cartão e, quando a sala foi aberta pela tela
+  inicial nesta aba, a mão de teste. O servidor não devolve o id do deck de quem espera, então o navegador guarda o par
+  sala/deck em `sessionStorage.gumgum.roomDeck` (`roomDeck.ts`). A sala de torneio à espera tem só o cartão.
+- **Animações** (`settings.animations`): em `full` e `soft` o cartão troca sozinho a cada 9 s, com uma entrada curta; a
+  barrinha do tempo e o pulso do ponto da pílula, que se repetem, só existem em `full`; em `off` nada troca sozinho.
+
 ### Polling (todas as consultas periódicas)
 
 Todas passam por `poll` (`apps/web/src/poll.ts`): a próxima consulta só é agendada quando a anterior termina (nunca
@@ -802,7 +833,7 @@ voltava (23/10/2026).
 | Menu (bloco "ao vivo") | `GET /api/online/live` | 15 s | aba visível |
 | Menu (bloco meta) | `GET /api/stats?days=7` | 5 min | aba visível |
 | Assistir partidas | `GET /api/online/live` | 5 s | sempre, enquanto a lista está aberta (cache no servidor + ETag/304) |
-| Fila casual/ranqueada | `GET /api/online/queue/:ticket` | 1,5 s | enquanto está na fila |
+| Fila casual/ranqueada | `GET /api/online/queue/:ticket` | 1,5 s | enquanto está na fila, em qualquer tela (`MainApp`) |
 | Página do torneio | `GET /api/tournaments/:id` | 5 s | torneio `running` (304 sem corpo quando nada mudou) |
 | Partida online | `ping` SSE (servidor → cliente) | 20 s | canal aberto |
 

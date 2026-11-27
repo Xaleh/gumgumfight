@@ -686,6 +686,25 @@ sem sobrepor pedidos e espaçando as tentativas quando o servidor não responde;
 presença: quem fecha a tela inicial sai dos "conectados" depois de 30 s. Jogadores conectados a uma partida, quem
 está na fila e os espectadores também contam.
 
+**Enquanto o oponente não chega.** A janela "Procurando oponente" (fila casual e ranqueada) não prende mais o jogador:
+
+- **Minimizar** (ou Esc, ou tocar fora) deixa só uma pílula com o tempo de busca, e o jogador segue pelo app. A busca
+  continua nas telas de navegar: tela inicial, estatísticas, perfis, a lista de lições, torneios e as partidas para
+  assistir (ao vivo e replays). Tocar na pílula reabre a janela.
+- **Partida encontrada** em qualquer uma dessas telas leva direto para a mesa, com um toque e, no celular, uma vibração.
+- **Telas onde se joga ou se edita algo** (construtor de decks, lição, desafio do dia, Sandbox, Selado, Draft, Yonko,
+  Administração) perguntam antes: "Sair da fila e abrir" ou "Continuar na fila". Na fila, os outros modos da tela
+  inicial ficam desligados. Assim a partida que chega nunca tira o jogador do meio de outra coisa nem apaga um deck
+  que ele estava editando.
+- **Cartão de dicas**: gira a cada 9 s (ou pelo botão) entre dicas de regra, os Líderes mais jogados da semana e o
+  histórico do jogador com o Líder do deck (vitórias contra outras pessoas, o melhor e o pior confronto, quando há
+  partidas suficientes).
+- **Mão de teste** com o deck da fila: a mesma do construtor (sortear, mulligan, comprar e as chances), sem sair da busca.
+
+A **sala privada** à espera do oponente ganhou o mesmo cartão de dicas e a mão de teste do deck com que a sala foi
+aberta; a sala de torneio à espera, o cartão de dicas. Tudo respeita a opção **Animações**: com ela desligada, o cartão
+só troca pelo botão e nada pulsa.
+
 - **O servidor é a autoridade.** Ele guarda o estado completo e aplica as ações com o motor; cada jogador recebe só a
   própria visão (`packages/engine/src/view.ts`): mão do oponente, decks e Vida virada para baixo chegam como cartas
   escondidas, sem seed nem RNG. Os ids das cartas viram apelidos aleatórios por partida, porque os ids do motor seguem a
@@ -1758,7 +1777,9 @@ npm run e2e                                # testes de ponta a ponta no navegado
 banco novo (em `e2e/.tmp/`, apagado a cada execução): partida contra o bot do menu ao fim de jogo (com o **Auto**, cerca
 de 2 minutos), desistir pelo menu da mesa, abrir os boosters do Selado e as partidas online com dois navegadores — na
 **Partida rápida** (fila, a mão do oponente escondida, o turno passando de um para o outro, recarregar a página no meio
-e voltar para a mesma sala, desistência) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe), e
+e voltar para a mesma sala, desistência), na **espera pela fila** (o cartão de dicas, a mão de teste, a busca
+minimizada que segue para as estatísticas, a pergunta "Sair da fila?" ao abrir o construtor e a partida que chega
+com o jogador em outra tela) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe), e
 um **torneio** do começo ao fim (o organizador cria, os jogadores se inscrevem pelo link de convite, a rodada abre, a
 partida é jogada na sala do torneio, o resultado entra sozinho e o torneio termina com a classificação). A mesa também
 é testada com o mouse e o teclado (`e2e/table.spec.ts`): arrastar um DON!! até o Líder e de volta, segurar o clique numa
