@@ -22511,6 +22511,60 @@ div.dk-tile-main {
 .friend-offline .friend-name {
   opacity: 0.8;
 }
+/* Busca pelo apelido: aparece em cima da lista quando há muitos amigos. */
+.friends-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin-bottom: 10px;
+  padding: 0 6px 0 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  color: var(--muted);
+}
+.friends-search:focus-within {
+  border-color: var(--accent);
+}
+.friends-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  /* 16px: abaixo disso o iPhone dá zoom na página ao focar o campo. */
+  font-size: 16px;
+  font-weight: 700;
+  appearance: none;
+}
+.friends-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.friends-search-clear {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--panel2);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+.friends-none {
+  margin: 0 0 4px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 2px dashed var(--line);
+  text-align: center;
+}
 /* Remover da lista: discreto, longe do peso do "Convidar" (pede confirmação). */
 .friend-remove {
   width: 40px;
@@ -22651,7 +22705,11 @@ div.dk-tile-main {
   margin: 0;
 }
 /* Painel "Chamar amigos" da sala de espera do Yonko. */
+/* A mesa não rola por causa da lista: com muitos amigos, ela rola por dentro. */
 .table-friends .friends-list {
+  max-height: 272px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   margin-top: 10px;
   grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
 }

@@ -759,6 +759,9 @@ Com login Google, o item **Amigos** do menu abre a lista de amigos:
   não só quem criou. Quem recebe toca no aviso (`/?yonko=CÓDIGO&convite=1`) ou em **Entrar** na faixa e senta direto
   na mesa com o deck do Yonko dele; lá dá para trocar o deck antes de marcar "Estou pronto". O convite vale enquanto
   a mesa espera com lugar vago.
+- **Busca:** a partir de 6 amigos, a lista ganha o campo **Buscar amigo**, que filtra pelo apelido sem diferenciar
+  maiúsculas nem acentos (Esc limpa a busca). O painel **Chamar amigos** da mesa do Yonko tem a mesma busca e rola
+  por dentro, para a sala de espera não crescer com a lista.
 - O item **Amigos** mostra quantos pedidos e convites estão esperando. Código: `apps/server/src/friends/` e
   `apps/web/src/components/Friends.tsx`.
 

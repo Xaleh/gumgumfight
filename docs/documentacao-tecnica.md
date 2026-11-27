@@ -1364,6 +1364,9 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
   mandou um convite, `picture`: o endereço da foto enviada no jogo (`customPictureOf`), ou null. A foto do Google
   nunca sai daqui. `GET /api/users/:id/picture` abre para o dono, os amigos aceitos e os admins. No navegador,
   `FriendAvatar` desenha o círculo (foto ou inicial numa cor de carta, aro do status).
+- **Busca**: com `FRIEND_SEARCH_MIN` amigos ou mais, a folha e o painel `TableFriends` mostram o campo de busca
+  (`friendSearch.ts`: todas as palavras da busca no apelido, sem acentos nem maiúsculas). É só no navegador: a lista
+  inteira já veio em `GET /api/friends`.
 - Pedido de amizade e aceite também geram push (`friends`, `/?amigos=1` abre a folha). Endereços lidos em
   `apps/web/src/friendLink.ts`; a folha e a faixa em `components/Friends.tsx`.
 

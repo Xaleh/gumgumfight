@@ -1,7 +1,8 @@
 // Amigos (roadmap E2): a folha "Amigos" (meu código, adicionar pelo código, pedidos recebidos e
 // enviados, a lista com quem está online e o botão Convidar, que abre por cima da folha a escolha do
 // formato: 1 contra 1 em cada formato ou a mesa do Yonko), a faixa de convite na tela inicial e o painel
-// "Chamar amigos" da sala de espera do Yonko.
+// "Chamar amigos" da sala de espera do Yonko. Com muitos amigos (FRIEND_SEARCH_MIN), as duas listas ganham um
+// campo de busca pelo apelido.
 //
 // O servidor guarda tudo (`/api/friends`): o status de cada amigo vem da presença que o lobby e as
 // mesas do Yonko já conhecem, e o convite leva o código da sala privada (ou da mesa) só para o amigo
@@ -14,6 +15,7 @@ import { type MessageKey, useLocale, useT } from '../i18n';
 import { fmtBerries } from '../i18n/format';
 import { poll } from '../poll';
 import { friendLink } from '../friendLink';
+import { FRIEND_SEARCH_MIN, searchFriends } from '../friendSearch';
 import { Icon } from './Icons';
 
 export type { FriendLink } from '../friendLink';
@@ -123,6 +125,35 @@ export interface InviteOption {
 
 type Friend = FriendList['friends'][number];
 
+/** Campo de busca de uma lista de amigos. Esc limpa a busca (e só fecha a folha com o campo já vazio). */
+function FriendSearch({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const t = useT();
+  return (
+    <div className="friends-search">
+      <Icon name="search" size={16} />
+      <input
+        type="search"
+        value={value}
+        placeholder={t('friends.search')}
+        aria-label={t('friends.search')}
+        autoComplete="off"
+        enterKeyHint="search"
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape' || !value) return;
+          e.stopPropagation();
+          onChange('');
+        }}
+      />
+      {value && (
+        <button type="button" className="friends-search-clear" aria-label={t('friends.searchClear')} onClick={() => onChange('')}>
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
 /**
  * A escolha do formato de um convite, por cima da folha de amigos (a lista não cresce nem rola): os formatos do
  * 1 contra 1 e a mesa do Yonko como botões, com o deck de cada grupo dito uma vez e, embaixo, o motivo dos que
@@ -222,6 +253,7 @@ export function FriendsSheet({
   const [copied, setCopied] = useState(false);
   /** Amigo com os formatos do convite abertos. */
   const [choosing, setChoosing] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   // Esc fecha primeiro a escolha do formato; sem ela aberta, a folha.
   useEffect(() => {
@@ -264,6 +296,9 @@ export function FriendsSheet({
   };
 
   const online = data?.friends.filter((f) => f.status !== 'offline').length ?? 0;
+  /** Com muitos amigos, a lista ganha a busca pelo apelido. */
+  const searchable = (data?.friends.length ?? 0) >= FRIEND_SEARCH_MIN;
+  const shown = searchable ? searchFriends(data?.friends ?? [], query) : (data?.friends ?? []);
   /** O amigo do convite em aberto (some se ele saiu da lista, entrou numa partida ou o convite ficou impedido). */
   const invited = inviteBlocked ? undefined : data?.friends.find((f) => f.id === choosing && f.status !== 'playing');
 
@@ -370,42 +405,46 @@ export function FriendsSheet({
                     <p className="muted small">{t('friends.empty')}</p>
                   </div>
                 ) : (
-                  <ul className="friends-list">
-                    {data.friends.map((f) => (
-                      <li key={f.id} className={`friend-${f.status}`}>
-                        <FriendAvatar name={f.name} picture={f.picture} status={f.status} />
-                        <span className="friend-name">
-                          {f.name}
-                          <small>
-                            <span className={`friend-status ${f.status}`}>{t(STATUS_KEY[f.status])}</span>
-                            {f.bounty > 0 && <span className="friend-bounty">{fmtBerries(f.bounty, locale)}</span>}
-                          </small>
-                        </span>
-                        <span className="btn-row">
-                          <button
-                            type="button"
-                            className="friend-remove"
-                            disabled={busy}
-                            aria-label={`${t('friends.remove')}: ${f.name}`}
-                            title={t('friends.remove')}
-                            onClick={() => window.confirm(t('friends.removeConfirm', { name: f.name })) && void act(() => api.friends.remove(f.id))}
-                          >
-                            <Icon name="close" size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn primary"
-                            disabled={busy || Boolean(inviteBlocked) || f.status === 'playing'}
-                            title={inviteBlocked ?? t('friends.inviteTitle', { name: f.name })}
-                            aria-haspopup="dialog"
-                            onClick={() => setChoosing(f.id)}
-                          >
-                            {t('friends.invite')}
-                          </button>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    {searchable && <FriendSearch value={query} onChange={setQuery} />}
+                    {shown.length === 0 && <p className="muted small friends-none">{t('friends.searchNone')}</p>}
+                    <ul className="friends-list">
+                      {shown.map((f) => (
+                        <li key={f.id} className={`friend-${f.status}`}>
+                          <FriendAvatar name={f.name} picture={f.picture} status={f.status} />
+                          <span className="friend-name">
+                            {f.name}
+                            <small>
+                              <span className={`friend-status ${f.status}`}>{t(STATUS_KEY[f.status])}</span>
+                              {f.bounty > 0 && <span className="friend-bounty">{fmtBerries(f.bounty, locale)}</span>}
+                            </small>
+                          </span>
+                          <span className="btn-row">
+                            <button
+                              type="button"
+                              className="friend-remove"
+                              disabled={busy}
+                              aria-label={`${t('friends.remove')}: ${f.name}`}
+                              title={t('friends.remove')}
+                              onClick={() => window.confirm(t('friends.removeConfirm', { name: f.name })) && void act(() => api.friends.remove(f.id))}
+                            >
+                              <Icon name="close" size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn primary"
+                              disabled={busy || Boolean(inviteBlocked) || f.status === 'playing'}
+                              title={inviteBlocked ?? t('friends.inviteTitle', { name: f.name })}
+                              aria-haspopup="dialog"
+                              onClick={() => setChoosing(f.id)}
+                            >
+                              {t('friends.invite')}
+                            </button>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 )}
                 {inviteBlocked && data.friends.length > 0 && <p className="muted small">{inviteBlocked}</p>}
               </section>
@@ -462,9 +501,12 @@ export function TableFriends({ invite, full }: { invite: (friendId: string) => P
   const { data } = useFriends(Boolean(user));
   const [sent, setSent] = useState<Record<string, 'sending' | 'sent'>>({});
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   if (!user || !data) return null;
+  const searchable = data.friends.length >= FRIEND_SEARCH_MIN;
+  const shown = searchable ? searchFriends(data.friends, query) : data.friends;
 
   const mark = (id: string, state?: 'sending' | 'sent') =>
     setSent((s) => {
@@ -493,8 +535,10 @@ export function TableFriends({ invite, full }: { invite: (friendId: string) => P
         <>
           <p className="muted small">{t('friends.tableHint')}</p>
           {error && <p className="error">{error}</p>}
+          {searchable && <FriendSearch value={query} onChange={setQuery} />}
+          {shown.length === 0 && <p className="muted small friends-none">{t('friends.searchNone')}</p>}
           <ul className="friends-list">
-            {data.friends.map((f) => (
+            {shown.map((f) => (
               <li key={f.id} className={`friend-${f.status}`}>
                 <FriendAvatar name={f.name} picture={f.picture} status={f.status} />
                 <span className="friend-name">
