@@ -19691,8 +19691,7 @@ div.dk-tile-main {
   pointer-events: none;
 }
 .yk-tabs,
-.yk-end.small,
-.yk-btn.read {
+.yk-end.small {
   display: none;
 }
 .yk-opps {
@@ -20601,7 +20600,7 @@ div.dk-tile-main {
   flex-direction: column;
   gap: 12px;
 }
-.yk-sheet.trash {
+.yk-sheet.sheet-trash {
   width: min(720px, 100%);
 }
 .yk-sheet header {
@@ -20618,8 +20617,38 @@ div.dk-tile-main {
   letter-spacing: 1px;
   color: var(--brand-yellow);
 }
+/*
+ * A carta aberta para ler: a carta grande e o texto ao lado (no celular, embaixo). O painel aqui tem a altura do
+ * conteúdo (no painel do lado ele enche a altura fixa do painel) e só rola quando passa da janela. As janelas
+ * levam `sheet-<tipo>` e nunca o tipo sozinho: `card` é a classe das cartas do jogo.
+ */
+.yk-sheet.sheet-card {
+  width: min(820px, 100%);
+  max-height: 92vh;
+}
 .yk-sheet .yk-card-panel {
-  max-height: none;
+  flex: 0 1 auto;
+  gap: 22px;
+  padding: 4px 4px 4px 2px;
+}
+.yk-sheet .yk-card-big {
+  --cw: clamp(190px, 38vh, 330px);
+}
+.yk-sheet .yk-card-big .card {
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55);
+}
+.yk-sheet .yk-card-panel .detail-text {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.yk-sheet .yk-card-panel .detail-name {
+  font-size: 24px;
+  line-height: 1.15;
+  margin-bottom: 2px;
+}
+.yk-sheet .yk-card-panel .detail-stats {
+  font-size: 14px;
+  margin: 10px 0;
 }
 .yk-sheet .yk-log {
   min-height: 200px;
@@ -21294,9 +21323,6 @@ div.dk-tile-main {
   .yk-tab-text small .hp + * {
     margin-left: 3px;
   }
-  .yk-btn.read {
-    display: inline-grid;
-  }
   .yk-tabs button.tab.on {
     border-color: var(--pc);
     background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 38%, #16263f), color-mix(in srgb, var(--pc) 16%, #101b31));
@@ -21454,6 +21480,22 @@ div.dk-tile-main {
     max-height: 82vh;
     border-radius: 22px 22px 0 0;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .yk-sheet.sheet-card {
+    max-height: 90vh;
+  }
+  .yk-sheet .yk-card-panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .yk-sheet .yk-card-big {
+    --cw: min(56vw, 34vh, 250px);
+    position: static;
+    align-self: center;
+  }
+  .yk-sheet .yk-card-panel .detail-name {
+    font-size: 21px;
   }
   .yk:not(.anim-off) .yk-sheet {
     animation: sheet-up 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);

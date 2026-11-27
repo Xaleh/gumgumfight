@@ -47,8 +47,26 @@ test.describe('Yonko', () => {
       await page.waitForTimeout(300);
     }
 
-    // O turno de quem joga: a faixa diz que é a vez dele; encerrar passa a vez para um bot.
+    // O turno de quem joga: a faixa diz que é a vez dele.
     await expect(page.getByText(label('yonko.yourTurn'), { exact: true })).toBeVisible();
+
+    // Ler uma carta: o Líder escolhido e a lupa da faixa abrem a carta grande, com o nome e o texto ao lado.
+    const table = page.getByRole('region', { name: label('yonko.yourTable'), exact: true });
+    await table.locator('.field-card .card').first().click();
+    await page.getByRole('button', { name: label('yonko.card'), exact: true }).click();
+    const reading = page.getByRole('dialog', { name: label('yonko.card'), exact: true });
+    const big = reading.locator('.yk-card-big .card');
+    await expect(big).toBeVisible();
+    await expect(reading.locator('.detail-name')).toBeVisible();
+    // A carta inteira cabe na janela (a janela já saiu com a altura de uma carta pequena, cortando tudo).
+    const [card, sheet] = [(await big.boundingBox())!, (await reading.boundingBox())!];
+    expect(card.height).toBeGreaterThan(200);
+    expect(card.y + card.height).toBeLessThanOrEqual(sheet.y + sheet.height);
+    await reading.getByRole('button', { name: label('yonko.close'), exact: true }).click();
+    await expect(reading).toBeHidden();
+    await page.keyboard.press('Escape');
+
+    // Encerrar passa a vez para um bot.
     await endTurn.click();
     await expect(endTurn).toBeDisabled();
 

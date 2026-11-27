@@ -1357,7 +1357,7 @@ export function YonkoTable({
 
         {sheet && (
           <div className="yk-sheet-back" onClick={() => setSheet(null)}>
-            <div className={['yk-sheet', typeof sheet === 'object' ? 'trash' : sheet].join(' ')} role="dialog" aria-modal="true" aria-label={sheetTitle} onClick={(e) => e.stopPropagation()}>
+            <div className={['yk-sheet', `sheet-${typeof sheet === 'object' ? 'trash' : sheet}`].join(' ')} role="dialog" aria-modal="true" aria-label={sheetTitle} onClick={(e) => e.stopPropagation()}>
               <header>
                 <h3>{sheetTitle}</h3>
                 <button type="button" className="yk-back" onClick={() => setSheet(null)} aria-label={t('yonko.close')}>
