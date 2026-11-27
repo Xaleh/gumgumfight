@@ -44,6 +44,7 @@ const pt = {
   friendAcceptedBody: '{name} aceitou o seu pedido de amizade.',
   friendInviteTitle: 'Convite para partida',
   friendInviteBody: '{name} chamou você para uma partida ({format}). Toque para entrar.',
+  friendInviteYonkoBody: '{name} chamou você para uma mesa do Yonko (4 jogadores). Toque para entrar.',
 };
 
 export type PushKey = keyof typeof pt;
@@ -87,6 +88,7 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     friendAcceptedBody: '{name} accepted your friend request.',
     friendInviteTitle: 'Match invite',
     friendInviteBody: '{name} invited you to a match ({format}). Tap to join.',
+    friendInviteYonkoBody: '{name} invited you to a Yonko table (4 players). Tap to join.',
   },
   es: {
     matchStartTitle: '¡Partida encontrada!',
@@ -125,6 +127,7 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     friendAcceptedBody: '{name} aceptó tu solicitud de amistad.',
     friendInviteTitle: 'Invitación a partida',
     friendInviteBody: '{name} te invitó a una partida ({format}). Toca para entrar.',
+    friendInviteYonkoBody: '{name} te invitó a una mesa de Yonko (4 jugadores). Toca para entrar.',
   },
   ja: {
     matchStartTitle: '対戦相手が見つかりました！',
@@ -163,6 +166,7 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     friendAcceptedBody: '{name}さんがあなたのフレンド申請を承認しました。',
     friendInviteTitle: '対戦の招待',
     friendInviteBody: '{name}さんから対戦の招待が届きました（{format}）。タップして参加しましょう。',
+    friendInviteYonkoBody: '{name}さんから四皇のテーブル（4人対戦）への招待が届きました。タップして参加しましょう。',
   },
   fr: {
     matchStartTitle: 'Partie trouvée !',
@@ -201,6 +205,7 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     friendAcceptedBody: '{name} a accepté votre demande d’ami.',
     friendInviteTitle: 'Invitation à une partie',
     friendInviteBody: '{name} vous invite à une partie ({format}). Touchez pour rejoindre.',
+    friendInviteYonkoBody: '{name} vous invite à une table Yonko (4 joueurs). Touchez pour rejoindre.',
   },
   de: {
     matchStartTitle: 'Match gefunden!',
@@ -239,6 +244,7 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     friendAcceptedBody: '{name} hat deine Freundschaftsanfrage angenommen.',
     friendInviteTitle: 'Einladung zum Match',
     friendInviteBody: '{name} hat dich zu einem Match eingeladen ({format}). Tippe, um beizutreten.',
+    friendInviteYonkoBody: '{name} hat dich an einen Yonko-Tisch eingeladen (4 Spieler). Tippe, um beizutreten.',
   },
 };
 

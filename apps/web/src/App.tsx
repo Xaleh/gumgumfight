@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type Dispatch, memo, type SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { api, isAdmin, isDev, isTeam, type OnlineSeat, seesHands, type WatchTarget, type YonkoSeatRef } from './api';
 import { audio } from './audio';
 import { useAuth } from './auth';
@@ -13,6 +13,8 @@ import { DAILY_PARAM } from './game/daily';
 import { Lesson } from './components/Lesson';
 import { Draft } from './components/Draft';
 import { Menu } from './components/Menu';
+import { useQueue } from './components/OnlineMenu';
+import { QueueDock, QueueLeaveConfirm, QueueProvider, QueueStopped, type QueueView } from './components/QueueDock';
 import { Sandbox } from './components/Sandbox';
 import { Sealed } from './components/Sealed';
 import { OAuthConsent } from './components/OAuthConsent';
@@ -30,6 +32,7 @@ import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
 import { isReplayPath } from './embed';
 import { parseSandboxLink, SANDBOX_PARAM } from './game/sandboxLink';
 import { PROFILE_PARAM, parseProfileParam } from './profileLink';
+import { queuePolicy } from './queueScreens';
 import { syncTutorialProgress } from './game/tutorial/progress';
 import type { GameSetup } from './game/useGame';
 import type { YonkoSetup } from './game/useYonkoGame';
@@ -123,8 +126,90 @@ export function App() {
   return broadcastKey ? <Broadcast broadcastKey={broadcastKey} /> : <MainApp />;
 }
 
+/** Partida encontrada com o jogador em outra tela (ou outra aba): um toque e, no celular, uma vibração. */
+function announceMatch() {
+  audio.play('turn');
+  try {
+    navigator.vibrate?.([120, 60, 120]);
+  } catch {
+    /* aparelho sem vibração */
+  }
+}
+
+/**
+ * A raiz do app: a tela aberta e a busca por oponente, que acompanha o jogador pelas telas de navegar
+ * (`queueScreens.ts`). Abrir, com a fila aberta, uma tela onde se joga ou se edita algo pede confirmação.
+ */
 function MainApp() {
-  const [screen, setScreen] = useState<Screen>(savedScreen);
+  const [screen, setScreenNow] = useState<Screen>(savedScreen);
+  const [queueError, setQueueError] = useState<unknown>(null);
+  const [queueView, setQueueView] = useState<QueueView>('wait');
+  /** Tela pedida com a fila aberta e que tira o jogador dela: espera o "Sair da fila e abrir". */
+  const [pending, setPending] = useState<Screen | null>(null);
+  const { queue, enqueue, cancel } = useQueue((seat) => {
+    announceMatch();
+    setPending(null);
+    setScreenNow({ name: 'online', seat });
+  }, setQueueError);
+
+  // `setScreen` não muda entre renders (as telas não redesenham a cada consulta à fila): lê o estado por refs.
+  const live = useRef({ screen, queued: Boolean(queue), cancel });
+  live.current = { screen, queued: Boolean(queue), cancel };
+  const setScreen = useCallback<Dispatch<SetStateAction<Screen>>>((action) => {
+    const { screen: from, queued, cancel: leaveQueue } = live.current;
+    const next = typeof action === 'function' ? action(from) : action;
+    if (next === from) return;
+    if (queued) {
+      const policy = queuePolicy(next.name, next.name === 'game' && next.setup.mode === 'replay');
+      if (policy === 'ask') return setPending(next);
+      if (policy === 'leave') leaveQueue();
+    }
+    setScreenNow(next);
+  }, []);
+  // A busca acabou (partida, cancelamento ou recusa) com a pergunta aberta: não há mais do que sair.
+  useEffect(() => {
+    if (!queue) setPending(null);
+  }, [queue]);
+
+  return (
+    <QueueProvider
+      value={{
+        queue,
+        view: queueView,
+        setView: setQueueView,
+        enqueue: async (...args) => {
+          setQueueError(null);
+          // Toda busca nova abre na janela.
+          setQueueView('wait');
+          await enqueue(...args);
+        },
+        cancel,
+        error: queueError,
+        clearError: () => setQueueError(null),
+      }}
+    >
+      <Pages screen={screen} setScreen={setScreen} />
+      {queue && <QueueDock queue={queue} screen={screen.name} onCancel={cancel} />}
+      {/* Na tela inicial o erro aparece junto dos modos (`Menu`). */}
+      {!queue && queueError !== null && screen.name !== 'menu' && (
+        <QueueStopped reason={queueError instanceof Error ? queueError.message : String(queueError)} onClose={() => setQueueError(null)} />
+      )}
+      {queue && pending && (
+        <QueueLeaveConfirm
+          onStay={() => setPending(null)}
+          onLeave={() => {
+            cancel();
+            setScreenNow(pending);
+            setPending(null);
+          }}
+        />
+      )}
+    </QueueProvider>
+  );
+}
+
+/** As telas. `memo`: a fila consulta o servidor a cada 1,5 s, e isso não deve redesenhar a tela aberta. */
+const Pages = memo(function Pages({ screen, setScreen }: { screen: Screen; setScreen: Dispatch<SetStateAction<Screen>> }) {
   useEffect(() => {
     try {
       if (screen.name === 'online' || screen.name === 'watch' || screen.name === 'yonko-online') sessionStorage.setItem(OPEN_MATCH, JSON.stringify(screen));
@@ -172,9 +257,10 @@ function MainApp() {
           })
           .catch(() => undefined);
       } else if (tournament) setScreen({ name: 'tournaments', id: tournament, lobby: url.searchParams.get('lobby') === '1' });
-      // Amigos: link para adicionar, aviso de pedido e convite para a sala de um amigo (no meio de uma partida online, fica nela).
+      // Amigos: link para adicionar, aviso de pedido e convite para a sala (ou a mesa do Yonko) de um amigo
+      // (no meio de uma partida online ou de uma mesa do Yonko, fica nela).
       const friendLink = friendLinkFrom(url);
-      if (friendLink) setScreen((s) => (s.name === 'online' ? s : { name: 'menu', friendLink }));
+      if (friendLink) setScreen((s) => (s.name === 'online' || s.name === 'yonko-online' ? s : { name: 'menu', friendLink }));
     };
     const here = new URL(location.href);
     if (here.searchParams.has(ROOM_PARAM) || here.searchParams.has(TOURNAMENT_PARAM) || friendLinkFrom(new URL(here.href))) {
@@ -438,9 +524,10 @@ function MainApp() {
       onTeamBot={isTeam(user) ? () => setScreen({ name: 'team' }) : undefined}
       onSealed={() => setScreen({ name: 'sealed', hub: 'sealed' })}
       onDraft={() => setScreen({ name: 'sealed', hub: 'draft' })}
-      onYonko={() => setScreen({ name: 'yonko' })}
+      onYonko={(code) => setScreen({ name: 'yonko', ...(code ? { code } : {}) })}
+      onYonkoOnline={(seat) => setScreen({ name: 'yonko-online', seat })}
       dev={dev}
       friendLink={screen.name === 'menu' ? screen.friendLink : undefined}
     />
   );
-}
+});

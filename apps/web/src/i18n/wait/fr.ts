@@ -1,0 +1,52 @@
+// Espera por oponente (Français): a busca minimizada, o cartão de dicas e a mão de teste com o deck da fila.
+
+import type waitPtBR from './pt-BR';
+
+const wait = {
+  'wait.minimize': 'Réduire',
+  'wait.minimizeHint': 'La recherche continue pendant que vous consultez les stats, les tournois, les parties en direct et les leçons.',
+  'wait.pill': 'Recherche d’un adversaire',
+  'wait.pillOpen': 'Recherche d’un adversaire depuis {time}. Ouvrir la recherche.',
+  'wait.handTest': 'Main de test',
+  'wait.handTestTitle': 'Main de test · {deck}',
+  'wait.handSearching': 'Recherche d’un adversaire · {time}',
+  'wait.handFailed': 'Impossible de charger le deck pour le moment.',
+  'wait.inQueueNote': 'Vous êtes dans la file d’attente. Annulez la recherche pour jouer à autre chose.',
+  'wait.leaveTitle': 'Quitter la file d’attente ?',
+  'wait.leaveText': 'Vous cherchez un adversaire. Ouvrir cet écran vous fait quitter la file d’attente.',
+  'wait.leaveStay': 'Rester dans la file',
+  'wait.leaveGo': 'Quitter la file et ouvrir',
+  'wait.stopped': 'La recherche d’un adversaire s’est arrêtée : {reason}',
+  'wait.watchingShort': '👁 {n}',
+  // ---- cartão de dicas ----
+  'wait.tipsLabel': 'En attendant',
+  'wait.kickerRule': 'Astuce de règles',
+  'wait.kickerMeta': 'Méta de la semaine',
+  'wait.kickerDeck': 'Votre deck',
+  'wait.kickerSpoiler': 'Nouveau spoiler',
+  'wait.spoilerToday': 'Arrivée aujourd’hui.',
+  'wait.spoilerYesterday': 'Arrivée hier.',
+  'wait.spoilerDays': 'Arrivée il y a {n} jours.',
+  'wait.spoilerOpen': 'Touchez la carte pour la lire.',
+  'wait.spoilerView': 'Voir la carte {name}',
+  'wait.next': 'Astuce suivante',
+  'wait.metaTop': 'Leaders les plus joués ces 7 derniers jours : {list}.',
+  'wait.deckRecord': 'Avec {name}, vous avez gagné {wins} sur {games|# partie|# parties} contre d’autres joueurs ({pct} %).',
+  'wait.matchupBest': 'Votre meilleur affrontement avec {name} : contre {opp}, {pct} % de victoires sur {games|# partie|# parties}.',
+  'wait.matchupWorst': 'Votre affrontement le plus difficile avec {name} : contre {opp}, {pct} % de victoires sur {games|# partie|# parties}.',
+  'wait.tip.firstTurn': 'Le joueur qui commence ne pioche pas au premier tour et n’y reçoit qu’1 DON!!.',
+  'wait.tip.noFirstAttack': 'Aucun des deux joueurs n’attaque pendant son premier tour.',
+  'wait.tip.rush': 'Un Personnage n’attaque pas le tour où il entre en jeu, sauf s’il a [Rush].',
+  'wait.tip.rested': 'Vous ne pouvez attaquer que les Personnages adverses épuisés. Le Leader peut toujours être attaqué.',
+  'wait.tip.tie': 'En cas d’égalité de puissance, l’attaque passe : il suffit d’égaler la puissance de la cible.',
+  'wait.tip.blockThenCounter': 'La défense suit un ordre : d’abord le [Blocker], ensuite le Counter. Après avoir utilisé un Counter, on ne peut plus bloquer.',
+  'wait.tip.don': 'Un DON!! attaché donne +1000 de puissance pendant votre tour seulement et retourne dans la zone de coût au début de votre prochain tour.',
+  'wait.tip.mulligan': 'Le mulligan, c’est tout ou rien : vous remettez les 5 cartes, mélangez et en piochez 5 autres, une seule fois.',
+  'wait.tip.zeroLife': 'À 0 Vie, vous êtes toujours en jeu : vous perdez quand votre Leader subit des dégâts sans Vie à retirer.',
+  'wait.tip.deckOut': 'Un joueur qui n’a plus aucune carte dans son deck perd la partie.',
+  'wait.tip.trigger': 'Quand une carte Vie avec [Trigger] irait dans votre main à cause de dégâts, vous pouvez la révéler et activer le [Trigger] à la place.',
+  'wait.tip.doubleBanish': '[Double Attack] inflige 2 dégâts à la Vie. Avec [Banish], la carte Vie va à la défausse et son [Trigger] ne s’active pas.',
+  'wait.tip.fiveCharacters': 'Vous avez au maximum 5 Personnages. Quand vous en jouez un sixième, l’un d’eux va à la défausse, et cela ne compte pas comme un K.O.',
+} satisfies Record<keyof typeof waitPtBR, string>;
+
+export default wait;

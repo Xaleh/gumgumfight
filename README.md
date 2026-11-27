@@ -532,7 +532,8 @@ que quatro capitães jogam cada um por si e vence o último de pé. As regras se
 [`docs/regras-yonko.md`](docs/regras-yonko.md). Há duas formas de jogar, e nenhuma entra nas estatísticas:
 
 - **Mesa online (com amigos):** quem cria recebe um **código de 6 letras** e um link de convite (`/?yonko=CÓDIGO`)
-  para até três pessoas. Na sala de espera cada um escolhe o deck e marca **"Estou pronto"**; quem criou a mesa
+  para até três pessoas, e com login chama os amigos do jogo pelo painel **Chamar amigos** (veja
+  [Amigos e convite direto](#amigos-e-convite-direto)). Na sala de espera cada um escolhe o deck e marca **"Estou pronto"**; quem criou a mesa
   põe **bots** nos lugares vagos, tira alguém (ou um bot) da mesa, muda as regras e começa quando houver 3 ou 4
   lugares ocupados e todos estiverem prontos. Cada jogador tem **25 minutos** para a partida inteira, e o relógio
   só corre nas decisões dele. Quem fica sem tempo, ou **2 minutos desconectado** na própria decisão, sai da mesa e
@@ -686,6 +687,31 @@ sem sobrepor pedidos e espaçando as tentativas quando o servidor não responde;
 presença: quem fecha a tela inicial sai dos "conectados" depois de 30 s. Jogadores conectados a uma partida, quem
 está na fila e os espectadores também contam.
 
+**Enquanto o oponente não chega.** A janela "Procurando oponente" (fila casual e ranqueada) não prende mais o jogador:
+
+- **Minimizar** (ou Esc, ou tocar fora) deixa só uma pílula com o tempo de busca, e o jogador segue pelo app. A busca
+  continua nas telas de navegar: tela inicial, estatísticas, perfis, a lista de lições, torneios e as partidas para
+  assistir (ao vivo e replays). Tocar na pílula reabre a janela. Na mesa (assistindo ou num replay) a pílula vira uma
+  etiqueta com o tempo no canto da mesa, junto das outras, para não cobrir nada da partida.
+- **Partida encontrada** em qualquer uma dessas telas leva direto para a mesa, com um toque e, no celular, uma vibração.
+- **Telas onde se joga ou se edita algo** (construtor de decks, lição, desafio do dia, Sandbox, Selado, Draft, Yonko,
+  Administração) perguntam antes: "Sair da fila e abrir" ou "Continuar na fila". Na fila, os outros modos da tela
+  inicial ficam desligados. Assim a partida que chega nunca tira o jogador do meio de outra coisa nem apaga um deck
+  que ele estava editando.
+- **Cartão de dicas**: gira a cada 9 s (ou pelo botão) entre dicas de regra, os Líderes mais jogados da semana e o
+  histórico do jogador com o Líder do deck (vitórias contra outras pessoas, o melhor e o pior confronto, quando há
+  partidas suficientes).
+- **Spoilers novos**: quando chegaram cartas de spoiler nos últimos 7 dias, o cartão alterna entre elas e o resto (um
+  item sim, um não), da mais nova para a mais antiga, com a miniatura, o nome e "Chegou hoje / ontem / há N dias".
+  Tocar na carta abre o texto ampliado, e o cartão espera enquanto ela está aberta. A data é a de quando a carta
+  entrou no banco deste servidor (o site de spoilers não informa o dia da revelação); as cartas que já estavam no
+  banco antes dessa data existir não aparecem, e a que vira oficial sai da lista.
+- **Mão de teste** com o deck da fila: a mesma do construtor (sortear, mulligan, comprar e as chances), sem sair da busca.
+
+A **sala privada** à espera do oponente ganhou o mesmo cartão de dicas e a mão de teste do deck com que a sala foi
+aberta; a sala de torneio à espera, o cartão de dicas. Tudo respeita a opção **Animações**: com ela desligada, o cartão
+só troca pelo botão e nada pulsa.
+
 - **O servidor é a autoridade.** Ele guarda o estado completo e aplica as ações com o motor; cada jogador recebe só a
   própria visão (`packages/engine/src/view.ts`): mão do oponente, decks e Vida virada para baixo chegam como cartas
   escondidas, sem seed nem RNG. Os ids das cartas viram apelidos aleatórios por partida, porque os ids do motor seguem a
@@ -735,15 +761,32 @@ Com login Google, o item **Amigos** do menu abre a lista de amigos:
   Quem recebe o código digita em **Adicionar pelo código**; o outro lado vê o pedido em **Pedidos recebidos** e
   aceita ou recusa. Quem pediu pode cancelar, e qualquer um dos dois remove a amizade quando quiser. Se os dois
   pedirem, a amizade vale na hora. Até 200 amigos por conta e 30 pedidos por hora (o código não dá para ser varrido).
-- **Quem está online:** cada amigo aparece como **Jogando** (numa partida online ou num treino transmitido),
-  **Online** (com o app aberto no menu ou na lista de amigos, numa sala de espera ou na fila) ou **Offline**. Só
+- **Quem está online:** cada amigo aparece como **Jogando** (numa partida online, num treino transmitido ou numa
+  mesa do Yonko), **Online** (com o app aberto no menu ou na lista de amigos, numa sala de espera ou na fila) ou
+  **Offline**. Só
   amigos aceitos veem o status, e nunca qual partida nem o código da sala. O nome mostrado é o apelido do jogador,
   nunca o da conta Google.
-- **Convidar com um toque:** **Convidar** cria uma sala privada com o deck equipado e as regras da Sala privada, leva
-  você para a sala de espera e avisa o amigo por notificação. Tocar no aviso (`/?convite=CÓDIGO`) abre o app e entra
-  direto na sala com o deck equipado (com a confirmação do deck, se ela estiver ligada nas Configurações). Com o app
-  aberto, o convite aparece como faixa na tela inicial, com **Entrar** e **Recusar**. O convite vale enquanto a sala
-  espera (no máximo 30 min) e dá para repetir a cada 15 s.
+- **Foto:** cada amigo aparece com a foto em círculo, como a arte dos Líderes, com o aro na cor do status. É a foto
+  que a pessoa enviou em "Trocar foto"; a do Google nunca vai para os amigos. Sem foto enviada, aparece a inicial do
+  apelido numa cor de carta. O cartão do topo da folha mostra como os amigos veem você, e a linha do amigo traz
+  também a recompensa dele.
+- **Convidar escolhendo o formato:** **Convidar** abre a escolha do formato por cima da folha, sem mexer na lista
+  de amigos: **1 contra 1** nas regras da Sala privada como estão escolhidas nela, em cada formato (Standard, Extra
+  Grand Battle, All Blue) e no Livre, ou **Yonko · mesa de 4**. Cada grupo diz com qual deck você vai; o formato em
+  que o deck equipado não vale fica apagado, com o motivo embaixo. Esc ou um toque fora fecha a escolha. O 1 contra 1 cria uma sala privada com o deck equipado, leva você para a sala de espera e avisa o amigo por
+  notificação. Tocar no aviso (`/?convite=CÓDIGO`) abre o app e entra direto na sala com o deck equipado (com a
+  confirmação do deck, se ela estiver ligada nas Configurações). Com o app aberto, o convite aparece como faixa na
+  tela inicial, com **Entrar** e **Recusar**. O convite vale enquanto a sala espera (no máximo 30 min) e dá para
+  repetir a cada 15 s.
+- **Convite para o Yonko:** a opção **Yonko** abre uma mesa online com o deck e as regras da sua última mesa (ou
+  usa a mesa em que você já espera) e avisa o amigo. Na sala de espera, o painel **Chamar amigos** lista os amigos
+  com o status e um botão **Convidar** para cada um, sem sair da mesa: qualquer pessoa sentada chama os amigos dela,
+  não só quem criou. Quem recebe toca no aviso (`/?yonko=CÓDIGO&convite=1`) ou em **Entrar** na faixa e senta direto
+  na mesa com o deck do Yonko dele; lá dá para trocar o deck antes de marcar "Estou pronto". O convite vale enquanto
+  a mesa espera com lugar vago.
+- **Busca:** a partir de 6 amigos, a lista ganha o campo **Buscar amigo**, que filtra pelo apelido sem diferenciar
+  maiúsculas nem acentos (Esc limpa a busca). O painel **Chamar amigos** da mesa do Yonko tem a mesma busca e rola
+  por dentro, para a sala de espera não crescer com a lista.
 - O item **Amigos** mostra quantos pedidos e convites estão esperando. Código: `apps/server/src/friends/` e
   `apps/web/src/components/Friends.tsx`.
 
@@ -1060,8 +1103,9 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
   já tinha perfil, as partidas do navegador vão para ele.
 - **Foto da conta**: no menu da conta, "Trocar foto" (ou o clique no avatar) envia uma imagem própria no lugar da
   foto do Google. O navegador recorta o centro e reduz para 256×256 JPEG antes de enviar; o servidor aceita JPEG, PNG
-  ou WebP (até 256 KB, tipo conferido pelos primeiros bytes) e guarda a imagem em `users.custom_picture`. Só o
-  próprio usuário e os admins a veem (`/api/users/:id/picture`). "Usar a foto do Google" volta para a original.
+  ou WebP (até 256 KB, tipo conferido pelos primeiros bytes) e guarda a imagem em `users.custom_picture`. O
+  próprio usuário, os amigos aceitos dele (a folha de amigos) e os admins a veem (`/api/users/:id/picture`). A foto
+  do Google continua só com o dono. "Usar a foto do Google" volta para a original.
 - **Logo no playmat** (perfis Streamer, Organizador e Admin): assistindo a uma partida na mesa lateral, o menu da partida tem
   "Logo no playmat" para trocar a logo do Uai Uai no Mi, no centro do playmat, pela logo de quem transmite. Ela fica
   guardada na conta (`users.playmat_logo`, até 512 KB) e aparece só na tela de quem enviou; os outros espectadores
@@ -1762,7 +1806,9 @@ npm run e2e                                # testes de ponta a ponta no navegado
 banco novo (em `e2e/.tmp/`, apagado a cada execução): partida contra o bot do menu ao fim de jogo (com o **Auto**, cerca
 de 2 minutos), desistir pelo menu da mesa, abrir os boosters do Selado e as partidas online com dois navegadores — na
 **Partida rápida** (fila, a mão do oponente escondida, o turno passando de um para o outro, recarregar a página no meio
-e voltar para a mesma sala, desistência) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe), e
+e voltar para a mesma sala, desistência), na **espera pela fila** (o cartão de dicas, a mão de teste, a busca
+minimizada que segue para as estatísticas, a pergunta "Sair da fila?" ao abrir o construtor e a partida que chega
+com o jogador em outra tela, e os spoilers novos alternando com as dicas e abrindo ampliados) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe), e
 um **torneio** do começo ao fim (o organizador cria, os jogadores se inscrevem pelo link de convite, a rodada abre, a
 partida é jogada na sala do torneio, o resultado entra sozinho e o torneio termina com a classificação). A mesa também
 é testada com o mouse e o teclado (`e2e/table.spec.ts`): arrastar um DON!! até o Líder e de volta, segurar o clique numa

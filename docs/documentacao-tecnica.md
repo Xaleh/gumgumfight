@@ -171,7 +171,7 @@ gumgumfight/
 │   ├── src/profiles/            perfil público do jogador: store.ts (SQL, regras do replay), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
-│   ├── src/friends/             store.ts (código de amigo e amizades), routes.ts (lista, pedidos, status online e convite)
+│   ├── src/friends/             store.ts (código de amigo e amizades), routes.ts (lista, pedidos, status online e convite para sala privada ou mesa do Yonko)
 │   ├── src/monitor/             store.ts (erros agrupados e horas dos canais SSE, SQL), sse.ts (SseMetrics), routes.ts (onError, relato do navegador, painel)
 │   └── test/                    9 arquivos de teste + fixtures da optcgapi/optcgleaks
 ├── apps/web/                    React + Vite
@@ -204,7 +204,7 @@ gumgumfight/
 ├── deploy/                      bootstrap-hostinger.sh, setup-vm.sh, remote-deploy.sh, ecosystem.config.cjs, HOSTINGER.md
 ├── e2e/                         testes de ponta a ponta (Playwright): playwright.config.ts, serve.ts (servidor com banco
 │                                temporário), support/ (textos pela chave do pt-BR, fixture de erros e de mais jogadores,
-│                                contas de teste no banco temporário, passos comuns, da fila online e do torneio),
+│                                contas de teste e spoilers novos no banco temporário, passos comuns, da fila online e do torneio),
 │                                *.spec.ts (bot, boosters, fila online, torneio)
 ├── scripts/build-release.sh     monta release/
 ├── docs/rules/                  base de regras (CR v1.2.1), interações, divergências do motor, mapeamento da DSL
@@ -798,6 +798,48 @@ mostra relógio local (`clock.remaining` − tempo desde o último snapshot, des
 partida não acabou, espera 3 s, consulta `/api/online/active` (jogador) ou `/api/online/rooms/:id` (espectador) e
 reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do protocolo na seção 11.
 
+### Espera por oponente (fila e sala privada)
+
+O estado da fila mora na raiz do app, não na tela inicial: `MainApp` (`App.tsx`) chama `useQueue`
+(`components/OnlineMenu.tsx`) e entrega a busca aos componentes por contexto (`QueueProvider` / `useAppQueue`, em
+`components/QueueDock.tsx`). As telas ficam num componente à parte (`Pages`, com `memo`), para a consulta à fila (a cada
+1,5 s) não redesenhar a tela aberta; só quem lê o contexto (a tela inicial) redesenha.
+
+- **`QueueDock`** desenha a busca por cima de qualquer tela, em três formas: a janela "Procurando oponente" (com o
+  cartão de dicas, "Mão de teste", "Minimizar" e "Cancelar"), a pílula minimizada (presa embaixo; com ela aberta, o
+  `#root` ganha um espaço no fim para o último conteúdo da página rolar por cima dela) e a folha da mão de teste.
+  Trocar de tela minimiza. Nas telas de mesa (`queueChipInTable`: assistir e replay) não há pílula solta, que
+  encostaria nos controles da partida: a busca minimizada é a etiqueta `QueueChip`, dentro do canto da própria mesa
+  (na barra do espectador, onde a etiqueta "Assistindo · N" encolhe para "👁 N", ou sob o botão do menu no replay).
+  Como a mesa também é usada fora do app principal (transmissão, replay embutido), a etiqueta lê o contexto sem
+  exigir o provedor. A forma da busca (`view`) mora no `MainApp` e vai no mesmo contexto.
+- **Quais telas mantêm a fila** (`queueScreens.ts`, `queuePolicy`): `keep` nas telas de navegar (`menu`, `stats`,
+  `profile`, `learn`, `tournaments`, `watch-list`, `watch` e `game` em modo replay); `leave` em `online` e
+  `yonko-online` (o jogador já tem um lugar numa sala, e o servidor tirou o bilhete: `lobby.leaveQueue`); `ask` em todas
+  as outras, inclusive uma tela nova ainda sem regra. O `setScreen` que as telas recebem passa por essa política: em
+  `ask`, a tela pedida fica guardada até o "Sair da fila e abrir" (`QueueLeaveConfirm`).
+- **Partida encontrada**: o `onEnter` do `useQueue` toca o efeito `turn`, vibra (`navigator.vibrate`, onde existe) e
+  abre a tela `online`. A recusa do servidor que encerra a busca aparece junto dos modos na tela inicial e, nas outras
+  telas, num aviso (`QueueStopped`).
+- **Cartão de dicas** (`components/WaitTips.tsx`, lógica em `waitTips.ts`): duas dicas de regra (`RULE_TIPS`, textos
+  em `i18n/wait`, embaralhadas a cada espera) e um item de dados, em ciclo. Os dados vêm de duas consultas feitas uma
+  vez ao abrir o cartão: `GET /api/stats?days=7` (os 3 Líderes mais jogados) e `GET /api/stats?mine=1&leader=&opponent=human`
+  (o histórico com o Líder do deck: o total a partir de 5 partidas, e o melhor e o pior confronto entre os que têm 3
+  ou mais). Sem resposta, o cartão fica só com as dicas.
+- **Spoilers novos**: a terceira consulta do cartão é `GET /api/spoilers/recent` (as cartas ainda não lançadas que
+  entraram no banco nos últimos 7 dias, até 40, da mais nova para a mais antiga, com `addedAt`). Havendo alguma, o
+  `nextTip` alterna: um item do ciclo de dicas e dados, um spoiler, cada lista no seu contador. O item mostra a
+  miniatura (`StaticCard`), o nome e há quantos dias do calendário do jogador a carta chegou (`daysAgo`); tocar abre o
+  `StaticCardZoom`, e o temporizador para enquanto ele está aberto. A data vem de `cards.added_at` (seção 7): o feed de
+  spoilers não traz o dia da revelação, então vale o dia em que a carta entrou neste servidor.
+- **Mão de teste** (`components/WaitHandTest.tsx`): o `HandTestPanel` do construtor com o deck da espera
+  (`GET /api/decks/:id`). Simulação local, sem relação com a mão da partida.
+- **Sala privada à espera** (`OnlineWaiting`, em `Online.tsx`): o mesmo cartão e, quando a sala foi aberta pela tela
+  inicial nesta aba, a mão de teste. O servidor não devolve o id do deck de quem espera, então o navegador guarda o par
+  sala/deck em `sessionStorage.gumgum.roomDeck` (`roomDeck.ts`). A sala de torneio à espera tem só o cartão.
+- **Animações** (`settings.animations`): em `full` e `soft` o cartão troca sozinho a cada 9 s, com uma entrada curta; a
+  barrinha do tempo e o pulso do ponto da pílula, que se repetem, só existem em `full`; em `off` nada troca sozinho.
+
 ### Polling (todas as consultas periódicas)
 
 Todas passam por `poll` (`apps/web/src/poll.ts`): a próxima consulta só é agendada quando a anterior termina (nunca
@@ -813,7 +855,7 @@ voltava (23/10/2026).
 | Menu (bloco "ao vivo") | `GET /api/online/live` | 15 s | aba visível |
 | Menu (bloco meta) | `GET /api/stats?days=7` | 5 min | aba visível |
 | Assistir partidas | `GET /api/online/live` | 5 s | sempre, enquanto a lista está aberta (cache no servidor + ETag/304) |
-| Fila casual/ranqueada | `GET /api/online/queue/:ticket` | 1,5 s | enquanto está na fila |
+| Fila casual/ranqueada | `GET /api/online/queue/:ticket` | 1,5 s | enquanto está na fila, em qualquer tela (`MainApp`) |
 | Página do torneio | `GET /api/tournaments/:id` | 5 s | torneio `running` (304 sem corpo quando nada mudou) |
 | Partida online | `ping` SSE (servidor → cliente) | 20 s | canal aberto |
 
@@ -892,7 +934,7 @@ baixadas quando tocam) + `public/`.
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
-| `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`. Índice `cards_set`. | importador, seed, sync de spoilers |
+| `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`, `added_at` (quando a carta entrou no banco pela primeira vez; as regravações não mexem nela, e é NULL nas cartas anteriores à coluna). Índice `cards_set`. | importador, seed, sync de spoilers; `added_at` é lida por `/api/spoilers/recent` |
 | `set_releases` | `set_code` | Coleções que viraram oficiais pela lista oficial da Bandai no dia do lançamento e que a optcgapi ainda não publicou: `source` (domínio da lista), `released_at` | `syncSpoilers` (entra quando a lista torna oficial, sai quando a API publica) |
 | `card_translations` | `(card_id, lang)` | `text`, `trigger` revisados à mão | seed (de `data/translations`) |
 | `card_engine_texts` | `card_id` | Texto para o motor: `text`, `trigger`, `base_key` (hash do texto oficial quando foi escrito; diferente = não vale), `author_id`, `author_name`, `updated_at` | `PUT/DELETE /api/dev/engine-texts/:id` |
@@ -1351,12 +1393,33 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
   é uma linha de `friendships` por par (pedido pendente → aceito). Pedir de volta a quem já pediu aceita na hora.
 - **Status**: `Lobby.presenceOf(user:<id>)` responde `playing` (lugar numa sala em andamento, contra alguém ou o bot),
   `online` (sinal do menu, que vem de `GET /api/online/stats` ou `GET /api/friends`, nos últimos 30 s; sala de espera;
-  fila) ou `offline`. Só amigos aceitos recebem o status, e nunca a sala nem o código.
-- **Convite**: o navegador cria a sala privada com `POST /api/online/rooms` (deck equipado e regras da Sala privada) e
+  fila) ou `offline`. As mesas do Yonko entram junto (`YonkoTables.presenceOf`): `playing` na partida em andamento
+  enquanto a pessoa não saiu dela, `online` na sala de espera com o canal aberto. Só amigos aceitos recebem o status,
+  e nunca a sala nem o código.
+- **Convite**: na folha, **Convidar** abre a escolha do formato por cima dela (`InvitePicker`, em `Friends.tsx`; as
+  opções são `InviteOption`, montadas no `Menu.tsx`): 1 contra 1 nas regras
+  da Sala privada e em cada `PLAY_FORMATS`, e a mesa do Yonko. No 1 contra 1, o navegador cria a sala privada com
+  `POST /api/online/rooms` (deck equipado e regras do formato escolhido) e
   chama `POST /api/friends/:id/invite`. O servidor exige o token do lugar 0 **e** que a conta seja a de quem criou,
   guarda o convite em memória (até 20 por pessoa, 30 min, só enquanto a sala espera e os dois são amigos) e manda o
   push da categoria `friends` com `/?convite=CÓDIGO`. Tocar no aviso (ou em **Entrar** na faixa da tela inicial)
   chama `POST /api/online/rooms/join` com o deck equipado, passando pela confirmação do deck se ela estiver ligada.
+- **Convite para o Yonko**: o mesmo `POST /api/friends/:id/invite`, com `{ tableId, token }` de uma mesa em espera em
+  que a conta tem lugar (qualquer lugar, não só o de quem criou: o código da mesa já está à vista de todos). Pela
+  folha, o navegador usa a mesa em que a pessoa já espera (`GET /api/yonko/active`) ou cria uma com o deck e as
+  regras guardados (`gumgum.yonko.deck` e `gumgum.yonko.rules`); pela sala de espera, o painel `TableFriends` chama
+  a rota para a mesa aberta. O convite (`kind: 'yonko'`) vale enquanto a mesa espera com lugar vago e some para quem
+  já sentou nela; chamar quem já está sentado responde 200 sem aviso. O push leva `/?yonko=CÓDIGO&convite=1`
+  (`friendLink.ts` lê como convite; sem o `convite`, `/?yonko=` continua sendo o link da mesa, que abre a entrada do
+  Yonko). Tocar no aviso ou em **Entrar** chama `POST /api/yonko/tables/join` com o deck do Yonko, sem a confirmação
+  do deck: a sala de espera mostra o deck e a partida só começa depois do "Estou pronto".
+- **Foto**: `GET /api/friends` traz `me` (apelido e foto, como os amigos me veem) e, em cada amigo aceito e em quem
+  mandou um convite, `picture`: o endereço da foto enviada no jogo (`customPictureOf`), ou null. A foto do Google
+  nunca sai daqui. `GET /api/users/:id/picture` abre para o dono, os amigos aceitos e os admins. No navegador,
+  `FriendAvatar` desenha o círculo (foto ou inicial numa cor de carta, aro do status).
+- **Busca**: com `FRIEND_SEARCH_MIN` amigos ou mais, a folha e o painel `TableFriends` mostram o campo de busca
+  (`friendSearch.ts`: todas as palavras da busca no apelido, sem acentos nem maiúsculas). É só no navegador: a lista
+  inteira já veio em `GET /api/friends`.
 - Pedido de amizade e aceite também geram push (`friends`, `/?amigos=1` abre a folha). Endereços lidos em
   `apps/web/src/friendLink.ts`; a folha e a faixa em `components/Friends.tsx`.
 
@@ -2111,6 +2174,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/health` | Verificação de saúde | Pública |
 | GET | `/api/config` | Configurações públicas (imagens, Client ID do Google, chave das notificações, apoio) | Pública |
 | GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (por coleção) e uma carta | Pública |
+| GET | `/api/spoilers/recent` | Spoilers novos: `{ days: 7, cards }`, as cartas ainda não lançadas que entraram no banco nos últimos 7 dias (até 40, da mais nova para a mais antiga), cada uma com `addedAt` (ISO, UTC) | Pública |
 | GET | `/api/coverage` | Cobertura dos efeitos automatizados por coleção | Pública |
 | GET | `/api/translations/pending` | Cartas com tradução automática parcial | Pública |
 | GET | `/api/dev/card-gaps` | Lacunas do leitor: cartas ⚙ por coleção e por parte do leitor, ranking das frases que faltam (até 300) e o número de novas | Dev |
@@ -2127,7 +2191,7 @@ Quem chama, na coluna da direita:
 | POST | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie | Pública |
 | POST | `/api/auth/logout` | Sai (apaga a sessão) | Sessão |
 | PUT · DELETE | `/api/auth/me/picture` | Troca a foto da conta (`{ image }` data URL) / volta para a do Google | Sessão |
-| GET | `/api/users/:id/picture` | Foto enviada por um usuário | Dono ou Admin |
+| GET | `/api/users/:id/picture` | Foto enviada por um usuário | Dono, amigo aceito ou Admin |
 | PUT · DELETE | `/api/auth/me/playmat-logo` | Logo de quem transmite no playmat da mesa lateral (`{ image }` data URL) / volta para a padrão | Streamer |
 | GET | `/api/users/:id/playmat-logo` | Logo do playmat enviada por um usuário | Dono (com o perfil que transmite) ou Admin |
 | GET | `/api/admin/users?q=` | Contas e perfis | Admin |
@@ -2215,10 +2279,10 @@ Quem chama, na coluna da direita:
 | POST | `/api/admin/stats/global/sync` | Força uma rodada do sync do meta global | Admin |
 | GET | `/api/online/config` · `/api/online/stats` · `/api/online/leaders?format=` | Configuração do online, contadores do menu e Líderes na fila casual | Pública |
 | GET | `/api/online/active` | Partidas em andamento de quem pede (com o token do assento) | Navegador |
-| GET | `/api/friends` | Meu código de amigo, amigos (nome público, recompensa e status `playing`/`online`/`offline`), pedidos recebidos e enviados e convites para partida ainda válidos. Também me conta como online | Sessão |
+| GET | `/api/friends` | Meu código de amigo, amigos (nome público, recompensa e status `playing`/`online`/`offline`), pedidos recebidos e enviados e convites ainda válidos (`kind`: `room`, sala privada, ou `yonko`, mesa do Yonko). Também me conta como online | Sessão |
 | POST | `/api/friends/requests` | Pede amizade pelo código (`{ code }`); se a outra conta já tinha pedido, vira amizade. 30 pedidos por hora por conta, até 200 amigos | Sessão |
 | POST · DELETE | `/api/friends/:id/accept` · `/api/friends/:id` | Aceita o pedido recebido / recusa, cancela ou desfaz a amizade | Sessão |
-| POST | `/api/friends/:id/invite` | Convida o amigo para a sala privada que acabei de criar (`{ roomId, token }`: lugar de quem criou, sala à espera); push com `/?convite=CÓDIGO`. Um convite a cada 15 s por amigo | Sessão + Assento |
+| POST | `/api/friends/:id/invite` | Convida o amigo para a sala privada que acabei de criar (`{ roomId, token }`: lugar de quem criou, sala à espera; push com `/?convite=CÓDIGO`) ou para a mesa do Yonko em que tenho lugar (`{ tableId, token }`: mesa à espera com lugar vago; push com `/?yonko=CÓDIGO&convite=1`). Um convite a cada 15 s por amigo | Sessão + Assento |
 | DELETE | `/api/friends/invites/:code` | Recusa o convite (some da tela inicial; a sala de quem convidou continua) | Sessão |
 | POST | `/api/online/rooms` · `/api/online/rooms/join` · `/api/online/queue` | Cria uma sala privada; entra numa; entra na fila (`{ deckId, format, queue }`; ranqueada exige login) | Navegador |
 | GET · DELETE | `/api/online/queue/:ticket` | Consulta a fila / sai dela | Quem tem o ticket |

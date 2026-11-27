@@ -15,6 +15,7 @@ import friends from './friends/fr';
 import monitor from './monitor/fr';
 import daily from './daily/fr';
 import analysis from './analysis/fr';
+import wait from './wait/fr';
 
 export default {
   // ---- general ----
@@ -3171,5 +3172,7 @@ export default {
   ...monitor,
   ...daily,
   ...analysis,
+  // ==== Espera por oponente: busca minimizada, dicas e mão de teste (i18n/wait) ====
+  ...wait,
 } satisfies Messages;
 

@@ -35,6 +35,7 @@ import {
   listCards,
   listDecks,
   recentMatches,
+  recentSpoilers,
   renameDeck,
   setDeckFavorite,
   type StoredDeck,
@@ -79,6 +80,10 @@ import { registerMonitorRoutes } from './monitor/routes';
 import { SseMetrics } from './monitor/sse';
 import { reportFromGame } from './tournaments/store';
 import { currentSpoilerSet } from './spoiler-set';
+
+/** Por quantos dias um spoiler conta como novo (`/api/spoilers/recent`) e quantos a rota devolve no máximo. */
+const RECENT_SPOILER_DAYS = 7;
+const RECENT_SPOILER_LIMIT = 40;
 
 /** Objeto sem as chaves `undefined` (para não sobrescrever os padrões num spread). */
 const stripUndefined = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
@@ -144,6 +149,16 @@ export function buildApp(
   }));
 
   app.get<{ Querystring: { set?: string } }>('/api/cards', async (req) => present(listCards(db, req.query.set)));
+
+  /**
+   * Spoilers novos: as cartas ainda não lançadas que chegaram nos últimos 7 dias, da mais nova para a mais antiga
+   * (o cartão de dicas da espera por oponente alterna entre elas).
+   */
+  app.get('/api/spoilers/recent', async () => {
+    const rows = recentSpoilers(db, RECENT_SPOILER_DAYS, RECENT_SPOILER_LIMIT);
+    const cards = present(rows.map((r) => r.card));
+    return { days: RECENT_SPOILER_DAYS, cards: cards.map((c, i) => ({ ...c, addedAt: rows[i].addedAt })) };
+  });
 
   app.get<{ Params: { id: string } }>('/api/cards/:id', async (req, reply) => {
     const [card] = present(getCards(db, [req.params.id]));
@@ -502,8 +517,6 @@ export function buildApp(
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
-  // Amigos e convite direto para partida (só com login; o status vem da presença do lobby).
-  registerFriendRoutes(app, { db, user: auth.viewer, lobby, notifier, now: opts.now });
   // Mesas do Yonko (todos contra todos): sala com código, bots nos lugares vagos e partida de 3 ou 4 (yonko/).
   const yonkoTables = registerYonkoRoutes(app, {
     db,
@@ -517,6 +530,8 @@ export function buildApp(
     sse,
   });
   app.decorate('yonkoTables', yonkoTables);
+  // Amigos e convite direto para partida ou mesa do Yonko (só com login; o status vem do lobby e das mesas).
+  registerFriendRoutes(app, { db, user: auth.viewer, lobby, yonko: yonkoTables, notifier, now: opts.now });
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
   registerTournamentRoutes(app, {
     db,

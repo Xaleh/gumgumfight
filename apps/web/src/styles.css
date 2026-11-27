@@ -7976,6 +7976,313 @@ tr.clickable:hover td {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Espera por oponente: a janela ganha o cartão de dicas, a mão de teste e "Minimizar"; minimizada, a busca vira
+ * uma pílula presa à tela, que acompanha o jogador pelo app (`QueueDock.tsx`).
+ *
+ * Animações (a opção "Animações" do jogador, em `anim-full` / `anim-soft` / `anim-off`): o pulso do ponto e a
+ * barrinha do tempo, que se repetem, só existem em `anim-full`; as entradas curtas valem em `anim-full` e
+ * `anim-soft`; em `anim-off` nada se move.
+ */
+.queue-actions {
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.queue-hint {
+  margin: 14px 0 2px;
+}
+/* A janela da espera e a pergunta "Sair da fila?": um pouco mais de borda que a janela padrão. */
+.modal-card.queue-wait,
+.queue-leave .modal-card {
+  padding: 22px 20px 20px;
+}
+.queue-leave .modal-card p {
+  margin: 0 0 18px;
+}
+/* Com a pílula embaixo, o fim da página ganha espaço para o último conteúdo rolar por cima dela (`QueueDock`).
+   Depois do `#root`, e não no `body`: os dois têm a altura da tela, e a página transborda deles. */
+html.queue-pill-open #root::after {
+  content: '';
+  display: block;
+  height: calc(76px + env(safe-area-inset-bottom));
+}
+.queue-pill {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  /* acima da barra do site (40), abaixo das janelas (50) */
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 11px 20px 11px 16px;
+  border: 1px solid rgba(253, 245, 224, 0.28);
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--cream);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(var(--shadow2-rgb), 0.35);
+  cursor: pointer;
+}
+/* Nas telas de mesa (assistir, replay) as bordas são todas da partida: lá a busca minimizada é uma etiqueta no
+   canto da mesa, do tamanho das vizinhas ("Assistindo", chat), e não a pílula solta. */
+.queue-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #12304b;
+  color: #fdf5e0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.18);
+  cursor: pointer;
+}
+.spectator-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.queue-chip b {
+  font-variant-numeric: tabular-nums;
+  color: #f2b733;
+}
+.queue-chip .queue-pill-dot {
+  width: 7px;
+  height: 7px;
+}
+.queue-chip:focus-visible {
+  outline: 2px solid #f2b733;
+  outline-offset: 2px;
+}
+.queue-chip.anim-full .queue-pill-dot {
+  animation: queue-pill-pulse 1.6s ease-in-out infinite;
+}
+.queue-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.queue-pill b {
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+.queue-pill:hover {
+  filter: brightness(1.15);
+}
+.queue-pill:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.queue-pill-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  /* fixo (e não `--ok`): a pílula é sempre azul-marinho, nos dois temas */
+  background: #3bc985;
+}
+.queue-pill.anim-full,
+.queue-pill.anim-soft {
+  animation: queue-pill-in 0.22s ease-out;
+}
+.queue-pill.anim-full .queue-pill-dot {
+  animation: queue-pill-pulse 1.6s ease-in-out infinite;
+}
+@keyframes queue-pill-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+}
+@keyframes queue-pill-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+/* A pergunta "Sair da fila?" fica por cima de qualquer janela da tela aberta. */
+.modal-backdrop.queue-leave {
+  z-index: 95;
+}
+.queue-stopped {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 12px 12px 12px 20px;
+  line-height: 1.4;
+  border-radius: 16px;
+  background: var(--navy);
+  color: var(--cream);
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(var(--shadow2-rgb), 0.35);
+}
+
+/* Cartão de dicas da espera (fila e sala privada): `WaitTips.tsx`. */
+.wait-tips {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 14px 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  text-align: left;
+  overflow: hidden;
+}
+.wait-tip {
+  flex: 1;
+  min-width: 0;
+  /* Três linhas de texto: o cartão não muda de altura (e a janela não pula) a cada dica. */
+  min-height: calc(1.1em + 3 * 1.4 * 14px);
+}
+.wait-tip-kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wait-tip p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+/* Spoiler novo: a carta à esquerda (abre ampliada ao toque) e o nome ao lado. */
+.wait-tip.spoiler {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wait-tip-card {
+  --cw: 54px;
+  --ch: calc(var(--cw) * 1.396);
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: zoom-in;
+}
+.wait-tip-card:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.wait-tip-text {
+  min-width: 0;
+}
+.wait-tip-name {
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.wait-tip-name small {
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.wait-tip-next {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.wait-tip-next svg {
+  transform: rotate(-90deg);
+}
+.wait-tip-next:hover {
+  background: var(--bg2);
+}
+.wait-tip-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--gold);
+  transform-origin: left;
+  animation: wait-tip-timer linear both;
+}
+.wait-tips.anim-full .wait-tip,
+.wait-tips.anim-soft .wait-tip {
+  animation: wait-tip-in 0.25s ease-out;
+}
+@keyframes wait-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes wait-tip-timer {
+  from {
+    transform: scaleX(0);
+  }
+}
+/* Sala privada à espera do oponente: o cartão não estica a coluna da sala. */
+.online-wait .wait-tips {
+  max-width: 460px;
+  margin: 18px auto;
+}
+.wait-hand-status {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.wait-hand-sheet .ht-hand {
+  --cw: 64px;
+}
+/* O painel da mão de teste nasceu na coluna estreita do construtor; na folha da espera ele tem espaço para respirar. */
+.wait-hand-sheet .hand-test {
+  padding: 14px;
+  gap: 12px;
+}
+.wait-hand-sheet .sheet-head {
+  padding: 18px 18px 10px 20px;
+}
+.wait-hand-sheet .sheet-body {
+  padding: 4px 20px 22px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .queue-pill,
+  .queue-pill .queue-pill-dot,
+  .queue-chip .queue-pill-dot,
+  .wait-tips .wait-tip {
+    animation: none;
+  }
+  .wait-tip-timer {
+    display: none;
+  }
+}
 .leader-pick-hint {
   margin: 0;
 }
@@ -22544,36 +22851,173 @@ div.dk-tile-main {
 /* ---- Amigos (Friends.tsx): folha, lista com status e faixa de convite ---- */
 .friends-sheet .sheet-body {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 .friends-sheet h4 {
-  margin: 4px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 10px;
   font-size: 15px;
 }
+/* Contador ao lado do título de uma seção ("1 online", pedidos recebidos). */
+.friends-count {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.friends-count.on {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  color: var(--ok);
+}
+/* A foto em círculo, como a arte dos Líderes: aro branco e, por fora, o aro do status. */
+.friend-avatar {
+  --ring: var(--line);
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 46px;
+}
+.friend-avatar-face {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px var(--ring), 0 4px 10px rgba(var(--shadow-rgb), 0.18);
+  background: var(--tone, var(--navy));
+  color: #fff;
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 22px;
+  line-height: 1;
+}
+.friend-avatar-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.friend-avatar.online {
+  --ring: var(--ok);
+}
+.friend-avatar.playing {
+  --ring: var(--gold);
+}
+.friend-avatar.offline .friend-avatar-face {
+  filter: saturate(0.55);
+  opacity: 0.8;
+}
+.friend-avatar-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 13px;
+  height: 13px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--ring);
+}
+.friend-avatar.offline .friend-avatar-dot {
+  background: var(--muted);
+}
+/* O meu cartão: a foto como os amigos a veem, o código e o botão de copiar o link. */
 .friends-me {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 2px solid var(--line);
+  gap: 10px 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: radial-gradient(120% 140% at 100% 0%, rgba(247, 205, 72, 0.18), transparent 55%), linear-gradient(135deg, #12304b 0%, #1b456b 100%);
+  border: 2px solid rgba(247, 205, 72, 0.5);
+  color: var(--cream);
+}
+.friends-me .friend-avatar {
+  --ring: var(--brand-yellow);
+  width: 58px;
+  height: 58px;
+}
+.friends-me .friend-avatar-face {
+  font-size: 28px;
+}
+.friends-me-who {
+  flex: 1 1 170px;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.friends-kicker {
+  color: var(--brand-yellow);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.friend-code {
+  color: #fff;
+  font-family: Bangers, Impact, sans-serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 4px;
+}
+.friends-me-name {
+  overflow: hidden;
+  color: rgba(253, 245, 224, 0.8);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friends-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  margin-left: auto;
 }
 .friends-me p {
   flex-basis: 100%;
   margin: 0;
+  color: rgba(253, 245, 224, 0.78);
+  font-size: 13px;
 }
-.friends-code {
-  display: grid;
-  flex: 1 1 auto;
+.friends-me .friends-photo-hint {
+  color: rgba(253, 245, 224, 0.62);
+  font-size: 12px;
 }
-.friend-code {
-  font-size: 22px;
-  letter-spacing: 3px;
-  font-variant-numeric: tabular-nums;
+/* No celular o botão não cabe ao lado do código: ocupa a linha inteira. */
+@media (max-width: 480px) {
+  .friends-copy {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
 }
 .friends-add {
   --mode: var(--accent);
+}
+.friends-notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+}
+/* Pedidos recebidos: em destaque, pedem resposta. */
+.friends-requests {
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
 }
 .friends-list {
   list-style: none;
@@ -22586,13 +23030,15 @@ div.dk-tile-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
+  gap: 10px 12px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 16px;
+  background: var(--panel);
   border: 1px solid var(--line);
 }
 .friends-list .btn-row {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-left: auto;
 }
@@ -22600,36 +23046,242 @@ div.dk-tile-main {
 .friends-list .btn-outline {
   min-height: 40px;
 }
+.friends-list li > .btn {
+  margin-left: auto;
+}
 .friend-name {
-  flex: 1 1 140px;
+  flex: 1 1 120px;
   min-width: 0;
   font-weight: 800;
   overflow-wrap: anywhere;
 }
 .friend-name small {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 700;
 }
-.friend-dot {
-  width: 10px;
-  height: 10px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--muted);
+.friend-status.online {
+  color: var(--ok);
 }
-.friend-dot.online {
-  background: var(--ok);
+.friend-status.playing {
+  color: var(--gold);
 }
-.friend-dot.playing {
-  background: var(--gold);
+.friend-bounty {
+  font-variant-numeric: tabular-nums;
+}
+.friend-bounty::before {
+  content: '·';
+  margin-right: 8px;
 }
 .friend-offline .friend-name {
-  opacity: 0.75;
+  opacity: 0.8;
+}
+/* Busca pelo apelido: aparece em cima da lista quando há muitos amigos. */
+.friends-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin-bottom: 10px;
+  padding: 0 6px 0 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  color: var(--muted);
+}
+.friends-search:focus-within {
+  border-color: var(--accent);
+}
+.friends-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  /* 16px: abaixo disso o iPhone dá zoom na página ao focar o campo. */
+  font-size: 16px;
+  font-weight: 700;
+  appearance: none;
+}
+.friends-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.friends-search-clear {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--panel2);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+.friends-none {
+  margin: 0 0 4px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 2px dashed var(--line);
+  text-align: center;
+}
+/* Remover da lista: discreto, longe do peso do "Convidar" (pede confirmação). */
+.friend-remove {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.friend-remove:hover:not(:disabled),
+.friend-remove:focus-visible {
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  color: var(--danger-text);
+}
+.friend-remove:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.friends-empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 22px 16px;
+  border-radius: 16px;
+  border: 2px dashed var(--line);
+  color: var(--muted);
+  text-align: center;
+}
+.friends-empty p {
+  margin: 0;
 }
 .home-banner.friend-invite .btn-row {
   display: flex;
   gap: 8px;
   margin-left: auto;
+}
+.home-banner.friend-invite .friend-avatar {
+  --ring: var(--note-line);
+}
+/* Escolha do formato do convite: abre por cima da folha de amigos, presa embaixo, sem mexer na lista. */
+.friends-sheet {
+  position: relative;
+  overflow: hidden;
+}
+.invite-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  background: var(--backdrop);
+}
+.invite-picker {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 16px;
+  padding: 16px 16px calc(18px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  background: var(--bg2);
+  border-top: 2px solid var(--brand-yellow);
+  box-shadow: 0 -10px 30px rgba(var(--shadow2-rgb), 0.3);
+}
+.invite-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.invite-picker-who {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.invite-picker-who strong {
+  font-size: 17px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+.invite-group {
+  display: grid;
+  gap: 8px;
+}
+.invite-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+.invite-kicker {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.invite-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.invite-chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+.invite-chip:hover:not(:disabled),
+.invite-chip:focus-visible {
+  background: linear-gradient(180deg, #fbda6a 0%, var(--brand-yellow) 100%);
+  border-color: var(--brown);
+  color: var(--brown);
+}
+.invite-chip:disabled {
+  border-style: dashed;
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: default;
+}
+.invite-group.yonko .invite-chip {
+  flex: 1 1 100%;
+}
+.invite-why {
+  margin: 0;
+}
+/* Painel "Chamar amigos" da sala de espera do Yonko. */
+/* A mesa não rola por causa da lista: com muitos amigos, ela rola por dentro. */
+.table-friends .friends-list {
+  max-height: 272px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
 }
 
 /* ------------------------------------------------------------------ Sandbox de regras */

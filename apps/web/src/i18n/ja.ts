@@ -15,6 +15,7 @@ import friends from './friends/ja';
 import monitor from './monitor/ja';
 import daily from './daily/ja';
 import analysis from './analysis/ja';
+import wait from './wait/ja';
 
 export default {
   // ---- 全般 ----
@@ -3169,5 +3170,7 @@ export default {
   ...monitor,
   ...daily,
   ...analysis,
+  // ==== Espera por oponente: busca minimizada, dicas e mão de teste (i18n/wait) ====
+  ...wait,
 } satisfies Messages;
 

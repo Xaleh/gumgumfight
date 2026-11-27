@@ -98,6 +98,13 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   referências escondidas do `view.ts` (`~…`) e o verso das cartas. O turno passa de um navegador para o outro; o segundo
   recarrega a página e volta para a mesma sala ainda com o turno; ele desiste e os dois veem o fim (vitória e derrota) e
   voltam ao menu.
+- `online.spec.ts`, espera pela fila (27/11/2026, junto com a busca minimizada): o cartão de dicas troca pelo botão, a
+  mão de teste do deck da fila sorteia 5 e compra a sexta, a busca minimizada continua nas estatísticas, o construtor
+  pergunta "Sair da fila?" (ficar mantém a busca; sair esvazia a fila no servidor) e a partida que chega leva quem
+  estava nas estatísticas para a mesa.
+- `online.spec.ts`, spoilers novos na espera: `addSpoilers()` (`e2e/support/spoilers.ts`, com `spoiler-cli.ts`) grava
+  duas cartas de spoiler no banco temporário pelo `upsertCards` do servidor; o cartão alterna dica e spoiler, mostra
+  "Chegou hoje", a carta abre ampliada e o Esc fecha só ela. No fim as cartas saem do banco (`removeSpoilers()`).
 - `online.spec.ts`, ranqueada: duas contas de teste, a ranqueada fica liberada, os dois entram na fila, um desiste e o
   bounty de quem venceu sobe (`/api/players/me`).
 - Os dois são `@iphone` desde 2026-11-27. Ficavam só no desktop por causa do arranjo da mesa no celular e da queda do
@@ -149,6 +156,10 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   desligadas valem na hora (a mesa leva `anim-off`). Entrou com o redesenho da mesa (playmats, animações de voo).
 - `yonko.spec.ts`, arrasto (só no `desktop`): joga até ter uma carta que dá para jogar, arrasta-a da mão até a mesa
   de quem joga (a mesa mostra que aceita a carta) e a carta sai da mão.
+- `friends.spec.ts` (só no `desktop`): três contas amigas. Uma abre **Amigos**, toca em **Convidar**, vê a escolha do formato
+  por cima da folha (1 contra 1 e o Yonko; Esc fecha só a escolha) e escolhe o Yonko; chega à sala de espera da mesa. A segunda vê a faixa do convite na tela
+  inicial e senta direto na mesa. Da sala de espera, a primeira chama a terceira pelo painel **Chamar amigos**, e a
+  faixa aparece para ela; o endereço do aviso (`/?yonko=CÓDIGO&convite=1`) a senta na mesa.
 - No teste da mesa local, nos dois projetos a partida corre com as animações completas. Depois de encerrar o turno, o
   teste espera a faixa de troca de turno atravessar a mesa na vez do bot e sair, e só então o jogador desliga as
   animações. (Até 2026-11-27 o `iphone` as desligava ainda na preparação, por causa do diagnóstico descrito abaixo.)
