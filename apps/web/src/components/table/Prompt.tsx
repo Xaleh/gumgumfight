@@ -443,10 +443,10 @@ export function Prompt(props: {
   }
 }
 
-type Confirm = Extract<NonNullable<GameState['pending']>, { kind: 'confirm' }>;
+export type Confirm = Extract<NonNullable<GameState['pending']>, { kind: 'confirm' }>;
 
 /** A pergunta cobra um custo? (O motor manda o custo nos parâmetros do texto: "Custo: …", "Pagar … para evitar?".) */
-function hasCost(pending: Confirm): boolean {
+export function hasCost(pending: Confirm): boolean {
   const p = pending as Confirm & Keyed;
   return Boolean(p.promptParts?.cost) || p.promptParams?.cost !== undefined;
 }
@@ -456,7 +456,7 @@ function hasCost(pending: Confirm): boolean {
  * frente (o nome e a carta já estão ao lado), o custo à parte no "usar o efeito?" e o aviso de que não dá
  * para pagar. Sem a chave do motor no dicionário, a pergunta fica como veio.
  */
-function askText(tryT: TryT, pending: Confirm, name: string | undefined): { question: string; cost?: string; cannot?: string } {
+export function askText(tryT: TryT, pending: Confirm, name: string | undefined): { question: string; cost?: string; cannot?: string } {
   const p = pending as Confirm & Keyed;
   let question = msgText(tryT, p.promptKey, p.promptParams, p.promptParts);
   if (question === undefined) return { question: pending.prompt };

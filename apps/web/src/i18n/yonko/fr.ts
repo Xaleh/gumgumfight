@@ -87,8 +87,6 @@ const yonko = {
   'yonko.mulliganRedraw': 'Repiocher',
   'yonko.curve': 'Choisissez votre départ.',
   'yonko.curveHint': 'Cela vaut pour votre premier tour ; ensuite, 2 DON!! et 1 carte par tour.',
-  'yonko.yes': 'Oui',
-  'yonko.no': 'Non',
   'yonko.confirm': 'Confirmer ({n})',
   'yonko.none': 'Aucun',
   'yonko.options': '{n|# option|# options}',

@@ -422,7 +422,9 @@ de fora, entraram pelo `useBoardMotion` e pelo `useMatchAudio` da mesa de dois, 
 
 **Arrastar e a carta da Vida (27/11/2026):** a mesa passou a aceitar o arrasto da mesa de dois (carta da mão até
 a mesa de quem joga, atacante até o alvo, DON!! ativo até uma carta), com o mouse e com o dedo, e a carta que sai
-da Vida abre no centro com o [Trigger] e a escolha (antes era só uma linha na faixa de ação).
+da Vida abre no centro com o [Trigger] e a escolha (antes era só uma linha na faixa de ação). A pergunta de usar um
+efeito ganhou a janela da mesa de dois (a carta ao lado, o custo, o texto e as duas respostas), e a janela de ler
+a carta, que saía cortada, foi refeita com a carta grande e o texto ao lado.
 
 ### Fora da v1
 

@@ -43,6 +43,7 @@ import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight, PickOrderContext } from './CardView';
 import { Icon } from './Icons';
 import { useBoardMotion } from './Motion';
+import { askText, type Confirm, hasCost } from './table/Prompt';
 import type { Drag } from './table/shared';
 import { useTableGestures } from './table/useTableGestures';
 
@@ -121,6 +122,12 @@ function optionLabels(tryT: TryT, pending: Extract<Pending, { kind: 'option' }>)
   });
 }
 
+/** As duas respostas de uma pergunta de sim ou não: "Pagar e usar" só quando há custo; no "comprar até N", comprar ou parar. */
+const confirmLabels = (t: Translate, p: Confirm) => ({
+  yes: p.drawUpTo ? t('game.drawOne') : hasCost(p) ? t('game.payAndUse') : t('game.useEffect'),
+  no: p.drawUpTo ? t('game.stop') : t('game.dontUse'),
+});
+
 interface Btn {
   label: string;
   onClick: () => void;
@@ -141,7 +148,7 @@ interface BannerView {
   mine: boolean;
   /** A mesa espera outra pessoa (ou um bot): a faixa mostra os três pontinhos. */
   waiting?: boolean;
-  /** A pergunta abre numa janela (a carta da Vida): o botão do olho a recolhe para olhar a mesa. */
+  /** A pergunta abre numa janela (a carta da Vida, usar um efeito): o botão do olho a recolhe para olhar a mesa. */
   peek?: boolean;
 }
 
@@ -528,6 +535,89 @@ function Result({
 }
 
 /**
+ * A pergunta de sim ou não do motor (usar um efeito, pagar um custo), no desenho da mesa de dois (`Prompt`, o caso
+ * `confirm` no desktop): a carta que pergunta ao lado (o clique abre para ler), o nome, a pergunta sem o nome
+ * repetido, o custo numa linha à parte e o texto da carta; as duas respostas do mesmo tamanho, e "Ver a mesa" e
+ * "Desfazer" num rodapé discreto. Sem como pagar o custo a pergunta abre mesmo assim (para os oponentes não
+ * deduzirem a mão), só com "Não usar".
+ */
+function AskEffect({
+  s,
+  pending,
+  t,
+  tryT,
+  onAnswer,
+  onPeek,
+  onCard,
+  onCancel,
+}: {
+  s: GameState;
+  pending: Confirm;
+  t: Translate;
+  tryT: TryT;
+  onAnswer: (yes: boolean) => void;
+  onPeek: () => void;
+  onCard: (uid: string) => void;
+  onCancel?: () => void;
+}) {
+  const { locale } = useSettings();
+  const def = s.cards[pending.source] ? cardDef(s, pending.source) : null;
+  const ask = askText(tryT, pending, def?.name);
+  const labels = confirmLabels(t, pending);
+  const text = def ? cardText(def, locale).text : null;
+  return (
+    <div className="modal-backdrop ask-backdrop yk-ask-back">
+      <div className={`modal-card ask yk-ask c-${def?.colors[0] ?? 'red'}`} role="dialog" aria-modal="true" aria-label={ask.question}>
+        <div className="ask-main">
+          {def && (
+            <div className="ask-art">
+              <CardView state={s} uid={pending.source} onClick={() => onCard(pending.source)} />
+            </div>
+          )}
+          <div className="ask-body">
+            {def && <div className="ask-name">{def.name}</div>}
+            <h3>{ask.question}</h3>
+            {ask.cost && (
+              <p className="ask-cost">
+                <b>{t('card.cost')}</b>
+                {ask.cost}
+              </p>
+            )}
+            {pending.cannot && (
+              <p className="ask-cannot">
+                {ask.cannot && <b>{ask.cannot}</b>}
+                {t('game.opponentSeesQuestion')}
+              </p>
+            )}
+            {text && <p className="ask-text">{text}</p>}
+            <div className="ask-answers">
+              {!pending.cannot && (
+                <button type="button" className="yk-btn primary" onClick={() => onAnswer(true)}>
+                  {labels.yes}
+                </button>
+              )}
+              <button type="button" className={['yk-btn', pending.cannot ? 'primary' : ''].join(' ')} onClick={() => onAnswer(false)}>
+                {labels.no}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="ask-foot">
+          <button type="button" className="yk-btn" onClick={onPeek} title={t('game.peekTitle')}>
+            {t('game.peek')}
+          </button>
+          {onCancel && (
+            <button type="button" className="yk-btn cancel" onClick={onCancel}>
+              {t('yonko.undo')}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * A carta que saiu da Vida, grande no centro da mesa, com o [Trigger] dela (quando há) e a escolha: ativar ou
  * levar para a mão. Toda carta que sai da Vida passa por aqui, com ou sem [Trigger]: os oponentes só veem que uma
  * carta da Vida está sendo olhada. "Ver a mesa" recolhe a janela; a faixa de ação fica com os mesmos botões.
@@ -891,17 +981,21 @@ export function YonkoTable({
             buttons: [...labels.map((label, index): Btn => ({ label, kind: labels.length <= 2 && index === 0 ? 'primary' : undefined, onClick: () => send({ type: 'option', player: me, index }) })), ...cancel],
           };
         }
-        case 'confirm':
+        case 'confirm': {
+          // A pergunta abre na janela `AskEffect`; a faixa fica com as mesmas respostas para quando ela está recolhida.
+          const labels = confirmLabels(t, p);
           return {
             icon: 'check',
             mine: true,
             text: promptText(tryT, p),
+            peek: true,
             buttons: [
-              ...(p.cannot ? [] : [{ label: t('yonko.yes'), kind: 'primary' as const, onClick: () => send({ type: 'answer', player: me, yes: true }) }]),
-              { label: t('yonko.no'), onClick: () => send({ type: 'answer', player: me, yes: false }) },
+              ...(p.cannot ? [] : [{ label: labels.yes, kind: 'primary' as const, onClick: () => send({ type: 'answer', player: me, yes: true }) }]),
+              { label: labels.no, kind: p.cannot ? ('primary' as const) : undefined, onClick: () => send({ type: 'answer', player: me, yes: false }) },
               ...cancel,
             ],
           };
+        }
         case 'selectTargets': {
           const offTable = [...new Set([...(p.shown ?? []), ...p.options])].filter((u) => !locate(s, u) && !mine.hand.includes(u));
           const n = picked.length;
@@ -1352,6 +1446,19 @@ export function YonkoTable({
         </div>
 
         {motion.layer}
+
+        {myPending?.kind === 'confirm' && !trayHidden && !sheet && (
+          <AskEffect
+            s={s}
+            pending={myPending}
+            t={t}
+            tryT={tryT}
+            onAnswer={(yes) => send({ type: 'answer', player: me, yes })}
+            onPeek={() => setTrayHidden(true)}
+            onCard={inspectCard}
+            onCancel={cancelAllowed(s, me) ? () => send({ type: 'cancel', player: me }) : undefined}
+          />
+        )}
 
         {lifeCard && !trayHidden && !sheet && <LifeReveal s={s} uid={lifeCard} trigger={legal.some((a) => a.type === 'answer' && a.yes)} t={t} onAnswer={(yes) => send({ type: 'answer', player: me, yes })} onPeek={() => setTrayHidden(true)} />}
 

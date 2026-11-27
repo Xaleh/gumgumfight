@@ -462,7 +462,10 @@ nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`
   entrega à mesa a visão de quem joga (`viewFor`); `components/YonkoTable.tsx` é a mesa, por clique ou arrastando
   (`useTableGestures`, o mesmo gancho da mesa de dois: as cartas levam `data-drag` `hand`/`attacker`, os DON!!
   ativos `data-drag="don"`, a mesa de quem joga `data-drop="field"`; não há reordenar a mão nem devolver DON!!
-  anexado). A carta que sai da Vida de quem joga abre a janela `LifeReveal` (a carta, o [Trigger] e a escolha).
+  anexado). A carta que sai da Vida de quem joga abre a janela `LifeReveal` (a carta, o [Trigger] e a escolha), e
+  a pergunta de sim ou não do motor (`confirm`) abre a `AskEffect`, com o desenho e os textos da mesa de dois (as
+  classes `.ask-*` e `askText`/`hasCost`, de `table/Prompt.tsx`), em qualquer largura de tela. As janelas da mesa
+  levam `sheet-<tipo>`, nunca o tipo sozinho (`card` é a classe das cartas).
   Cada lugar é um
   playmat na cor do Líder, com as zonas marcadas do mesmo jeito que na mesa de dois (`.field-card`, `.pile`,
   `[data-hand-uid]` e as âncoras `data-anchor` de Vida, deck, descarte, mão, DON!! e `arena`): é isso que deixa a

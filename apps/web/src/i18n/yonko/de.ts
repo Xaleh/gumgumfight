@@ -87,8 +87,6 @@ const yonko = {
   'yonko.mulliganRedraw': 'Neu ziehen',
   'yonko.curve': 'Wähle deinen Start.',
   'yonko.curveHint': 'Gilt für deinen ersten Zug; danach 2 DON!! und 1 Karte pro Zug.',
-  'yonko.yes': 'Ja',
-  'yonko.no': 'Nein',
   'yonko.confirm': 'Bestätigen ({n})',
   'yonko.none': 'Keins',
   'yonko.options': '{n|# Option|# Optionen}',

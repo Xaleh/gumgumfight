@@ -19429,6 +19429,8 @@ div.dk-tile-main {
   --knob: #43536d;
   --amber-text: #f2b733;
   --danger-text: #ff9a9a;
+  --danger-bg: rgba(255, 90, 90, 0.14);
+  --backdrop: rgba(2, 8, 18, 0.66);
   --trigger-text: #ffa676;
   --shadow-rgb: 0, 0, 0;
   --shadow2-rgb: 0, 0, 0;
@@ -20842,6 +20844,70 @@ div.dk-tile-main {
 .yk-me.drop-over {
   background-color: rgba(79, 211, 255, 0.1);
   box-shadow: inset 0 0 0 2px rgba(79, 211, 255, 0.7), 0 0 30px rgba(79, 211, 255, 0.35), 0 10px 26px rgba(0, 0, 0, 0.38);
+}
+
+/*
+ * ---- a pergunta de usar um efeito: a janela da mesa de dois (`.modal-card.ask`), com os botões desta mesa ----
+ * O desenho (a carta ao lado, o nome, a pergunta, o custo, o texto, as duas respostas e o rodapé) vem das regras
+ * `.ask-*`; aqui ficam só o que muda no tema escuro da mesa e a versão estreita, com a carta em cima.
+ */
+.yk .yk-ask-back {
+  z-index: 55;
+}
+.yk .yk-ask {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--card-color, transparent) 26%, transparent), transparent 62%),
+    linear-gradient(180deg, #1a3250, #0f1c30);
+}
+.yk .yk-ask .ask-text {
+  background: rgba(0, 0, 0, 0.26);
+}
+.yk .yk-ask .ask-answers .yk-btn {
+  flex: 1 1 0;
+  min-height: 48px;
+  font-size: 15px;
+}
+.yk .yk-ask .ask-foot {
+  background: rgba(0, 0, 0, 0.22);
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+.yk .yk-ask .ask-foot .yk-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--muted);
+}
+.yk .yk-ask .ask-foot .yk-btn:hover {
+  background: var(--panel2);
+  color: var(--text);
+  filter: none;
+}
+.yk .yk-ask .ask-foot .yk-btn.cancel {
+  margin-left: auto;
+  color: var(--danger-text);
+}
+.yk .yk-ask .ask-foot .yk-btn.cancel:hover {
+  background: var(--danger-bg);
+}
+@media (max-width: 620px) {
+  .yk .yk-ask .ask-main {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 16px;
+  }
+  .yk .yk-ask .ask-art {
+    --cw: min(40vw, 150px);
+    align-self: center;
+  }
+  .yk .yk-ask h3 {
+    font-size: 20px;
+  }
 }
 
 /* ---- a carta que saiu da Vida, no centro da mesa ---- */
