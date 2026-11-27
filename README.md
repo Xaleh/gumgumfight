@@ -750,7 +750,7 @@ espectadores seguem para a partida nova.
 
 - **O que o espectador vê:** a visão pública da mesa (`viewFor` com `viewer = null`): campo, descarte, Vida virada para
   cima, cartas reveladas e o log público. Mãos, decks e Vida virada para baixo chegam escondidas.
-- **Ver mãos (Streamer e Admin, só em torneio e em sala privada liberada):** nas partidas de torneio e nas salas
+- **Ver mãos (Streamer, Organizador e Admin, só em torneio e em sala privada liberada):** nas partidas de torneio e nas salas
   privadas em que quem criou marcou **Liberar as mãos para transmissão** (no card de Sala privada), a lista e a mesa
   têm o botão **Ver mãos**, que mostra as mãos dos dois jogadores (decks e Vida continuam escondidos). Assim um streamer
   combina uma partida entre dois amigos e transmite com as mãos. Os dois jogadores veem o aviso "📡 Mãos liberadas" na
@@ -764,7 +764,7 @@ espectadores seguem para a partida nova.
 - **Interagir assistindo:** quem assiste toca numa carta à vista para ampliá-la e ler o efeito (no computador, passar
   o mouse mostra a carta no painel lateral), abre o descarte dos dois jogadores e o histórico, e o botão **Chat** da
   faixa do espectador esconde ou mostra as mensagens e emotes dos jogadores só para si (lembrado no navegador).
-- **Modo transmissão (OBS, Streamer e Admin):** em **Assistir partidas**, o painel **Modo transmissão** cria um link
+- **Modo transmissão (OBS, Streamer, Organizador e Admin):** em **Assistir partidas**, o painel **Modo transmissão** cria um link
   secreto (`/?transmissao=<chave>`) para colocar no OBS como **Fonte de navegador** (1920 × 1080). A fonte do OBS não
   tem o login do Google: a chave faz esse papel, só para assistir. Cada partida da lista ganha o botão **📡 Transmitir**,
   o campo do código de sala privada também (essas salas não aparecem na lista), e o menu de qualquer partida aberta
@@ -791,7 +791,7 @@ espectadores seguem para a partida nova.
 ### Perfis (Player, Streamer, Organizador, Admin, Dev)
 
 Cada conta Google tem um perfil (coluna `users.role`): **Player** (padrão: joga e assiste sem ver as mãos),
-**Streamer** (assiste vendo as mãos, com atraso, e usa o modo transmissão), **Organizador** (cria torneios e gerencia os que criou), **Admin** (tudo
+**Streamer** (assiste vendo as mãos, com atraso, usa o modo transmissão e troca a logo do playmat), **Organizador** (tudo do Streamer, e cria torneios e gerencia os que criou), **Admin** (tudo
 isso, gerencia qualquer torneio, muda os perfis e vê os relatos de partidas em **Administração**, no menu) ou **Dev** (tudo do Admin e as
 funções de desenvolvimento). Sem login, a pessoa assiste como Player.
 
@@ -1056,7 +1056,7 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
   foto do Google. O navegador recorta o centro e reduz para 256×256 JPEG antes de enviar; o servidor aceita JPEG, PNG
   ou WebP (até 256 KB, tipo conferido pelos primeiros bytes) e guarda a imagem em `users.custom_picture`. Só o
   próprio usuário e os admins a veem (`/api/users/:id/picture`). "Usar a foto do Google" volta para a original.
-- **Logo no playmat** (perfis Streamer e Admin): assistindo a uma partida na mesa lateral, o menu da partida tem
+- **Logo no playmat** (perfis Streamer, Organizador e Admin): assistindo a uma partida na mesa lateral, o menu da partida tem
   "Logo no playmat" para trocar a logo do Uai Uai no Mi, no centro do playmat, pela logo de quem transmite. Ela fica
   guardada na conta (`users.playmat_logo`, até 512 KB) e aparece só na tela de quem enviou; os outros espectadores
   continuam vendo a padrão. "Usar a logo padrão" desfaz.

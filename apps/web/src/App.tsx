@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, isAdmin, isDev, isTeam, type OnlineSeat, type WatchTarget, type YonkoSeatRef } from './api';
+import { api, isAdmin, isDev, isTeam, type OnlineSeat, seesHands, type WatchTarget, type YonkoSeatRef } from './api';
 import { audio } from './audio';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
@@ -327,7 +327,7 @@ function MainApp() {
       <WatchGameScreen
         key={screen.target.roomId}
         target={screen.target}
-        canHands={role === 'streamer' || isAdmin(role)}
+        canHands={seesHands(role)}
         exitTo={screen.tournament ? 'tournament' : screen.home ? 'menu' : 'back'}
         onExit={() =>
           setScreen(

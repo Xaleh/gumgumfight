@@ -1174,7 +1174,7 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
   desconhecido) e confere assinatura, `iss`, `aud = GOOGLE_CLIENT_ID`, `exp`/`iat` (tolerância 60 s), `sub`.
 - **Sessão**: cookie `gg_session` (`HttpOnly; SameSite=Lax; Path=/; Secure` em HTTPS), 60 dias; no banco só
   `sha256(token)`. Login apaga a sessão anterior e as expiradas.
-- **Perfis** (`users.role`): `player`, `streamer` (vê mãos ao assistir, com atraso, e usa o modo transmissão), `organizer` (cria/gerencia torneios), `admin`
+- **Perfis** (`users.role`): `player`, `streamer` (vê mãos ao assistir, com atraso, usa o modo transmissão e troca a logo do playmat), `organizer` (tudo do `streamer`, e cria/gerencia torneios), `admin`
   (gerencia tudo, muda perfis), `dev` (admin + telas de desenvolvimento). `ADMIN_EMAILS` promove a admin no login com
   e-mail verificado. **Judge** não é perfil da conta: é um papel por torneio (`tournament_judges`, seção 12).
 - **Migração do navegador para a conta** (`claimBrowserData`): no primeiro login, decks `user` do `owner_hash` do
@@ -1365,7 +1365,7 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
 - `?judge=1` (**Judge do torneio**, organizador ou admin, via `actsAsJudge`): entra em qualquer sala do torneio (até em
   espera) vendo as duas mãos **ao vivo**, sem atraso (`Connection.judge`, `lateDelay` = 0), com o log inteiro desde o
   começo (toda conexão nova recebe o log do 0). Fora de sala de torneio, `judge` é ignorado. Cada entrada vai para o log do servidor.
-- `?hands=1` (**Streamer**, **Admin** e **Dev**, via `seesHands`, **só onde `Room.handsAllowed`**: partida de torneio
+- `?hands=1` (**Streamer**, **Organizador**, **Admin** e **Dev**, via `seesHands`, **só onde `Room.handsAllowed`**: partida de torneio
   ou sala privada com `RoomData.showHands`, marcado por quem criou em `POST /api/online/rooms {showHands}` e mantido na
   revanche): `extra` = as duas mãos + a carta da Vida sendo olhada. Recusado (403) fora disso (`handsTournamentOnly`) e
   para quem joga a própria partida. A `Room` também garante a regra: sem `handsAllowed`, `hands` é ignorado ao
@@ -1402,7 +1402,7 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   transmissão (`Table` com `broadcast`) esconde menus, botões e avisos de erro, esconde o chat se `chat` estiver
   desligado e mostra `PlayHighlight`: a carta de `playCard`, `counter` ou `activate`, grande, por 2,8 s.
 - **Logo de quem transmite no playmat** (mesa lateral da visão do Streamer): o centro do playmat mostra a logo do
-  Uai Uai no Mi (`.lat-center::before`). Os perfis Streamer, Admin e Dev trocam por uma logo própria no menu da
+  Uai Uai no Mi (`.lat-center::before`). Os perfis Streamer, Organizador, Admin e Dev trocam por uma logo própria no menu da
   partida (Playmat → Logo no playmat, `PlaymatLogoField` em `table/TableMenu.tsx`): o navegador reduz a imagem
   (`playmatLogo` em `picture.ts`: até 512 px no maior lado, PNG ou WebP com a transparência) e
   `PUT /api/auth/me/playmat-logo` guarda em `users.playmat_logo` (JPEG, PNG ou WebP, até 512 KB, tipo conferido
@@ -2079,7 +2079,7 @@ Quem chama, na coluna da direita:
 - **Jogou**: uma das contas da partida (replay de torneio só depois que ele termina).
 - **Organizador**: organizador do torneio (perfil Organizador ou cota de apoiador) ou Admin.
 - **Judge**: Judge do torneio, o organizador ou Admin.
-- **Streamer**: perfil Streamer ou Admin.
+- **Streamer**: perfil Streamer, Organizador ou Admin (`seesHands`: o Organizador tem tudo o que o Streamer tem).
 - **Admin**: perfis Admin e Dev.
 - **Token (scope)**: também aceita um token de parceiro com o scope; as outras rotas respondem 403 `token_not_allowed` a tokens.
 - **Cliente OAuth**: `client_id` + `client_secret` de um app cadastrado.
