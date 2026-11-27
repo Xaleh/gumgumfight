@@ -420,6 +420,10 @@ ação mostra a batalha (poder contra poder) e a mão ficou em leque. As animaç
 de fora, entraram pelo `useBoardMotion` e pelo `useMatchAudio` da mesa de dois, sempre seguindo a opção
 "Animações" do jogador; o descarte agora abre carta a carta. No celular a mesa cabe na tela sem rolar.
 
+**Arrastar e a carta da Vida (27/11/2026):** a mesa passou a aceitar o arrasto da mesa de dois (carta da mão até
+a mesa de quem joga, atacante até o alvo, DON!! ativo até uma carta), com o mouse e com o dedo, e a carta que sai
+da Vida abre no centro com o [Trigger] e a escolha (antes era só uma linha na faixa de ação).
+
 ### Fora da v1
 
 Mesa de 3, fila pública, torneio de Yonko, alianças formais, 2 contra 2 e bot competitivo.

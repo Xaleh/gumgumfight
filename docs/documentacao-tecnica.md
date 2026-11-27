@@ -459,7 +459,11 @@ nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`
 - **Telas** (`apps/web`): `components/Yonko.tsx` (a sala) monta o `GameConfig` com `yonkoDeckFrom` (deck de teste de
   60 a partir de um deck comum) e as regras escolhidas; `game/useYonkoGame.ts` roda a partida no navegador
   (`createGame`/`applyAction`), faz os bots jogarem com `chooseSimpleBotAction` sobre a visão do lugar deles e
-  entrega à mesa a visão de quem joga (`viewFor`); `components/YonkoTable.tsx` é a mesa, por clique. Cada lugar é um
+  entrega à mesa a visão de quem joga (`viewFor`); `components/YonkoTable.tsx` é a mesa, por clique ou arrastando
+  (`useTableGestures`, o mesmo gancho da mesa de dois: as cartas levam `data-drag` `hand`/`attacker`, os DON!!
+  ativos `data-drag="don"`, a mesa de quem joga `data-drop="field"`; não há reordenar a mão nem devolver DON!!
+  anexado). A carta que sai da Vida de quem joga abre a janela `LifeReveal` (a carta, o [Trigger] e a escolha).
+  Cada lugar é um
   playmat na cor do Líder, com as zonas marcadas do mesmo jeito que na mesa de dois (`.field-card`, `.pile`,
   `[data-hand-uid]` e as âncoras `data-anchor` de Vida, deck, descarte, mão, DON!! e `arena`): é isso que deixa a
   mesa usar `useBoardMotion` (`Motion.tsx`, com `root: '.yk'`) e `useMatchAudio`, que valem para qualquer número de
