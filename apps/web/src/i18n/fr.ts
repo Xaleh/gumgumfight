@@ -391,6 +391,10 @@ export default {
   'menu.bothDecksValid': 'Les deux decks doivent être légaux en {format}.',
   'menu.battle': 'Combat !',
   'menu.opponent': 'Adversaire : {name}',
+  /** Card "Contra o bot": o botão-resumo e a folha com quem começa, nível e estilo. */
+  'menu.botOptions': 'Options du bot',
+  'menu.botSummary': 'Bot : {value}',
+  'menu.firstSummary': 'Commence : {who}',
   'menu.whoStarts': 'Qui commence',
   'menu.firstRandom': 'Pile ou face',
   'menu.you': 'Vous',

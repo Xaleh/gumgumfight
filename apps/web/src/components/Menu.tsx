@@ -93,7 +93,7 @@ function savedBotLevel(): BotLevel {
   }
 }
 
-/** As opções do estilo do bot: o valor, o rótulo e a explicação (aparece embaixo e no título do botão). */
+/** As opções do estilo do bot: o valor, o rótulo e a explicação (aparece junto, na folha de opções do bot). */
 const BOT_STYLE_OPTIONS = [
   ['balanced', 'menu.botBalanced', 'menu.botBalancedTitle'],
   ['aggressive', 'menu.botAggressive', 'menu.botAggressiveTitle'],
@@ -133,6 +133,115 @@ function DeckArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
       colors={deck?.colors}
       size={small ? 'small' : undefined}
     />
+  );
+}
+
+const FIRST_OPTIONS = [
+  ['random', 'menu.firstRandom'],
+  ['0', 'menu.you'],
+  ['1', 'menu.botName'],
+] as const satisfies ReadonlyArray<readonly ['random' | '0' | '1', MessageKey]>;
+
+const BOT_LEVEL_LABEL: Record<BotLevel, MessageKey> = { easy: 'menu.botEasy', normal: 'menu.botNormal', hard: 'menu.botHard', team: 'menu.botTeam' };
+
+/**
+ * Opções do treino contra o bot (quem começa, nível e estilo), numa folha: no card "Contra o bot" fica só o resumo,
+ * para ele não passar da altura dos outros modos.
+ */
+function BotOptions({
+  first,
+  onFirst,
+  level,
+  onLevel,
+  team,
+  personality,
+  onPersonality,
+  teamServer,
+  onClose,
+}: {
+  first: 'random' | '0' | '1';
+  onFirst: (first: 'random' | '0' | '1') => void;
+  level: BotLevel;
+  onLevel: (level: BotLevel) => void;
+  /** Quem é do Time vê o nível Time (o Bot do Time). */
+  team: boolean;
+  personality: BotPersonality;
+  onPersonality: (personality: BotPersonality) => void;
+  /** O Bot do Time vai jogar no servidor (aviso embaixo do nível). */
+  teamServer: boolean;
+  onClose: () => void;
+}) {
+  const t = useT();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const levels: BotLevel[] = team ? ['easy', 'normal', 'hard', 'team'] : ['easy', 'normal', 'hard'];
+  return (
+    <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>
+      <div className="sheet bot-options" role="dialog" aria-modal="true" aria-labelledby="bot-options-title" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h3 id="bot-options-title">{t('menu.botOptions')}</h3>
+          <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">
+          <div className="mode-field">
+            <span className="mode-field-label" id="first-label">
+              {t('menu.whoStarts')}
+            </span>
+            <div className="seg" role="group" aria-labelledby="first-label">
+              {FIRST_OPTIONS.map(([v, label]) => (
+                <button key={v} type="button" className={first === v ? 'on' : ''} aria-pressed={first === v} onClick={() => onFirst(v)}>
+                  {t(label)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mode-field">
+            <span className="mode-field-label" id="bot-level-label">
+              {t('menu.botLevel')}
+            </span>
+            <div className="seg" role="group" aria-labelledby="bot-level-label">
+              {levels.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={[level === v ? 'on' : '', v === 'team' ? 'team' : ''].join(' ')}
+                  aria-pressed={level === v}
+                  title={v === 'team' ? t('menu.botTeamTitle') : undefined}
+                  onClick={() => onLevel(v)}
+                >
+                  {t(BOT_LEVEL_LABEL[v])}
+                </button>
+              ))}
+            </div>
+            {level === 'team' && teamServer && <p className="muted small mode-hint">{t('menu.botTeamServer')}</p>}
+          </div>
+          {/* O Bot do Time não tem estilo: o dele sai do perfil do deck. */}
+          {level !== 'team' && (
+            <div className="mode-field">
+              <span className="mode-field-label" id="bot-style-label">
+                {t('menu.botStyle')}
+              </span>
+              <div className="bot-styles" role="group" aria-labelledby="bot-style-label">
+                {BOT_STYLE_OPTIONS.map(([v, label, hint]) => (
+                  <button key={v} type="button" className={['bot-style', personality === v ? 'on' : ''].join(' ')} aria-pressed={personality === v} onClick={() => onPersonality(v)}>
+                    <span className="bot-style-name">{t(label)}</span>
+                    <span className="bot-style-hint">{t(hint)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <button type="button" className="btn primary" onClick={onClose}>
+            {t('common.ok')}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -384,6 +493,9 @@ export function Menu({
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
   const [first, setFirst] = useState<'random' | '0' | '1'>('random');
+  /** Folha com as opções do bot (quem começa, nível e estilo); no card fica só o resumo. */
+  const [showBotOptions, setShowBotOptions] = useState(false);
+  const closeBotOptions = useCallback(() => setShowBotOptions(false), []);
   const [savedLevel, setBotLevel] = useState<BotLevel>(savedBotLevel);
   /** O nível Time (o Bot do Time) só vale para quem é do Time; para os outros, o guardado vira "difícil". */
   const team = isTeam(user);
@@ -640,6 +752,9 @@ export function Menu({
   };
   const privateMode = modeOf(privateRules);
   const botMode = modeOf(botRules);
+  /** Resumo das opções do bot no card: "Difícil · Controle" (o Bot do Time não tem estilo) e quem começa. */
+  const botSummary = [t(BOT_LEVEL_LABEL[botLevel]), ...(botLevel === 'team' ? [] : [t(BOT_STYLE_OPTIONS.find(([v]) => v === botPersonality)![1])])].join(' · ');
+  const firstSummary = t(FIRST_OPTIONS.find(([v]) => v === first)![1]);
   /** O deck é completo e vale nas regras. */
   function playsIn(d: DeckSummary | undefined, mode: PlayMode): d is DeckSummary {
     return Boolean(d && canPlay(d, mode.format, spoilerRule(mode)));
@@ -1123,66 +1238,21 @@ export function Menu({
                     saveRules(LAST_BOT_RULES, r);
                   }}
                 />
-                <div className="mode-field">
-                  <span className="mode-field-label" id="first-label">
-                    {t('menu.whoStarts')}
+                <button
+                  type="button"
+                  className="pick-btn bot-summary"
+                  onClick={() => setShowBotOptions(true)}
+                  aria-haspopup="dialog"
+                  // O nome diz o que o botão abre e o que está escolhido (sem ele, o leitor de tela só ouviria os valores).
+                  aria-label={`${t('menu.botOptions')}: ${botSummary}, ${t('menu.firstSummary', { who: firstSummary })}`}
+                  title={t('menu.botOptions')}
+                >
+                  <span className="bot-summary-lines">
+                    <span>{interp(t('menu.botSummary'), 'value', <strong>{botSummary}</strong>)}</span>
+                    <span className="bot-summary-sub">{interp(t('menu.firstSummary'), 'who', <strong>{firstSummary}</strong>)}</span>
                   </span>
-                  <div className="seg small" role="group" aria-labelledby="first-label">
-                    {(
-                      [
-                        ['random', 'menu.firstRandom'],
-                        ['0', 'menu.you'],
-                        ['1', 'menu.botName'],
-                      ] as const
-                    ).map(([v, label]) => (
-                      <button key={v} type="button" className={first === v ? 'on' : ''} aria-pressed={first === v} onClick={() => setFirst(v)}>
-                        {t(label)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="mode-field">
-                  <span className="mode-field-label" id="bot-level-label">
-                    {t('menu.botLevel')}
-                  </span>
-                  <div className="seg small level-seg" role="group" aria-labelledby="bot-level-label">
-                    {(
-                      [
-                        ['easy', 'menu.botEasy'],
-                        ['normal', 'menu.botNormal'],
-                        ['hard', 'menu.botHard'],
-                        ...(team ? ([['team', 'menu.botTeam']] as const) : []),
-                      ] as const
-                    ).map(([v, label]) => (
-                      <button
-                        key={v}
-                        type="button"
-                        className={[botLevel === v ? 'on' : '', v === 'team' ? 'team' : ''].join(' ')}
-                        aria-pressed={botLevel === v}
-                        title={v === 'team' ? t('menu.botTeamTitle') : undefined}
-                        onClick={() => setBotLevel(v)}
-                      >
-                        {t(label)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {botLevel !== 'team' && (
-                  <div className="mode-field">
-                    <span className="mode-field-label" id="bot-style-label">
-                      {t('menu.botStyle')}
-                    </span>
-                    <div className="seg small level-seg" role="group" aria-labelledby="bot-style-label">
-                      {BOT_STYLE_OPTIONS.map(([v, label, title]) => (
-                        <button key={v} type="button" className={botPersonality === v ? 'on' : ''} aria-pressed={botPersonality === v} title={t(title)} onClick={() => setBotPersonality(v)}>
-                          {t(label)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {botLevel !== 'team' && <p className="muted small mode-hint">{t(BOT_STYLE_OPTIONS.find(([v]) => v === botPersonality)![2])}</p>}
-                {botLevel === 'team' && botRooms && user && <p className="muted small mode-hint">{t('menu.botTeamServer')}</p>}
+                  <Icon name="chevron" size={14} />
+                </button>
                 {botRooms && (
                   <label className={['check', user ? '' : 'disabled'].join(' ')} title={user ? t('menu.broadcastTitle') : undefined}>
                     <input type="checkbox" checked={broadcasting} disabled={!user} onChange={(e) => setBroadcast(e.target.checked)} />
@@ -1300,6 +1370,19 @@ export function Menu({
           onInvite={inviteFriend}
           inviteBlocked={inviteBlocked}
           onClose={() => setShowFriends(null)}
+        />
+      )}
+      {showBotOptions && (
+        <BotOptions
+          first={first}
+          onFirst={setFirst}
+          level={botLevel}
+          onLevel={setBotLevel}
+          team={team}
+          personality={botPersonality}
+          onPersonality={setBotPersonality}
+          teamServer={botRooms && Boolean(user)}
+          onClose={closeBotOptions}
         />
       )}
       {showTests && <TestOptions seed={seed} onSeed={setSeed} onClose={() => setShowTests(false)} />}

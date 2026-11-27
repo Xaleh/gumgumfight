@@ -17254,18 +17254,68 @@ div.dk-tile-main {
 .admin-team input {
   margin: 0;
 }
-/* Nível Time no seletor do bot (só para quem é do Time). */
-.mode-card .seg.small button.team.on {
+/* Card "Contra o bot": o resumo das opções do bot em duas linhas (nível e estilo; quem começa). O texto quebra em
+   vez de ser cortado: na carta estreita (PC com as cinco cartas lado a lado) "Difícil · Conservador" não cabe. */
+.pick-btn.bot-summary {
+  padding-block: 7px;
+}
+.bot-summary-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pick-btn.bot-summary span {
+  white-space: normal;
+}
+.bot-summary-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.bot-summary-sub strong {
+  color: var(--text);
+}
+/* Folha "Opções do bot": quem começa, nível e estilo. */
+.page-sheet .sheet.bot-options {
+  width: min(460px, 100%);
+}
+/* Nível Time (só para quem é do Time). */
+.bot-options .seg button.team.on {
   background: color-mix(in srgb, var(--accent) 35%, var(--panel));
 }
-/* Com o nível Time são quatro opções: numa carta estreita (PC com as cinco cartas lado a lado) elas não cabem
-   numa linha e o "Time" ficava cortado pelo overflow do .seg. Aqui o que não cabe desce para uma segunda linha. */
-.mode-card .seg.level-seg {
-  flex-wrap: wrap;
-  border-radius: 18px;
+.bot-options .mode-field-label {
+  font-size: 13px;
 }
-.mode-card .seg.level-seg button {
-  flex: 1 1 auto;
+/* Os estilos, um por linha, cada um com a explicação. */
+.bot-styles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bot-style {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bot-style.on {
+  border-color: var(--purple);
+  background: color-mix(in srgb, var(--purple) 12%, var(--panel));
+}
+.bot-style-name {
+  font-size: 14px;
+  font-weight: 900;
+}
+.bot-style-hint {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
 }
 .mode-hint {
   margin: 4px 0 0;

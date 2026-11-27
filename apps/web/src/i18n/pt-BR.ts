@@ -391,6 +391,10 @@ const ptBR = {
   'menu.bothDecksValid': 'Os dois decks precisam valer no {format}.',
   'menu.battle': 'Batalhar!',
   'menu.opponent': 'Oponente: {name}',
+  /** Card "Contra o bot": o botão-resumo e a folha com quem começa, nível e estilo. */
+  'menu.botOptions': 'Opções do bot',
+  'menu.botSummary': 'Bot: {value}',
+  'menu.firstSummary': 'Começa: {who}',
   'menu.whoStarts': 'Quem começa',
   'menu.firstRandom': 'Sorteio',
   'menu.you': 'Você',

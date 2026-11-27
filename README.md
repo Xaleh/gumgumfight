@@ -891,7 +891,8 @@ Fases seguintes (análise guardada no servidor, precisão em "Minhas partidas", 
 
 ## Estilos do bot
 
-Em **Contra o bot**, além do **Nível** (Fácil, Normal, Difícil), há o **Estilo do bot**, salvo no navegador:
+Em **Contra o bot**, o botão com o resumo ("Bot: Difícil · Controle") abre as **Opções do bot**: quem começa, o
+**Nível** (Fácil, Normal, Difícil) e o **Estilo do bot**, salvo no navegador:
 
 - **Equilibrado** (padrão): o bot de sempre, com os pesos ajustados em auto-jogo.
 - **Agressivo**: vai na Vida do oponente. Defende pouco (não bloqueia nem na última Vida, guarda o Counter), aceita
