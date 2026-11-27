@@ -95,6 +95,8 @@ class GameAudio {
   private wanted: MusicName | null = null;
   private musicRequest = 0;
   private installed = false;
+  /** O navegador não tem Web Audio (ou não deixou criar o contexto): não adianta tentar de novo. */
+  private unavailable = false;
 
   /** O áudio já foi destravado por um gesto do usuário? */
   get unlocked(): boolean {
@@ -105,27 +107,29 @@ class GameAudio {
   install() {
     if (this.installed || typeof window === 'undefined') return;
     this.installed = true;
-    const unlock = () => {
-      if (this.unlock()) {
-        window.removeEventListener('pointerdown', unlock, true);
-        window.removeEventListener('keydown', unlock, true);
-        window.removeEventListener('touchend', unlock, true);
-      }
+    // Os ouvintes ficam ligados: o primeiro gesto destrava o áudio e os seguintes o religam quando o
+    // aparelho recusou ou interrompeu a saída de som (ver `wake`).
+    const onGesture = () => {
+      if (this.ctx) this.wake();
+      else this.unlock();
     };
-    window.addEventListener('pointerdown', unlock, true);
-    window.addEventListener('keydown', unlock, true);
-    window.addEventListener('touchend', unlock, true);
+    window.addEventListener('pointerdown', onGesture, true);
+    window.addEventListener('keydown', onGesture, true);
+    window.addEventListener('touchend', onGesture, true);
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return;
-      if (document.hidden) void this.ctx.suspend();
-      else void this.ctx.resume();
+      if (document.hidden) this.ctx.suspend().catch(() => undefined);
+      else this.wake();
     });
   }
 
-  private unlock(): boolean {
-    if (this.ctx) return true;
+  private unlock() {
+    if (this.ctx || this.unavailable) return;
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return true; // navegador sem Web Audio: fica mudo, sem erro
+    if (!Ctor) {
+      this.unavailable = true; // navegador sem Web Audio: fica mudo, sem erro
+      return;
+    }
     try {
       const ctx = new Ctor();
       this.ctx = ctx;
@@ -134,14 +138,25 @@ class GameAudio {
       this.sfxBus.connect(ctx.destination);
       this.musicBus.connect(ctx.destination);
       this.applyVolumes();
-      void ctx.resume();
+      this.wake();
     } catch {
-      return true;
+      if (!this.ctx) this.unavailable = true;
+      return;
     }
     // Pré-carrega os efeitos (pequenos: uns 330 KB ao todo) e começa a música pedida.
     for (const urls of this.variants.values()) for (const u of urls) void this.load(u);
     if (this.wanted) void this.start(this.wanted);
-    return true;
+  }
+
+  /**
+   * Liga (ou religa) a saída de som. O aparelho pode recusar: no iPhone, com uma ligação em curso ou outro
+   * app segurando o áudio, o `resume()` rejeita com "InvalidStateError: Failed to start the audio device".
+   * Não é erro do jogo: o contexto continua suspenso e o próximo gesto (ou a volta à aba) tenta de novo.
+   */
+  private wake() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state === 'running') return;
+    ctx.resume().catch(() => undefined);
   }
 
   setVolumes(v: { sfx: number; music: number }) {
@@ -179,7 +194,9 @@ class GameAudio {
     this.lastVariant.set(name, i);
     const bus = this.sfxBus;
     void this.load(urls[i]).then((buffer) => {
-      if (!buffer || this.ctx !== ctx) return;
+      // Com a saída suspensa (aba escondida, som recusado pelo aparelho) o relógio do contexto para: os
+      // efeitos agendados ficariam guardados e tocariam todos de uma vez na volta.
+      if (!buffer || this.ctx !== ctx || ctx.state !== 'running') return;
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       const detune = opts.detune ?? 1;
