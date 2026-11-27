@@ -1960,6 +1960,8 @@ export default {
   'game.stepDamage': 'Paso de daño',
   'game.stepAttack': 'Ataque',
   'game.blockedStatus': 'Bloqueado · {status}',
+  'game.promptAttacker': 'Atacante · {who}',
+  'game.promptTarget': 'Objetivo · {who}',
   // ---- preguntas del motor ----
   'game.peek': '👁 Ver la mesa',
   'game.peekTitle': 'Pliega la pregunta para que veas la mesa y tu mano; luego vuelve y responde',

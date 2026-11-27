@@ -43,7 +43,7 @@ import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight, PickOrderContext } from './CardView';
 import { Icon } from './Icons';
 import { useBoardMotion } from './Motion';
-import { askText, type Confirm, hasCost } from './table/Prompt';
+import { askText, type Confirm, hasCost, PromptBackdrop } from './table/Prompt';
 import type { Drag } from './table/shared';
 import { useTableGestures } from './table/useTableGestures';
 
@@ -539,10 +539,11 @@ function Result({
  * `confirm` no desktop): a carta que pergunta ao lado (o clique abre para ler), o nome, a pergunta sem o nome
  * repetido, o custo numa linha à parte e o texto da carta; as duas respostas do mesmo tamanho, e "Ver a mesa" e
  * "Desfazer" num rodapé discreto. Sem como pagar o custo a pergunta abre mesmo assim (para os oponentes não
- * deduzirem a mão), só com "Não usar".
+ * deduzirem a mão), só com "Não usar". Numa batalha, embaixo da janela vai quem ataca quem (`PromptBackdrop`).
  */
 function AskEffect({
   s,
+  me,
   pending,
   t,
   tryT,
@@ -552,6 +553,7 @@ function AskEffect({
   onCancel,
 }: {
   s: GameState;
+  me: PlayerId;
   pending: Confirm;
   t: Translate;
   tryT: TryT;
@@ -566,7 +568,7 @@ function AskEffect({
   const labels = confirmLabels(t, pending);
   const text = def ? cardText(def, locale).text : null;
   return (
-    <div className="modal-backdrop ask-backdrop yk-ask-back">
+    <PromptBackdrop className="modal-backdrop ask-backdrop yk-ask-back" state={s} human={me}>
       <div className={`modal-card ask yk-ask c-${def?.colors[0] ?? 'red'}`} role="dialog" aria-modal="true" aria-label={ask.question}>
         <div className="ask-main">
           {def && (
@@ -613,7 +615,7 @@ function AskEffect({
           )}
         </div>
       </div>
-    </div>
+    </PromptBackdrop>
   );
 }
 
@@ -621,14 +623,15 @@ function AskEffect({
  * A carta que saiu da Vida, grande no centro da mesa, com o [Trigger] dela (quando há) e a escolha: ativar ou
  * levar para a mão. Toda carta que sai da Vida passa por aqui, com ou sem [Trigger]: os oponentes só veem que uma
  * carta da Vida está sendo olhada. "Ver a mesa" recolhe a janela; a faixa de ação fica com os mesmos botões.
+ * Embaixo da janela vai o ataque que tirou a carta da Vida (`PromptBackdrop`).
  */
-function LifeReveal({ s, uid, trigger, t, onAnswer, onPeek }: { s: GameState; uid: string; trigger: boolean; t: Translate; onAnswer: (yes: boolean) => void; onPeek: () => void }) {
+function LifeReveal({ s, me, uid, trigger, t, onAnswer, onPeek }: { s: GameState; me: PlayerId; uid: string; trigger: boolean; t: Translate; onAnswer: (yes: boolean) => void; onPeek: () => void }) {
   const { locale } = useSettings();
   const def = cardDef(s, uid);
   const text = def.abilities.some((a) => a.timing === 'trigger') ? cardText(def, locale).trigger : null;
   const title = text ? t('game.triggerRevealed') : t('game.lifeCard');
   return (
-    <div className="yk-reveal-back">
+    <PromptBackdrop className="yk-reveal-back" state={s} human={me}>
       <div className={['yk-reveal', text ? 'trigger' : ''].join(' ')} role="dialog" aria-modal="true" aria-label={`${title}: ${def.name}`}>
         <div className="yk-reveal-kicker">{title}</div>
         <div className="yk-reveal-card" key={uid}>
@@ -657,7 +660,7 @@ function LifeReveal({ s, uid, trigger, t, onAnswer, onPeek }: { s: GameState; ui
           {t('game.peek')}
         </button>
       </div>
-    </div>
+    </PromptBackdrop>
   );
 }
 
@@ -1450,6 +1453,7 @@ export function YonkoTable({
         {myPending?.kind === 'confirm' && !trayHidden && !sheet && (
           <AskEffect
             s={s}
+            me={me}
             pending={myPending}
             t={t}
             tryT={tryT}
@@ -1460,7 +1464,7 @@ export function YonkoTable({
           />
         )}
 
-        {lifeCard && !trayHidden && !sheet && <LifeReveal s={s} uid={lifeCard} trigger={legal.some((a) => a.type === 'answer' && a.yes)} t={t} onAnswer={(yes) => send({ type: 'answer', player: me, yes })} onPeek={() => setTrayHidden(true)} />}
+        {lifeCard && !trayHidden && !sheet && <LifeReveal s={s} me={me} uid={lifeCard} trigger={legal.some((a) => a.type === 'answer' && a.yes)} t={t} onAnswer={(yes) => send({ type: 'answer', player: me, yes })} onPeek={() => setTrayHidden(true)} />}
 
         {sheet && (
           <div className="yk-sheet-back" onClick={() => setSheet(null)}>

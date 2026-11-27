@@ -1,5 +1,6 @@
 // A janela da pergunta do motor (`state.pending`): confirmar, escolher cartas ou opções, a ordem dos efeitos, olhar
-// cartas. "Ver a mesa" recolhe a janela para um balão (`PromptPill`).
+// cartas. "Ver a mesa" recolhe a janela para um balão (`PromptPill`). Numa batalha, a janela leva embaixo quem ataca
+// quem (`PromptBackdrop`).
 
 import { type Action, cardDef, type GameState, type PlayerId, translateToPt, zoneOf } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
@@ -8,6 +9,7 @@ import { listText, msgText } from '../../game/engineText';
 import { cardText, useSettings } from '../../settings';
 import { CardView, type Highlight } from '../CardView';
 import { type Keyed, type KeyedOptions, orderText, promptText, type TryT, useMediaQuery } from './shared';
+import { battleClash } from './CenterBand';
 import { OFF_TABLE } from './decisions';
 
 // ------------------------------------------------------------------ prompts
@@ -105,6 +107,8 @@ export function Prompt(props: {
     </button>
   ) : null;
   const hint = !onCancel && cancelHint ? <p className="muted small cancel-hint">{t('game.sentence', { text: cancelHint })}</p> : null;
+  /** O fundo das janelas que podem abrir no meio de uma batalha: levam embaixo quem ataca quem. */
+  const backdrop = { state, human };
 
   switch (pending.kind) {
     case 'chooseFirst':
@@ -217,7 +221,7 @@ export function Prompt(props: {
       );
       if (shown || offBoard.length === pending.options.length) {
         return (
-          <div className="modal-backdrop">
+          <PromptBackdrop {...backdrop}>
             <div className="modal-card">
               <SourceLine state={state} uid={pending.source} />
               <h3>{prompt}</h3>
@@ -239,7 +243,7 @@ export function Prompt(props: {
               {confirm}
               {hint}
             </div>
-          </div>
+          </PromptBackdrop>
         );
       }
       // Alvos todos na mesa ou na mão: o pedido fica na faixa central (TargetRequest) e o botão de
@@ -281,7 +285,7 @@ export function Prompt(props: {
       const def = cardDef(state, pending.card);
       const trigger = def.abilities.some((a) => a.timing === 'trigger') ? cardText(def, locale).trigger : null;
       return (
-        <div className="modal-backdrop">
+        <PromptBackdrop {...backdrop}>
           <div className="modal-card">
             <div className="modal-kicker">{trigger ? t('game.triggerRevealed') : t('game.lifeCard')}</div>
             <div className="modal-feature">
@@ -315,7 +319,7 @@ export function Prompt(props: {
             </div>
             {trigger && <div className="btn-row center">{peekButton}</div>}
           </div>
-        </div>
+        </PromptBackdrop>
       );
     }
     case 'option': {
@@ -323,7 +327,7 @@ export function Prompt(props: {
       // Rótulos das opções: a chave do motor (`optionKeys`), quando há; senão o texto da carta (traduzido em pt-BR).
       const { optionKeys, optionParts } = pending as typeof pending & KeyedOptions;
       return (
-        <div className="modal-backdrop">
+        <PromptBackdrop {...backdrop}>
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
             {pending.shown?.length ? (
@@ -357,7 +361,7 @@ export function Prompt(props: {
             </div>
             {hint}
           </div>
-        </div>
+        </PromptBackdrop>
       );
     }
     case 'confirm': {
@@ -382,7 +386,7 @@ export function Prompt(props: {
         const def = state.cards[pending.source] ? cardDef(state, pending.source) : null;
         const ask = askText(tryT, pending, def?.name);
         return (
-          <div className="modal-backdrop ask-backdrop">
+          <PromptBackdrop className="modal-backdrop ask-backdrop" {...backdrop}>
             <div className={`modal-card ask c-${def?.colors[0] ?? 'red'}`}>
               <div className="ask-main">
                 {def && (
@@ -418,11 +422,11 @@ export function Prompt(props: {
                 {cancel}
               </div>
             </div>
-          </div>
+          </PromptBackdrop>
         );
       }
       return (
-        <div className="modal-backdrop">
+        <PromptBackdrop {...backdrop}>
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
             <h3>{prompt}</h3>
@@ -437,7 +441,7 @@ export function Prompt(props: {
             </div>
             {hint}
           </div>
-        </div>
+        </PromptBackdrop>
       );
     }
   }
@@ -476,6 +480,72 @@ export function askText(tryT: TryT, pending: Confirm, name: string | undefined):
 }
 
 const capital = (text: string) => text.charAt(0).toLocaleUpperCase() + text.slice(1);
+
+/**
+ * A batalha em curso, embaixo da janela da pergunta: quem ataca quem, de quem é cada carta e o poder de cada uma.
+ * A janela cobre a mesa, e sem isto era preciso "Ver a mesa" só para saber qual ataque a pergunta interrompeu.
+ * O que falta para defender (ou para acertar) aparece enquanto o poder ainda decide a batalha: depois do dano
+ * (a carta da Vida, o [Trigger]) ficam só os dois lados.
+ */
+function PromptBattle({ state, human }: { state: GameState; human: PlayerId }) {
+  const t = useT();
+  const b = state.battle;
+  if (!b || !state.cards[b.attacker] || !state.cards[b.target]) return null;
+  const clash = battleClash(state, human, t);
+  const undecided = b.step !== 'damage' && b.step !== 'end' && !state.stack.some((f) => f.kind === 'damage');
+  const side = (uid: string, role: 'atk' | 'def', power: number) => {
+    const owner = state.cards[uid].owner;
+    const who = owner === human ? t('menu.you') : state.players[owner].name;
+    return (
+      <span className={`pb-side ${role}`}>
+        <span className="source-thumb">
+          <CardView state={state} uid={uid} />
+        </span>
+        <span className="pb-text">
+          <small>{t(role === 'atk' ? 'game.promptAttacker' : 'game.promptTarget', { who })}</small>
+          <em>{cardDef(state, uid).name}</em>
+        </span>
+        <b>{power}</b>
+      </span>
+    );
+  };
+  const label = t('log.attacks', { card: cardDef(state, b.attacker).name, power: clash.atk, target: cardDef(state, b.target).name, targetPower: clash.def });
+  return (
+    <div className="prompt-battle" role="group" aria-label={label}>
+      {side(b.attacker, 'atk', clash.atk)}
+      <span className="pb-vs" aria-hidden="true">
+        ⚔
+      </span>
+      {side(b.target, 'def', clash.def)}
+      {undecided && <span className={['pb-status', clash.hits ? 'hit' : 'safe'].join(' ')}>{clash.status}</span>}
+    </div>
+  );
+}
+
+/**
+ * O fundo da janela da pergunta, com a janela e, embaixo dela, a batalha em curso (se há uma). `className`: as
+ * classes do fundo (a mesa Yonko tem os seus).
+ */
+export function PromptBackdrop({
+  className = 'modal-backdrop',
+  state,
+  human,
+  children,
+}: {
+  className?: string;
+  state: GameState;
+  human: PlayerId;
+  children: ReactNode;
+}) {
+  return (
+    <div className={className}>
+      <div className="modal-stack">
+        {children}
+        <PromptBattle state={state} human={human} />
+      </div>
+    </div>
+  );
+}
 
 function SourceLine({ state, uid }: { state: GameState; uid: string }) {
   if (!state.cards[uid]) return null;

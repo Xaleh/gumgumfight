@@ -1961,6 +1961,9 @@ const ptBR = {
   'game.stepDamage': 'Etapa de Dano',
   'game.stepAttack': 'Ataque',
   'game.blockedStatus': 'Bloqueado · {status}',
+  // Embaixo da janela de uma pergunta feita no meio de uma batalha: de quem é o atacante e de quem é o alvo.
+  'game.promptAttacker': 'Atacante · {who}',
+  'game.promptTarget': 'Alvo · {who}',
   // ---- perguntas do motor ----
   'game.peek': '👁 Ver a mesa',
   'game.peekTitle': 'Recolhe a pergunta para você olhar a mesa e a mão; depois volte e responda',

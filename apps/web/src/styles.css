@@ -4176,6 +4176,111 @@ button.hint-pill::after,
 }
 
 /*
+ * A batalha em curso, embaixo da janela da pergunta (`PromptBackdrop`): o atacante e o alvo, cada um com a
+ * miniatura, de quem é, o nome e o poder (nas cores do confronto da faixa central, `.pow`); embaixo, o que falta
+ * para defender ou para acertar. Um em cima do outro, para o nome e o dono caberem inteiros; lado a lado só
+ * embaixo da janela larga do sim ou não (`.modal-card.ask`). Sem animação própria: entra com o fundo da janela.
+ */
+.modal-stack {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.prompt-battle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  width: min(460px, 100%);
+  padding: 8px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 12px 34px rgba(var(--shadow2-rgb), 0.3);
+}
+.modal-card.ask + .prompt-battle {
+  width: min(620px, 100%);
+  border: 1px solid var(--line);
+}
+@media (min-width: 621px) {
+  .modal-card.ask + .prompt-battle {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .modal-card.ask + .prompt-battle .pb-vs {
+    display: block;
+  }
+}
+.pb-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--panel2);
+}
+.pb-side .source-thumb {
+  flex: none;
+}
+.pb-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: left;
+}
+.pb-text small,
+.pb-text em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pb-text small {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pb-text em {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 900;
+}
+.pb-side b {
+  flex: none;
+  padding: 4px 9px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+.pb-side.atk b {
+  background: linear-gradient(180deg, #ff8a5c, #f0532a);
+}
+.pb-side.def b {
+  background: linear-gradient(180deg, #4da3ff, var(--blue));
+}
+.pb-vs {
+  display: none;
+  font-size: 16px;
+}
+.pb-status {
+  grid-column: 1 / -1;
+  justify-self: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+.pb-status.hit {
+  color: var(--hot-text);
+}
+.pb-status.safe {
+  color: var(--ok);
+}
+
+/*
  * Pergunta de sim ou não no desktop (usar um efeito, pagar um custo): a carta que pergunta fica ao lado, com o
  * nome, a pergunta, o custo e o texto dela; as duas respostas do mesmo tamanho, e "Ver a mesa" e "Cancelar"
  * num rodapé discreto. A mesa atrás escurece sem desfocar, para dar para ler o campo e a mão. Sem animação
@@ -20952,6 +21057,20 @@ div.dk-tile-main {
   border: 2px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
   text-align: center;
+}
+/* Com a batalha embaixo (`PromptBackdrop`): a faixa na largura da janela, que cede a altura dela. */
+.yk-reveal:not(:last-child) {
+  max-height: calc(96vh - 106px);
+}
+.yk-reveal + .prompt-battle {
+  width: min(440px, 100%);
+}
+.yk .prompt-battle {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, #1a3250, #0f1c30);
+}
+.yk .pb-side {
+  background: rgba(0, 0, 0, 0.26);
 }
 .yk-reveal.trigger {
   border-color: var(--brand-yellow);
