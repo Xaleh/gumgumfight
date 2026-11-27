@@ -745,10 +745,10 @@ Com login Google, o item **Amigos** do menu abre a lista de amigos:
   que a pessoa enviou em "Trocar foto"; a do Google nunca vai para os amigos. Sem foto enviada, aparece a inicial do
   apelido numa cor de carta. O cartão do topo da folha mostra como os amigos veem você, e a linha do amigo traz
   também a recompensa dele.
-- **Convidar escolhendo o formato:** **Convidar** abre os formatos embaixo do amigo: **1 contra 1** nas regras da
-  Sala privada como estão escolhidas nela, em cada formato (Standard, Extra Grand Battle, All Blue) e no Livre, ou
-  **Yonko · mesa de 4**. Cada opção diz com qual deck você vai; a que o deck equipado não vale fica apagada, com o
-  motivo. O 1 contra 1 cria uma sala privada com o deck equipado, leva você para a sala de espera e avisa o amigo por
+- **Convidar escolhendo o formato:** **Convidar** abre a escolha do formato por cima da folha, sem mexer na lista
+  de amigos: **1 contra 1** nas regras da Sala privada como estão escolhidas nela, em cada formato (Standard, Extra
+  Grand Battle, All Blue) e no Livre, ou **Yonko · mesa de 4**. Cada grupo diz com qual deck você vai; o formato em
+  que o deck equipado não vale fica apagado, com o motivo embaixo. Esc ou um toque fora fecha a escolha. O 1 contra 1 cria uma sala privada com o deck equipado, leva você para a sala de espera e avisa o amigo por
   notificação. Tocar no aviso (`/?convite=CÓDIGO`) abre o app e entra direto na sala com o deck equipado (com a
   confirmação do deck, se ela estiver ligada nas Configurações). Com o app aberto, o convite aparece como faixa na
   tela inicial, com **Entrar** e **Recusar**. O convite vale enquanto a sala espera (no máximo 30 min) e dá para

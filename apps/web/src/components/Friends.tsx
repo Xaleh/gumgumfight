@@ -1,7 +1,7 @@
 // Amigos (roadmap E2): a folha "Amigos" (meu código, adicionar pelo código, pedidos recebidos e
-// enviados, a lista com quem está online e o botão Convidar, que deixa escolher o formato: 1 contra 1
-// em cada formato ou a mesa do Yonko), a faixa de convite na tela inicial e o painel "Chamar amigos"
-// da sala de espera do Yonko.
+// enviados, a lista com quem está online e o botão Convidar, que abre por cima da folha a escolha do
+// formato: 1 contra 1 em cada formato ou a mesa do Yonko), a faixa de convite na tela inicial e o painel
+// "Chamar amigos" da sala de espera do Yonko.
 //
 // O servidor guarda tudo (`/api/friends`): o status de cada amigo vem da presença que o lobby e as
 // mesas do Yonko já conhecem, e o convite leva o código da sala privada (ou da mesa) só para o amigo
@@ -111,11 +111,78 @@ export function FriendInvites({ invites, onJoin, onDecline }: { invites: FriendI
 /** Um formato para o qual dá para convidar: 1 contra 1 nas regras de cartas de `label`, ou a mesa do Yonko. */
 export interface InviteOption {
   key: string;
+  /** 1 contra 1 (sala privada) ou a mesa do Yonko: cada grupo tem o deck dele. */
+  group: 'duel' | 'yonko';
+  /** Curto, para o botão: "Standard", "Livre (vale tudo)", "Yonko · mesa de 4". */
   label: string;
   /** O deck que vai para a partida. */
   deck?: string;
   /** Por que não dá para convidar neste formato (null: dá). */
   blocked: string | null;
+}
+
+type Friend = FriendList['friends'][number];
+
+/**
+ * A escolha do formato de um convite, por cima da folha de amigos (a lista não cresce nem rola): os formatos do
+ * 1 contra 1 e a mesa do Yonko como botões, com o deck de cada grupo dito uma vez e, embaixo, o motivo dos que
+ * não dá para escolher.
+ */
+function InvitePicker({ friend, options, busy, onPick, onClose }: { friend: Friend; options: InviteOption[]; busy: boolean; onPick: (key: string) => void; onClose: () => void }) {
+  const t = useT();
+  const groups: Array<{ id: InviteOption['group']; title: string; options: InviteOption[] }> = [
+    { id: 'duel' as const, title: t('friends.duel'), options: options.filter((o) => o.group === 'duel') },
+    { id: 'yonko' as const, title: t('yonko.homeKicker'), options: options.filter((o) => o.group === 'yonko') },
+  ].filter((g) => g.options.length > 0);
+  /** Os motivos de um grupo: um só, se é o mesmo para todos (sem deck); senão, um por formato apagado. */
+  const reasons = (list: InviteOption[]) => {
+    const blocked = list.filter((o) => o.blocked);
+    if (blocked.length === list.length && new Set(blocked.map((o) => o.blocked)).size === 1) return [blocked[0].blocked!];
+    return blocked.map((o) => `${o.label}: ${o.blocked}`);
+  };
+  return (
+    <div className="invite-picker-backdrop" onClick={onClose}>
+      <div className="invite-picker" role="dialog" aria-modal="true" aria-labelledby="invite-picker-title" onClick={(e) => e.stopPropagation()}>
+        <div className="invite-picker-head">
+          <FriendAvatar name={friend.name} picture={friend.picture} status={friend.status} />
+          <div className="invite-picker-who">
+            <strong id="invite-picker-title">{t('friends.inviteTo', { name: friend.name })}</strong>
+            <span className="muted small">{t('friends.inviteHint')}</span>
+          </div>
+          <button type="button" className="zoom-close static" autoFocus onClick={onClose} aria-label={t('common.close')}>
+            ✕
+          </button>
+        </div>
+        {groups.map((g) => (
+          <section key={g.id} className={`invite-group ${g.id}`}>
+            <div className="invite-group-head">
+              <span className="invite-kicker">{g.title}</span>
+              {g.options[0].deck && <span className="muted small">{t('friends.inviteDeck', { deck: g.options[0].deck })}</span>}
+            </div>
+            <div className="invite-chips">
+              {g.options.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  className="invite-chip"
+                  aria-label={g.id === 'duel' ? t('friends.inviteDuel', { format: o.label }) : o.label}
+                  disabled={busy || Boolean(o.blocked)}
+                  onClick={() => onPick(o.key)}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            {reasons(g.options).map((r) => (
+              <p key={r} className="muted small invite-why">
+                {r}
+              </p>
+            ))}
+          </section>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -156,11 +223,12 @@ export function FriendsSheet({
   /** Amigo com os formatos do convite abertos. */
   const [choosing, setChoosing] = useState<string | null>(null);
 
+  // Esc fecha primeiro a escolha do formato; sem ela aberta, a folha.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && (choosing ? setChoosing(null) : onClose());
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, choosing]);
 
   const act = async (fn: () => Promise<string | null | void>) => {
     setBusy(true);
@@ -196,6 +264,8 @@ export function FriendsSheet({
   };
 
   const online = data?.friends.filter((f) => f.status !== 'offline').length ?? 0;
+  /** O amigo do convite em aberto (some se ele saiu da lista, entrou numa partida ou o convite ficou impedido). */
+  const invited = inviteBlocked ? undefined : data?.friends.find((f) => f.id === choosing && f.status !== 'playing');
 
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet" onClick={onClose}>
@@ -327,32 +397,12 @@ export function FriendsSheet({
                             className="btn primary"
                             disabled={busy || Boolean(inviteBlocked) || f.status === 'playing'}
                             title={inviteBlocked ?? t('friends.inviteTitle', { name: f.name })}
-                            aria-expanded={choosing === f.id}
-                            onClick={() => setChoosing(choosing === f.id ? null : f.id)}
+                            aria-haspopup="dialog"
+                            onClick={() => setChoosing(f.id)}
                           >
                             {t('friends.invite')}
                           </button>
                         </span>
-                        {choosing === f.id && !inviteBlocked && f.status !== 'playing' && (
-                          <div className="friend-formats" role="group" aria-label={t('friends.inviteTo', { name: f.name })}>
-                            <span className="muted small">{t('friends.inviteTo', { name: f.name })}</span>
-                            {inviteOptions.map((o) => (
-                              <button
-                                key={o.key}
-                                type="button"
-                                className="friend-format"
-                                disabled={busy || Boolean(o.blocked)}
-                                onClick={() => {
-                                  setChoosing(null);
-                                  void act(() => onInvite(f, o.key));
-                                }}
-                              >
-                                <b>{o.label}</b>
-                                <small>{o.blocked ?? (o.deck ? t('friends.inviteDeck', { deck: o.deck }) : '')}</small>
-                              </button>
-                            ))}
-                          </div>
-                        )}
                       </li>
                     ))}
                   </ul>
@@ -382,6 +432,18 @@ export function FriendsSheet({
             </>
           )}
         </div>
+        {invited && (
+          <InvitePicker
+            friend={invited}
+            options={inviteOptions}
+            busy={busy}
+            onClose={() => setChoosing(null)}
+            onPick={(key) => {
+              setChoosing(null);
+              void act(() => onInvite(invited, key));
+            }}
+          />
+        )}
       </div>
     </div>
   );

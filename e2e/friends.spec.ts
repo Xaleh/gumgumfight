@@ -27,12 +27,18 @@ test.describe('Amigos', () => {
     const nameOf = (id: string) => friends.find((f) => f.id === id)!.name;
     const [friendName, thirdName] = [nameOf(friendId), nameOf(thirdId)];
 
-    // Quem convida: Amigos → Convidar abre os formatos (1 contra 1 em cada formato e o Yonko).
+    // Quem convida: Amigos → Convidar abre a escolha do formato (1 contra 1 em cada formato e o Yonko).
     await openHome(page);
     await page.getByRole('button', { name: new RegExp(`^${label('friends.nav')}`) }).first().click();
     const sheet = page.getByRole('dialog', { name: label('friends.title') });
     await sheet.getByRole('listitem').filter({ hasText: friendName }).getByRole('button', { name: label('friends.invite'), exact: true }).click();
-    const formats = sheet.getByRole('group');
+    // A escolha abre por cima da folha (a lista de amigos não cresce) e fecha com Esc, sem fechar a folha.
+    const formats = sheet.getByRole('dialog', { name: label('friends.inviteTo', { name: friendName }) });
+    await expect(formats).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(formats).toBeHidden();
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole('listitem').filter({ hasText: friendName }).getByRole('button', { name: label('friends.invite'), exact: true }).click();
     await expect(formats.getByRole('button', { name: new RegExp(`^${label('friends.inviteDuel', { format: 'Standard' })}`) })).toBeVisible();
     await expect(formats.getByRole('button', { name: new RegExp(`^${label('friends.inviteDuel', { format: label('mode.free') }).replace(/[()]/g, '\\$&')}`) })).toBeVisible();
     await formats.getByRole('button', { name: new RegExp(`^${label('friends.inviteYonko')}`) }).click();

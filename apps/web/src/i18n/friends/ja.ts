@@ -34,6 +34,8 @@ const friends = {
   'friends.invite': '招待',
   'friends.inviteTitle': '対戦フォーマットを選んで{name}さんに知らせます',
   'friends.inviteTo': '{name}さんを招待：',
+  'friends.inviteHint': 'フォーマットを選ぶと、すぐに招待が送られます。',
+  'friends.duel': '1対1',
   'friends.inviteDuel': '1対1 · {format}',
   'friends.inviteYonko': '四皇 · 4人テーブル',
   'friends.inviteDeck': 'デッキ：{deck}',

@@ -740,11 +740,12 @@ export function Menu({
   const inviteOptions: InviteOption[] = [
     ...duelModes.map((m, i) => ({
       key: `duel:${i}`,
-      label: t('friends.inviteDuel', { format: modeLabel(m) }),
+      group: 'duel' as const,
+      label: modeLabel(m),
       deck: d0?.name,
       blocked: playsIn(d0, m) ? null : !d0 ? t('menu.pickDeck') : (whyNotPlayable(d0, m.format, spoilerRule(m))?.split('\n')[0] ?? t('menu.deckNotValidIn', { format: modeLabel(m) })),
     })),
-    { key: 'yonko', label: t('friends.inviteYonko'), deck: yonkoDeck?.name, blocked: yonkoDeck ? null : t('yonko.noDeck') },
+    { key: 'yonko', group: 'yonko' as const, label: t('friends.inviteYonko'), deck: yonkoDeck?.name, blocked: yonkoDeck ? null : t('yonko.noDeck') },
   ];
   /**
    * Convidar um amigo no formato escolhido. 1 contra 1: sala privada com o deck equipado nas regras do formato.

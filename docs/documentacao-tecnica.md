@@ -1343,7 +1343,8 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
   fila) ou `offline`. As mesas do Yonko entram junto (`YonkoTables.presenceOf`): `playing` na partida em andamento
   enquanto a pessoa não saiu dela, `online` na sala de espera com o canal aberto. Só amigos aceitos recebem o status,
   e nunca a sala nem o código.
-- **Convite**: na folha, **Convidar** abre os formatos (`InviteOption`, montados no `Menu.tsx`): 1 contra 1 nas regras
+- **Convite**: na folha, **Convidar** abre a escolha do formato por cima dela (`InvitePicker`, em `Friends.tsx`; as
+  opções são `InviteOption`, montadas no `Menu.tsx`): 1 contra 1 nas regras
   da Sala privada e em cada `PLAY_FORMATS`, e a mesa do Yonko. No 1 contra 1, o navegador cria a sala privada com
   `POST /api/online/rooms` (deck equipado e regras do formato escolhido) e
   chama `POST /api/friends/:id/invite`. O servidor exige o token do lugar 0 **e** que a conta seja a de quem criou,

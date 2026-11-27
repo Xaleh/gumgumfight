@@ -32,6 +32,8 @@ const friendsPtBR = {
   'friends.invite': 'Convidar',
   'friends.inviteTitle': 'Escolha o formato da partida e avise {name}',
   'friends.inviteTo': 'Chamar {name} para:',
+  'friends.inviteHint': 'Escolha o formato. O convite sai na hora.',
+  'friends.duel': '1 contra 1',
   'friends.inviteDuel': '1 contra 1 · {format}',
   'friends.inviteYonko': 'Yonko · mesa de 4',
   'friends.inviteDeck': 'Com o deck {deck}',

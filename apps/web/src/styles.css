@@ -22556,47 +22556,99 @@ div.dk-tile-main {
 .home-banner.friend-invite .friend-avatar {
   --ring: var(--note-line);
 }
-/* Formatos do convite: abrem embaixo do amigo, na folha (1 contra 1 em cada formato e a mesa do Yonko). */
-.friend-formats {
-  flex-basis: 100%;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--line);
+/* Escolha do formato do convite: abre por cima da folha de amigos, presa embaixo, sem mexer na lista. */
+.friends-sheet {
+  position: relative;
+  overflow: hidden;
 }
-.friend-formats > span {
-  grid-column: 1 / -1;
+.invite-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  background: var(--backdrop);
 }
-.friend-format {
+.invite-picker {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
-  align-content: center;
+  gap: 16px;
+  padding: 16px 16px calc(18px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  background: var(--bg2);
+  border-top: 2px solid var(--brand-yellow);
+  box-shadow: 0 -10px 30px rgba(var(--shadow2-rgb), 0.3);
+}
+.invite-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.invite-picker-who {
+  flex: 1;
+  min-width: 0;
+  display: grid;
   gap: 2px;
-  min-height: 52px;
-  padding: 8px 12px;
-  border-radius: 12px;
+}
+.invite-picker-who strong {
+  font-size: 17px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+.invite-group {
+  display: grid;
+  gap: 8px;
+}
+.invite-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+.invite-kicker {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.invite-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.invite-chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
   background: var(--panel);
   border: 2px solid var(--line);
   color: var(--text);
   font: inherit;
-  text-align: left;
+  font-weight: 900;
   cursor: pointer;
 }
-.friend-format:hover:not(:disabled),
-.friend-format:focus-visible {
-  border-color: var(--accent);
+.invite-chip:hover:not(:disabled),
+.invite-chip:focus-visible {
+  background: linear-gradient(180deg, #fbda6a 0%, var(--brand-yellow) 100%);
+  border-color: var(--brown);
+  color: var(--brown);
 }
-.friend-format:disabled {
-  opacity: 0.55;
+.invite-chip:disabled {
+  border-style: dashed;
+  color: var(--muted);
+  opacity: 0.6;
   cursor: default;
 }
-.friend-format b {
-  font-weight: 900;
+.invite-group.yonko .invite-chip {
+  flex: 1 1 100%;
 }
-.friend-format small {
-  color: var(--muted);
-  font-weight: 700;
-  overflow-wrap: anywhere;
+.invite-why {
+  margin: 0;
 }
 /* Painel "Chamar amigos" da sala de espera do Yonko. */
 .table-friends .friends-list {

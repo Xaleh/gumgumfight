@@ -34,6 +34,8 @@ const friends = {
   'friends.invite': 'Inviter',
   'friends.inviteTitle': 'Choisissez le format de la partie et prévenez {name}',
   'friends.inviteTo': 'Inviter {name} à :',
+  'friends.inviteHint': 'Choisissez le format. L’invitation part aussitôt.',
+  'friends.duel': '1 contre 1',
   'friends.inviteDuel': '1 contre 1 · {format}',
   'friends.inviteYonko': 'Yonko · table de 4',
   'friends.inviteDeck': 'Avec le deck {deck}',
