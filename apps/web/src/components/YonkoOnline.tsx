@@ -1,4 +1,5 @@
-// Mesa online do Yonko: a sala de espera (lugares, decks, "pronto", bots, regras e o código para convidar) e,
+// Mesa online do Yonko: a sala de espera (lugares, decks, "pronto", bots, regras, o código para convidar e o painel
+// "Chamar amigos", que avisa os amigos do GGF sem sair da mesa) e,
 // quando a partida começa, a mesa (`YonkoTable`) ligada ao servidor, com o relógio de cada jogador.
 
 import { type PlayerId, type TableRules, yonkoBannedIn } from '@gumgum/engine';
@@ -8,6 +9,7 @@ import { yonkoLegal } from '../deckLibrary';
 import { useYonkoOnline } from '../game/useYonkoOnline';
 import { type Translate, useT, useTryT } from '../i18n';
 import { DeckPicker } from './DeckPicker';
+import { TableFriends } from './Friends';
 import { Icon } from './Icons';
 import { RulesPanel, YonkoHero } from './YonkoRules';
 import { type SeatStatus, YonkoTable } from './YonkoTable';
@@ -255,6 +257,7 @@ function WaitingRoom({ online, room, seat, onExit, onBuildDecks }: { online: Onl
           ))}
         </div>
         <p className="muted small">{host ? t('yonko.hostHint') : t('yonko.guestHint')}</p>
+        <TableFriends full={room.seats.every(Boolean)} invite={(friend) => api.friends.inviteYonko(friend, seat)} />
 
         <div className="yk-lobby-grid">
           <RulesPanel rules={rules} editable={host} onChange={(next) => ask(api.yonko.rules(seat.id, seat.token, next))} onBuildDecks={onBuildDecks} />
