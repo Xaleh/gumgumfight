@@ -169,7 +169,7 @@ gumgumfight/
 │   │                            global.ts e global-routes.ts (meta global: TCG Matchmaking pela OPTCG Logpose API)
 │   │                            handguess.ts (o deck provável de cada Líder para o bot deduzir a mão do oponente, D2)
 │   ├── src/profiles/            perfil público do jogador: store.ts (SQL, regras do replay), routes.ts
-│   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
+│   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), chat.ts (chat do lobby), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
 │   ├── src/friends/             store.ts (código de amigo e amizades), routes.ts (lista, pedidos, status online e convite para sala privada ou mesa do Yonko)
 │   ├── src/monitor/             store.ts (erros agrupados e horas dos canais SSE, SQL), sse.ts (SseMetrics), routes.ts (onError, relato do navegador, painel)
@@ -615,7 +615,8 @@ de todas as rotas e o `SseMetrics` que vai para as rotas online e do Yonko; ver 
 - Rate limit nas ações das salas (60 ações / 10 s por assento), nos emotes (1 / 3 s) e no chat (1 / 1,5 s e 10 / min por
   assento). O chat (`Room.chat`) limpa o texto (sem controle/quebras, até 120 caracteres) e censura palavrões em PT/EN
   (`online/profanity.ts`: palavra inteira, sem acentos, com trocas de letra por número/símbolo, repetição e soletrado) antes
-  de repassar; nada fica gravado.
+  de repassar; nada fica gravado. As regras do texto e do ritmo ficam em `online/chat-rules.ts` (`chatText`, `chatPace`)
+  e valem também para o chat do lobby do torneio (até 240 caracteres, por conta e por torneio; ver "Chat do lobby").
 - **Tetos de salas** (`online/lobby.ts`, `DEFAULT_LIMITS`, conferidos em `lobby.admit` antes de criar sala, entrar numa,
   entrar na fila ou abrir treino contra o bot): 400 salas ativas no servidor (`ONLINE_MAX_ROOMS`, 503 acima), 100 salas de
   bot (`ONLINE_MAX_BOT_ROOMS`, 503; o menu cai para o treino no navegador), 16 salas ou lugares na fila por IP ao mesmo tempo (429) e 60 criações por IP a cada
@@ -679,6 +680,7 @@ uma ação de qualquer lado, e o `GameScreen` abre as duas mãos e não grava a 
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |
 | `localStorage.gumgum.watchHands`, `gumgum.watchChatOff`, `gumgum.statsFilters`, `gumgum.statsMin` | preferências de espectador e estatísticas |
 | `sessionStorage.gumgum.openMatch` | partida/transmissão aberta |
+| `sessionStorage.gumgum.lobbyChatSeen.<torneio>` | a última mensagem do chat do lobby que a pessoa já viu (a contagem de não lidas da barra do celular) |
 | `localStorage.gumgum.sandbox` | última mesa montada no Sandbox de regras (`SandboxSpec`) |
 
 Nada de cache de cartas: o construtor baixa `GET /api/cards` inteiro toda vez que abre.
@@ -1568,6 +1570,8 @@ tem, e `lastAction`.
   **`tournament_interventions`**: a auditoria do modo manual (`match_id`, `room_id`, `game`, `user_id`, `role` =
   `admin | dev | organizer | judge` no momento, `kind` = `manual_on | manual_off | undo | judge_action`, `payload` JSON
   (a ação `judge`/a resposta no lugar do jogador, ou `{ to }` no desfazer), `removed` JSON (as ações desfeitas), `note`, `at`).
+  **`tournament_chat`**: o chat do lobby (`user_id`, `name` e `role` = `organizer | judge | player` na hora da
+  mensagem, `text` já censurado, `sent_at`, `removed_at`/`removed_by` da mensagem apagada, que fica na tabela).
 - **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye | none | loss`
   (`none` = derrota dupla: W.O. duplo ou lançada pelo organizador, os dois perdem; `loss` = derrota sem oponente da
   inscrição atrasada, o espelho do bye), nunca empate), `next_first` (quem perdeu começa o próximo jogo), `room_id`
@@ -1670,6 +1674,33 @@ tem, e `lastAction`.
   Judge/organizador** (`viewer.judge`): `remaining`/`running` (relógio de cada jogador, de `Room.clock()`), `connected`,
   quem abriu o chamado (`call.byName`), `calls` (salas pedindo presença) e `warningsPending`. Jogadores recebem `null`
   nesses campos: nunca veem o relógio dos outros.
+
+### Chat do lobby (`tournaments/chat.ts`)
+
+Uma conversa por torneio, mostrada no lobby (`LobbyChat.tsx`; a resposta do lobby traz `chat: true`). A Sala do Tempo
+não tem (`hasLobbyChat`: `chat: false` e as rotas respondem 404 `lobbyChatOff`).
+
+- **Rotas**: `GET /api/tournaments/:id/chat` (pública) devolve `{ rev, post, moderate, max, messages }`, com as últimas
+  `LOBBY_CHAT_WINDOW` (100) mensagens não apagadas (`{ id, userId, name, role, text, at }`); `post` diz se quem pede pode
+  escrever (`ok`) ou por que não (`login`, `participants`, `closed`) e `moderate`, se pode apagar as mensagens dos
+  outros. `POST …/chat { text }` (201) e `DELETE …/chat/:messageId` devolvem a conversa já atualizada.
+- **Quem escreve** (`chatRole`): o organizador (`organizer`), um Judge da lista (`judge`), um inscrito, mesmo eliminado ou
+  desistente (`player`), e um Admin/Dev que não seja nenhum dos três (`judge`). Os outros recebem 403
+  `lobbyChatParticipantsOnly`. O nome é o do perfil público na hora da mensagem. **Quem apaga**: o autor, um Judge ou
+  quem gerencia o torneio (403 `lobbyChatCannotRemove`); a mensagem ganha `removed_at`/`removed_by` e some da conversa.
+- **Texto e ritmo**: os do chat da partida (`online/chat-rules.ts`), com até `LOBBY_CHAT_MAX_LENGTH` (240) caracteres;
+  o ritmo é por conta e por torneio, em memória.
+- **Aberto até quando** (`lobbyChatOpen`): durante as inscrições e o torneio, e por `LOBBY_CHAT_AFTER_MS` (2 h) depois de
+  `finished_at`; depois disso, 409 `lobbyChatClosed` (ler e apagar continuam valendo).
+- **Consulta**: o lobby não tem canal aberto com o servidor, então a tela consulta o chat a cada 2,5 s (`poll`). A
+  conversa de cada torneio fica pronta em memória (`LobbyChat.feed`) com uma versão `rev`, refeita só quando alguém
+  escreve ou apaga (o prefixo sorteado ao subir impede que um reinício repita uma versão antiga). O ETag é
+  `rev:post:moderate`: a consulta sem novidade sai como 304 e custa só a sessão, o torneio e o papel de quem pede. As
+  gravações do chat **não** mexem em `dataVersion` (não invalidam o cache das outras respostas).
+- **Tela**: a partir de 1100 px o chat é uma coluna ao lado das mesas; abaixo disso, uma barra presa embaixo com a
+  última mensagem e a contagem das que chegaram com ela fechada (o que já foi visto fica em
+  `sessionStorage.gumgum.lobbyChatSeen.<torneio>`). A resposta de um envio já traz a conversa, e uma consulta que
+  saiu antes do envio é descartada (`epoch`), para a mensagem não sumir e voltar. Sem animações.
 
 ### Check-in e relógio (`tournaments/clock.ts`)
 
@@ -2297,6 +2328,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/broadcast/:key` | O que a tela de transmissão mostra (a chave faz as vezes do login) | Chave |
 | GET | `/api/tournaments` · `/api/tournaments/:id` · `/api/tournaments/:id/lobby` | Torneios, detalhe e lobby (o que quem pede pode fazer vem na resposta) | Pública |
 | GET | `/api/tournaments/me` | Torneios em que a conta está em jogo agora | Sessão |
+| GET · POST · DELETE | `/api/tournaments/:id/chat` · `/chat/:messageId` | Chat do lobby: lê (qualquer pessoa); escreve `{ text }` (inscrito, Judge ou organizador); apaga (o autor, um Judge ou o organizador) | Pública · Sessão |
 | POST | `/api/tournaments` | Cria (`{ name, format, structure, rounds, swissBestOf, topCut, bo3From, bo5From, maxPlayers, startsAt, checkIn, … }`) | Organizador ou apoiador Capitão/Almirante (cota) |
 | PUT · DELETE | `/api/tournaments/:id` | Edita (só com inscrições abertas) / apaga | Organizador |
 | POST · DELETE | `/api/tournaments/:id/register` · POST `/checkin` | Inscreve ou troca o deck (`{ deckId }`); cancela ou desiste; check-in | Sessão |

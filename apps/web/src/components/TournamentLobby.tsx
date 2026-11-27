@@ -4,7 +4,8 @@
 // topo) e a aura verde nas mesas com os dois jogadores prontos. Antes do início, os inscritos
 // aparecem em cinza e ganham cor ao fazer check-in. Com a rodada começada, a mesa de quem ainda
 // não entrou na sala pisca em laranja para ele. Qualquer um assiste às mesas em andamento; o Judge
-// e o organizador também podem entrar como Judge.
+// e o organizador também podem entrar como Judge. Ao lado das mesas (embaixo, na tela estreita) fica o
+// chat do torneio (LobbyChat.tsx); a Sala do Tempo, treino de uma pessoa só, não tem.
 
 import { useEffect, useState } from 'react';
 import { api, type LobbyPlayer, type LobbySide, type LobbyTable, type OnlineSeat, type TournamentDetail, type TournamentLobby as Lobby, type WatchTarget } from '../api';
@@ -13,6 +14,7 @@ import { type Locale, useLocale, useT } from '../i18n';
 import { fmtTime } from '../i18n/format';
 import { useNow } from './HomeBlocks';
 import { LeaderArt } from './LeaderArt';
+import { LobbyChat } from './LobbyChat';
 import { WarningDots } from './Tournaments';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -82,7 +84,7 @@ export default function TournamentLobby({
   const remaining = (side: LobbySide) => (side.remaining === null ? null : side.running ? Math.max(0, side.remaining - elapsed) : side.remaining);
 
   return (
-    <div className="coverage tournaments tour-lobby">
+    <div className={['coverage', 'tournaments', 'tour-lobby', lobby?.chat ? 'has-chat' : ''].join(' ')}>
       <header className="builder-header">
         <button className="btn small" onClick={onClose}>
           {tr('lobby.back')}
@@ -90,121 +92,124 @@ export default function TournamentLobby({
         <h2>{lobby ? tr('lobby.title', { name: lobby.name }) : tr('lobby.titlePlain')}</h2>
       </header>
       <div className="coverage-body">
-        {error && <div className="error">{error}</div>}
-        {!lobby && !error && <p className="muted">{tr('common.loading')}</p>}
-        {lobby && judge && lobby.calls.length > 0 && (
-          <div className="lobby-calls" role="alert">
-            {lobby.calls.map((c) => (
-              <div key={c.matchId} className="lobby-call">
-                <span className="lobby-call-ico">⚖</span>
-                <div className="lobby-call-text">
-                  <strong>{tr('lobby.callBanner', { table: c.table, a: c.names[0], b: c.names[1] })}</strong>
-                  {c.reason && <span className="small">{tr(`judge.reason.${c.reason}`)}</span>}
-                  <span className="small">{tr('lobby.callSince', { time: clockTime(c.openedAt, locale) })}</span>
+        <div className="lobby-main">
+          {error && <div className="error">{error}</div>}
+          {!lobby && !error && <p className="muted">{tr('common.loading')}</p>}
+          {lobby && judge && lobby.calls.length > 0 && (
+            <div className="lobby-calls" role="alert">
+              {lobby.calls.map((c) => (
+                <div key={c.matchId} className="lobby-call">
+                  <span className="lobby-call-ico">⚖</span>
+                  <div className="lobby-call-text">
+                    <strong>{tr('lobby.callBanner', { table: c.table, a: c.names[0], b: c.names[1] })}</strong>
+                    {c.reason && <span className="small">{tr(`judge.reason.${c.reason}`)}</span>}
+                    <span className="small">{tr('lobby.callSince', { time: clockTime(c.openedAt, locale) })}</span>
+                  </div>
+                  {c.roomId && (
+                    <button className="btn primary small" onClick={() => onWatch({ roomId: c.roomId!, hands: false, judge: true })}>
+                      {tr('lobby.enterRoom')}
+                    </button>
+                  )}
                 </div>
-                {c.roomId && (
-                  <button className="btn primary small" onClick={() => onWatch({ roomId: c.roomId!, hands: false, judge: true })}>
-                    {tr('lobby.enterRoom')}
-                  </button>
+              ))}
+            </div>
+          )}
+          {lobby && judge && lobby.warningsPending.length > 0 && (
+            <div className="error small">{tr('lobby.warningsPending', { names: lobby.warningsPending.map((p) => p.name).join(', ') })}</div>
+          )}
+          {lobby && (
+            <section className="menu-card lobby-head">
+              <div className="tour-card-head">
+                <strong>
+                  {lobby.status === 'registration'
+                    ? lobby.checkIn
+                      ? tr('lobby.checkInPhase', { n: lobby.checkedIn, total: lobby.players.length })
+                      : tr('lobby.registrationPhase', { n: lobby.players.length })
+                    : lobby.status === 'finished'
+                      ? tr('lobby.finished')
+                      : lobby.roundStartedAt
+                        ? tr('lobby.roundRunning', { label: lobby.label })
+                        : tr('lobby.roundWaiting', { label: lobby.label })}
+                </strong>
+                {lobby.status === 'running' && (
+                  <span className="muted small">
+                    {lobby.roundStartedAt
+                      ? lobby.deadline
+                        ? tr('lobby.deadline', { time: clockTime(lobby.deadline, locale) })
+                        : tr('lobby.startedAt', { time: clockTime(lobby.roundStartedAt, locale) })
+                      : tr('lobby.readyTables', { ready: lobby.readyTables, total: lobby.pendingTables })}
+                  </span>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-        {lobby && judge && lobby.warningsPending.length > 0 && (
-          <div className="error small">{tr('lobby.warningsPending', { names: lobby.warningsPending.map((p) => p.name).join(', ') })}</div>
-        )}
-        {lobby && (
-          <section className="menu-card lobby-head">
-            <div className="tour-card-head">
-              <strong>
-                {lobby.status === 'registration'
-                  ? lobby.checkIn
-                    ? tr('lobby.checkInPhase', { n: lobby.checkedIn, total: lobby.players.length })
-                    : tr('lobby.registrationPhase', { n: lobby.players.length })
-                  : lobby.status === 'finished'
-                    ? tr('lobby.finished')
-                    : lobby.roundStartedAt
-                      ? tr('lobby.roundRunning', { label: lobby.label })
-                      : tr('lobby.roundWaiting', { label: lobby.label })}
-              </strong>
-              {lobby.status === 'running' && (
-                <span className="muted small">
-                  {lobby.roundStartedAt
-                    ? lobby.deadline
-                      ? tr('lobby.deadline', { time: clockTime(lobby.deadline, locale) })
-                      : tr('lobby.startedAt', { time: clockTime(lobby.roundStartedAt, locale) })
-                    : tr('lobby.readyTables', { ready: lobby.readyTables, total: lobby.pendingTables })}
-                </span>
+              {lobby.status === 'registration' && lobby.startsAt && (
+                <p className="muted small">
+                  {lobby.autoStart ? tr('lobby.autoStartAt', { time: clockTime(lobby.startsAt, locale) }) : tr('lobby.manualStartAt', { time: clockTime(lobby.startsAt, locale) })}
+                </p>
               )}
+              {manage && lobby.status === 'running' && !lobby.roundStartedAt && (
+                <div className="btn-row">
+                  <button
+                    className="btn primary"
+                    disabled={busy}
+                    onClick={() => run(() => api.tournaments.beginRound(id), tr('tour.confirmBeginRound', { ready: lobby.readyTables, tables: lobby.pendingTables }))}
+                  >
+                    {tr('tour.beginRound', { ready: lobby.readyTables, tables: lobby.pendingTables })}
+                  </button>
+                </div>
+              )}
+              {manage && lobby.status === 'registration' && (
+                <div className="btn-row">
+                  <button
+                    className="btn primary"
+                    disabled={busy || lobby.players.length < 2}
+                    onClick={() => run(() => api.tournaments.start(id), tr('tour.confirmStart', { n: lobby.players.length }))}
+                  >
+                    {tr('tour.start')}
+                  </button>
+                </div>
+              )}
+              {judge && lobby.judges.length > 0 && (
+                <p className="muted small">
+                  {tr('tour.judgesLabel')} {lobby.judges.map((j) => j.name).join(', ')}
+                </p>
+              )}
+              <p className="muted small">{tr(judge ? 'lobby.legendJudge' : 'lobby.legend')}</p>
+            </section>
+          )}
+
+          {lobby && lobby.status === 'registration' && (
+            <div className="lobby-grid players">
+              {lobby.players.map((p) => (
+                <PlayerCard key={p.userId} p={p} apt={!lobby.checkIn || p.checkedIn} me={p.userId === me} judge={judge} />
+              ))}
+              {lobby.players.length === 0 && <p className="muted">{tr('tour.noPlayers')}</p>}
             </div>
-            {lobby.status === 'registration' && lobby.startsAt && (
-              <p className="muted small">
-                {lobby.autoStart ? tr('lobby.autoStartAt', { time: clockTime(lobby.startsAt, locale) }) : tr('lobby.manualStartAt', { time: clockTime(lobby.startsAt, locale) })}
-              </p>
-            )}
-            {manage && lobby.status === 'running' && !lobby.roundStartedAt && (
-              <div className="btn-row">
-                <button
-                  className="btn primary"
-                  disabled={busy}
-                  onClick={() => run(() => api.tournaments.beginRound(id), tr('tour.confirmBeginRound', { ready: lobby.readyTables, tables: lobby.pendingTables }))}
-                >
-                  {tr('tour.beginRound', { ready: lobby.readyTables, tables: lobby.pendingTables })}
-                </button>
-              </div>
-            )}
-            {manage && lobby.status === 'registration' && (
-              <div className="btn-row">
-                <button
-                  className="btn primary"
-                  disabled={busy || lobby.players.length < 2}
-                  onClick={() => run(() => api.tournaments.start(id), tr('tour.confirmStart', { n: lobby.players.length }))}
-                >
-                  {tr('tour.start')}
-                </button>
-              </div>
-            )}
-            {judge && lobby.judges.length > 0 && (
-              <p className="muted small">
-                {tr('tour.judgesLabel')} {lobby.judges.map((j) => j.name).join(', ')}
-              </p>
-            )}
-            <p className="muted small">{tr(judge ? 'lobby.legendJudge' : 'lobby.legend')}</p>
-          </section>
-        )}
+          )}
 
-        {lobby && lobby.status === 'registration' && (
-          <div className="lobby-grid players">
-            {lobby.players.map((p) => (
-              <PlayerCard key={p.userId} p={p} apt={!lobby.checkIn || p.checkedIn} me={p.userId === me} judge={judge} />
-            ))}
-            {lobby.players.length === 0 && <p className="muted">{tr('tour.noPlayers')}</p>}
-          </div>
-        )}
-
-        {lobby && lobby.status !== 'registration' && (
-          <div className="lobby-grid">
-            {lobby.tables.map((m) => (
-              <TableCard
-                key={m.id}
-                m={m}
-                lobby={lobby}
-                me={me}
-                judge={judge}
-                remaining={remaining}
-                busy={busy}
-                onReady={(ready) => run(() => api.tournaments.ready(id, m.id, ready))}
-                onPlay={() =>
-                  run(async () => {
-                    onPlay(await api.tournaments.play(id, m.id));
-                  })
-                }
-                onWatch={(asJudge) => m.roomId && onWatch({ roomId: m.roomId, hands: false, ...(asJudge ? { judge: true } : {}) })}
-              />
-            ))}
-          </div>
-        )}
+          {lobby && lobby.status !== 'registration' && (
+            <div className="lobby-grid">
+              {lobby.tables.map((m) => (
+                <TableCard
+                  key={m.id}
+                  m={m}
+                  lobby={lobby}
+                  me={me}
+                  judge={judge}
+                  remaining={remaining}
+                  busy={busy}
+                  onReady={(ready) => run(() => api.tournaments.ready(id, m.id, ready))}
+                  onPlay={() =>
+                    run(async () => {
+                      onPlay(await api.tournaments.play(id, m.id));
+                    })
+                  }
+                  onWatch={(asJudge) => m.roomId && onWatch({ roomId: m.roomId, hands: false, ...(asJudge ? { judge: true } : {}) })}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        {lobby?.chat && <LobbyChat id={id} me={me} />}
       </div>
     </div>
   );

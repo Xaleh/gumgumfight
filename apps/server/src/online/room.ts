@@ -60,7 +60,7 @@ import {
 } from '@gumgum/engine';
 import { type ErrorParams, fail } from '../errors';
 import type { PlayFormat } from '../stats/catalog';
-import { censor } from './profanity';
+import { chatPace, chatText, chatTooFast } from './chat-rules';
 
 export const TIME_BANK_MS = 17 * 60_000 + 30_000;
 /** Jogador da vez desconectado por este tempo perde por abandono. */
@@ -98,11 +98,8 @@ export interface DiceThrow {
 export const EMOTES = ['hello', 'gg', 'nice', 'think', 'wow', 'oops', 'thanks', 'hurry'] as const;
 export type EmoteId = (typeof EMOTES)[number];
 
-/** Tamanho máximo de uma mensagem do chat da partida. */
+/** Tamanho máximo de uma mensagem do chat da partida (o ritmo, por assento, está em chat-rules.ts). */
 export const CHAT_MAX_LENGTH = 120;
-/** Chat: intervalo mínimo entre mensagens e teto por minuto, por assento. */
-const CHAT_MIN_INTERVAL_MS = 1500;
-const CHAT_PER_MINUTE = 10;
 
 /**
  * private = sala com código; casual e ranked = filas; bot = treino contra o bot do
@@ -1141,18 +1138,14 @@ export class Room {
    * gravado: o chat vive só na memória da sala.
    */
   chat(seat: PlayerId, text: unknown): ActResult {
-    if (typeof text !== 'string') return { ok: false, code: 400, ...fail('invalidChatMessage', 'Mensagem inválida.') };
-    // Sem quebras de linha nem caracteres de controle; espaços repetidos viram um só.
-    const clean = text.replace(/[\p{Cc}\p{Cf}]/gu, ' ').replace(/\s+/g, ' ').trim();
-    if (!clean) return { ok: false, code: 400, ...fail('emptyChatMessage', 'Mensagem vazia.') };
-    if (clean.length > CHAT_MAX_LENGTH) return { ok: false, code: 400, ...fail('chatMessageTooLong', `A mensagem pode ter no máximo ${CHAT_MAX_LENGTH} caracteres.`, { max: CHAT_MAX_LENGTH }) };
+    const clean = chatText(text, CHAT_MAX_LENGTH);
+    if (!clean.ok) return clean;
     const now = this.deps.now();
-    const times = (this.chatTimes[seat] = this.chatTimes[seat].filter((t) => now - t < 60_000));
-    const last = times[times.length - 1] ?? 0;
-    if (now - last < CHAT_MIN_INTERVAL_MS || times.length >= CHAT_PER_MINUTE) return { ok: false, code: 429, ...fail('chatTooFast', 'Espere um pouco antes de mandar outra mensagem.') };
-    times.push(now);
-    const message = censor(clean);
-    this.emit('chat', { seat, text: message });
+    const pace = chatPace(this.chatTimes[seat], now);
+    this.chatTimes[seat] = pace.recent;
+    if (!pace.allowed) return chatTooFast();
+    pace.recent.push(now);
+    this.emit('chat', { seat, text: clean.text });
     return { ok: true, actionCount: this.state?.actionCount ?? 0 };
   }
 
