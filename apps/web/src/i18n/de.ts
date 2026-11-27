@@ -2511,6 +2511,7 @@ export default {
   'engine.optLifeTopFaceUp': 'Oben ins Leben legen (offen)',
   'engine.optPeekOwnLife': 'Dein Leben ansehen',
   'engine.optPeekOpponentLife': 'Leben des Gegners ansehen',
+  'engine.optPeekLifeOf': 'Leben von {player} ansehen',
   'engine.optDontPeek': 'Nicht ansehen',
   // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
   'engine.whoseDonToRest': '{source}: Von welchem Gegner 1 aktive DON!! erschöpfen?',

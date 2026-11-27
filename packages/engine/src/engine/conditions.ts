@@ -65,7 +65,9 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   const tp = cond.ownTypedCharacterMinPower;
   if (tp && !ps.characters.some((c) => hasType(cardDef(state, c.uid), tp.type) && getPower(state, c.uid) >= tp.power)) return false;
   if (cond.lifeHandMax !== undefined && ps.life.length + ps.hand.length > cond.lifeHandMax) return false;
-  if (cond.minTurn !== undefined && state.turn < cond.minTurn) return false;
+  // "If it is your second turn or later" (`minTurn: 3`, o turno 3 da partida de dois). Numa mesa de mais de dois o
+  // número do turno da mesa não diz de quem é o turno: valem os turnos que o próprio jogador já jogou.
+  if (cond.minTurn !== undefined && (isMultiplayer(state) ? (state.turnsTaken?.[controller] ?? 0) < Math.ceil(cond.minTurn / 2) : state.turn < cond.minTurn)) return false;
   if (cond.totalCharacterCostMin !== undefined && ps.characters.reduce((n, c) => n + getCost(state, c.uid), 0) < cond.totalCharacterCostMin) {
     return false;
   }

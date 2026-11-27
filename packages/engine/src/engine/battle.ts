@@ -161,7 +161,10 @@ export function stepDamage(state: GameState, frame: DamageFrame) {
     // Reações ao dano só depois que ele (e os [Trigger]) termina.
     if (frame.lost) {
       emit(state, { kind: 'damageTaken', player: frame.defender });
-      emit(state, { kind: 'damageDealt', player: frame.defender });
+      // "When you deal damage": só para quem causou o dano (quem atacou, ou quem usou o efeito). Numa mesa de mais
+      // de dois, os outros oponentes do defensor não causaram nada.
+      const dealer = frame.attack && state.battle && state.cards[state.battle.attacker] ? ownerOf(state, state.battle.attacker) : frame.by;
+      emit(state, { kind: 'damageDealt', player: frame.defender, ...(dealer !== undefined ? { byPlayer: dealer } : {}) });
       // "When your number of Life cards becomes 0" já aconteceu quando a carta saiu, ainda que um
       // [Trigger] tenha devolvido Vida depois: o efeito dispara agora, depois dos [Trigger].
       lifeRemoved(state, frame.defender, frame.zero);

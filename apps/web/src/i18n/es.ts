@@ -2511,6 +2511,7 @@ export default {
   'engine.optLifeTopFaceUp': 'Añadir arriba de la Vida (boca arriba)',
   'engine.optPeekOwnLife': 'Mirar tu Vida',
   'engine.optPeekOpponentLife': 'Mirar la Vida de tu rival',
+  'engine.optPeekLifeOf': 'Mirar la Vida de {player}',
   'engine.optDontPeek': 'No mirar',
   // ---- mesa con más de dos jugadores (Yonko) ----
   'engine.whoseDonToRest': '{source}: ¿girar 1 DON!! activo de qué rival?',

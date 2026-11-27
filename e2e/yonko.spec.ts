@@ -4,6 +4,13 @@ import { expect, test } from './support/fixtures';
 import { openHome } from './support/app';
 import { label } from './support/i18n';
 
+/**
+ * O botão que responde ao que a mesa pergunta: o botão em destaque da faixa de ação ou, quando a pergunta abre numa
+ * janela (a largada, a mão inicial, uma escolha, usar um efeito, a carta da Vida), o da janela, que cobre a faixa.
+ * As janelas vêm depois da faixa na página: vale o último.
+ */
+const ANSWER = '.yk-banner .yk-btn.primary, .yk-ask .ask-answers .yk-btn, .yk-reveal .yk-btn, .yk-modal .yk-btn.primary';
+
 test.describe('Yonko', () => {
   test('mesa local: a preparação, um turno de quem joga e a vez dos bots @iphone', async ({ page }) => {
     // Quem joga pode ser o último da ordem: até três turnos de bot (com as animações) antes do primeiro dele.
@@ -30,10 +37,10 @@ test.describe('Yonko', () => {
       await options.getByRole('button', { name: label('yonko.close'), exact: true }).click();
       await expect(options).toBeHidden();
     };
-    // A preparação (largada e mão inicial) e o que os bots perguntarem (bloquear, Counter): sempre o botão em
-    // destaque da faixa de ação, até "Encerrar turno" acender.
+    // A preparação (largada e mão inicial, cada uma na sua janela) e o que os bots perguntarem (bloquear, Counter):
+    // sempre o botão em destaque, até "Encerrar turno" acender.
     const endTurn = page.getByRole('button', { name: label('yonko.endTurn'), exact: true });
-    const answer = page.locator('.yk-reveal .yk-btn, .yk-banner .yk-btn.primary').first();
+    const answer = page.locator(ANSWER).last();
     const deadline = Date.now() + 3 * 60_000;
     while (!(await endTurn.isEnabled({ timeout: 1_000 }).catch(() => false))) {
       expect(crashed, 'a página da mesa caiu').toBe(false);
@@ -45,8 +52,16 @@ test.describe('Yonko', () => {
     // O turno de quem joga: a faixa diz que é a vez dele.
     await expect(page.getByText(label('yonko.yourTurn'), { exact: true })).toBeVisible();
 
-    // Ler uma carta: o Líder escolhido e a lupa da faixa abrem a carta grande, com o nome e o texto ao lado.
     const table = page.getByRole('region', { name: label('yonko.yourTable'), exact: true });
+    // Os DON!! ativos são marcados com um toque, como na mesa de dois (vários vão juntos para uma carta): o marcado
+    // sobe, o Líder acende para recebê-lo e Esc solta a marcação.
+    await table.locator('.yk-don-cards .don-card[data-drag]').first().click();
+    await expect(table.locator('.yk-don-cards .don-card.picked')).toHaveCount(1);
+    await expect(table.locator('.field-card .card.hl-option').first()).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(table.locator('.yk-don-cards .don-card.picked')).toHaveCount(0);
+
+    // Ler uma carta: o Líder escolhido e a lupa da faixa abrem a carta grande, com o nome e o texto ao lado.
     await table.locator('.field-card .card').first().click();
     await page.getByRole('button', { name: label('yonko.card'), exact: true }).click();
     const reading = page.getByRole('dialog', { name: label('yonko.card'), exact: true });
@@ -87,7 +102,7 @@ test.describe('Yonko', () => {
     // Joga até ter, no próprio turno, uma carta da mão que dá para jogar: responde ao que a mesa perguntar (a
     // janela da carta da Vida, o botão em destaque da faixa) e encerra o turno enquanto não tem.
     const endTurn = page.getByRole('button', { name: label('yonko.endTurn'), exact: true });
-    const answer = page.locator('.yk-reveal .yk-btn, .yk-banner .yk-btn.primary').first();
+    const answer = page.locator(ANSWER).last();
     const playable = page.locator('.yk-hand .hand-card:has(.hl-playable)').first();
     await expect(async () => {
       if (await endTurn.isEnabled({ timeout: 500 }).catch(() => false)) {

@@ -1,10 +1,10 @@
 // Passos de efeito sobre a Vida: virar para cima e para baixo, olhar, arrumar, mandar para a mão, o trash ou o
 // deck, pôr cartas na Vida e causar dano.
 
-import type { EffectStep, GameState, PlayerState } from '../../types';
+import type { EffectStep, GameState, MsgList, PlayerState } from '../../types';
 import type { EffectFrame } from '../constants';
 import { lg, LIFE_TOP_BOTTOM, log, pr } from '../messages';
-import { isMultiplayer, opponentOf } from '../table';
+import { isMultiplayer, opponentOf, opponentSides } from '../table';
 import { cardDef, locate, matchesFilter } from '../queries';
 import { discardable, restricted } from '../options';
 import { askCards, askOption, resolveTargets, upToCount } from '../effects';
@@ -296,20 +296,29 @@ export function execLifeStep(state: GameState, frame: EffectFrame, step: LifeSte
       return true;
     }
     case 'peekLife': {
-      const opp = step.whose === 'own' ? ps : state.players[opponentOf(state, frame.controller)];
-      // Etapa 1: de quem é a Vida (memo[0] = 'own' | 'opp').
+      // De quem é a Vida: 'own', ou 'opp:<lugar>' (uma opção por oponente: com "your or your opponent's" numa mesa
+      // de mais de dois, a carta olhada é uma só, da Vida de quem o jogador escolher).
+      const lifeOf = (side: string) => (side === 'own' ? ps : state.players[side.startsWith('opp:') ? Number(side.slice(4)) : opponentOf(state, frame.controller)]);
+      // Etapa 1: de quem é a Vida (memo[0] = o lado).
       if (!frame.memo) {
-        const sides = (step.whose === 'either' ? ['own', 'opp'] : [step.whose === 'own' ? 'own' : 'opp']).filter(
-          (side) => (side === 'own' ? ps : opp).life.length > 0,
-        );
+        const opps = step.whose === 'own' ? [] : opponentSides(state, frame.controller).map((id) => `opp:${id}`);
+        const sides = [...(step.whose === 'opponent' ? [] : ['own']), ...opps].filter((side) => lifeOf(side).life.length > 0);
         if (!sides.length) return true;
         if (!frame.choice) {
-          const labels = sides.map((side) => (side === 'own' ? 'Olhar a sua Vida' : 'Olhar a Vida do oponente'));
-          const labelKeys = sides.map((side) => (side === 'own' ? 'engine.optPeekOwnLife' : 'engine.optPeekOpponentLife'));
-          askOption(state, frame, frame.controller, pr('peekWhichLife', `${srcName}: olhar a carta do topo de qual Vida?`, { source: srcName }), [...labels, 'Não olhar'], [
-            ...labelKeys,
-            'engine.optDontPeek',
-          ]);
+          // Com um oponente só à escolha, "a Vida do oponente"; com vários, o nome de cada um.
+          const named = opps.length > 1;
+          const labels = sides.map((side) => (side === 'own' ? 'Olhar a sua Vida' : named ? `Olhar a Vida de ${lifeOf(side).name}` : 'Olhar a Vida do oponente'));
+          const labelKeys = sides.map((side) => (side === 'own' ? 'engine.optPeekOwnLife' : named ? null : 'engine.optPeekOpponentLife'));
+          const parts = sides.map((side): MsgList | null => (side !== 'own' && named ? { items: [{ key: 'engine.optPeekLifeOf', params: { player: lifeOf(side).name } }] } : null));
+          askOption(
+            state,
+            frame,
+            frame.controller,
+            pr('peekWhichLife', `${srcName}: olhar a carta do topo de qual Vida?`, { source: srcName }),
+            [...labels, 'Não olhar'],
+            [...labelKeys, 'engine.optDontPeek'],
+            named ? [...parts, null] : undefined,
+          );
           frame.memo = ['pick', ...sides];
           return false;
         }
@@ -322,7 +331,7 @@ export function execLifeStep(state: GameState, frame: EffectFrame, step: LifeSte
         frame.choice = undefined;
       }
       const side = frame.memo![0];
-      const life = (side === 'own' ? ps : opp).life;
+      const life = lifeOf(side).life;
       if (!frame.choice) {
         const card = life[life.length - 1];
         askOption(

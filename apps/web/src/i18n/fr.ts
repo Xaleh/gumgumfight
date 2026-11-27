@@ -2511,6 +2511,7 @@ export default {
   'engine.optLifeTopFaceUp': 'Ajouter sur le dessus de la Vie (face visible)',
   'engine.optPeekOwnLife': 'Regarder votre Vie',
   'engine.optPeekOpponentLife': 'Regarder la Vie adverse',
+  'engine.optPeekLifeOf': 'Regarder la Vie de {player}',
   'engine.optDontPeek': 'Ne pas regarder',
   // ---- table à plus de deux joueurs (Yonko) ----
   'engine.whoseDonToRest': '{source}: incliner 1 DON!! redressée de quel adversaire ?',

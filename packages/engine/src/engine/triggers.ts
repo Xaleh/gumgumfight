@@ -241,7 +241,8 @@ function eventMatches(state: GameState, e: GameEvent, ev: EmittedEvent, owner: P
     case 'lifeToHand':
       return ev.player === owner;
     case 'damageDealt':
-      return ev.player !== owner;
+      // Com quem causou o dano conhecido (o ataque; numa mesa de mais de dois, também o efeito), só ele reage.
+      return ev.player !== owner && (ev.byPlayer === undefined || ev.byPlayer === owner);
     case 'leaderBattle':
       return ev.player === owner && (!e.filter || matchesFilter(cardDef(state, ev.card!), e.filter));
     case 'returnedToHand':

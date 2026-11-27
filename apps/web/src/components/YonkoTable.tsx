@@ -32,8 +32,11 @@ import {
   type PlayerState,
 } from '@gumgum/engine';
 import { type CSSProperties, type PointerEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { audio } from '../audio';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { listText, logText, msgText, winReasonText } from '../game/engineText';
+import { enteredWithoutRush } from '../game/freshCharacter';
+import { usePreloadCardImages } from '../game/preloadImages';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { useYonkoGame, type YonkoSetup } from '../game/useYonkoGame';
 import { useBoardSize } from '../hooks/useBoardSize';
@@ -43,8 +46,9 @@ import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight, PickOrderContext } from './CardView';
 import { Icon } from './Icons';
 import { useBoardMotion } from './Motion';
-import { askText, type Confirm, hasCost, PromptBackdrop } from './table/Prompt';
-import type { Drag } from './table/shared';
+import { askText, type Confirm, hasCost, PromptBackdrop, useSkipGuard } from './table/Prompt';
+import type { Drag, Mode } from './table/shared';
+import { CurveModal, MulliganModal, OptionModal, PickModal } from './YonkoPrompts';
 import { useTableGestures } from './table/useTableGestures';
 
 type TryT = ReturnType<typeof useTryT>;
@@ -104,6 +108,12 @@ const startingLife = (s: GameState, id: PlayerId) => (cardDef(s, s.players[id].l
 /** Vida de agora; durante a preparação (a Vida ainda não foi posta), a que o jogador vai ter. */
 const lifeNow = (s: GameState, id: PlayerId) => (s.phase === 'mulligan' && !s.players[id].out ? startingLife(s, id) : s.players[id].life.length);
 
+/** A mesma jogada? (As jogadas são objetos simples; a ordem dos campos não conta.) */
+const sameAction = (a: Action, b: Action) => {
+  const flat = (x: Action) => JSON.stringify(Object.entries(x).sort(([k], [l]) => (k < l ? -1 : 1)));
+  return flat(a) === flat(b);
+};
+
 const donOnField = (ps: PlayerState) => ps.donActive + ps.donRested + [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])].reduce((n, c) => n + c.don, 0);
 
 /** Texto de uma pergunta do motor no idioma da interface (ver `GameScreen`). */
@@ -134,6 +144,8 @@ interface Btn {
   kind?: 'primary' | 'danger';
   disabled?: boolean;
   title?: string;
+  /** Uma linha menor embaixo do rótulo ("toque de novo para confirmar"). */
+  small?: string;
 }
 
 interface BannerView {
@@ -148,8 +160,10 @@ interface BannerView {
   mine: boolean;
   /** A mesa espera outra pessoa (ou um bot): a faixa mostra os três pontinhos. */
   waiting?: boolean;
-  /** A pergunta abre numa janela (a carta da Vida, usar um efeito): o botão do olho a recolhe para olhar a mesa. */
+  /** A pergunta abre numa janela (a carta da Vida, usar um efeito, as escolhas): o botão do olho a recolhe para olhar a mesa. */
   peek?: boolean;
+  /** DON!! marcados para anexar: a conta deles vai na faixa, com a carta de DON!! ao lado. */
+  don?: number;
 }
 
 /**
@@ -244,7 +258,23 @@ function LifeStack({ s, id, h, t }: { s: GameState; id: PlayerId; h: CardHandler
 }
 
 /** O deck de DON!!, os DON!! em campo em cartas (ativos em pé, virados deitados) e a conta dos ativos. */
-function DonRow({ ps, t, draggable, dragging }: { ps: PlayerState; t: Translate; draggable?: boolean; dragging?: number[] }) {
+function DonRow({
+  ps,
+  t,
+  draggable,
+  dragging,
+  picked,
+  onDon,
+}: {
+  ps: PlayerState;
+  t: Translate;
+  draggable?: boolean;
+  dragging?: number[];
+  /** Posições dos DON!! ativos marcados para anexar de uma vez. */
+  picked?: number[];
+  /** O toque num DON!! ativo (marca ou desmarca). */
+  onDon?: (index: number) => void;
+}) {
   const total = ps.donActive + ps.donRested;
   return (
     <div className="yk-don" title={t('yonko.donTitle')}>
@@ -256,8 +286,8 @@ function DonRow({ ps, t, draggable, dragging }: { ps: PlayerState; t: Translate;
         {Array.from({ length: total }, (_, i) => (
           <span
             key={i}
-            className={['don-card', i >= ps.donActive ? 'rested' : '', dragging?.includes(i) ? 'dragging' : ''].join(' ')}
-            {...(draggable && i < ps.donActive ? { 'data-drag': 'don', 'data-don': i } : {})}
+            className={['don-card', i >= ps.donActive ? 'rested' : '', dragging?.includes(i) ? 'dragging' : '', picked?.includes(i) ? 'picked' : ''].join(' ')}
+            {...(draggable && i < ps.donActive ? { 'data-drag': 'don', 'data-don': i, onClick: () => onDon?.(i) } : {})}
           />
         ))}
       </span>
@@ -758,8 +788,16 @@ export function YonkoTable({
   const { state: s, dispatch } = game;
   const t = useT();
   const tryT = useTryT();
-  const { locale, animations } = useSettings();
+  const { locale, animations, confirmActions, quickCounter: quickCounterOn, donQuickPick, showImages } = useSettings();
   const mine = s.players[me];
+  /**
+   * "Confirmar ações" desligado (como na mesa de dois): a escolha de alvos sai assim que estiver completa, sem o
+   * botão "Confirmar", e o Counter é usado no toque.
+   */
+  const quickChoice = !confirmActions;
+  const quickCounter = quickCounterOn || quickChoice;
+  // As imagens das cartas já conhecidas baixam antes de a carta aparecer (e voar) na mesa.
+  usePreloadCardImages(s, showImages);
 
   // Só a opção do app decide (como na mesa de dois): `off` troca a mesa na hora, `soft` tira as paradas no
   // centro e os efeitos de enfeite, `full` mostra tudo.
@@ -788,6 +826,10 @@ export function YonkoTable({
   /** O que está sendo arrastado: uma carta da mão, um atacante ou um DON!! ativo. */
   const [drag, setDrag] = useState<Drag | null>(null);
   const [resultOpen, setResultOpen] = useState(true);
+  /** DON!! ativos marcados para anexar de uma vez (as posições na fileira), como na mesa de dois. */
+  const [donPicked, setDonPicked] = useState<number[]>([]);
+  /** Quantas das próximas jogadas mantêm a carta escolhida (os DON!! dados ou tirados dela pelos botões da faixa). */
+  const keepSel = useRef(0);
   /** A faixa que cruza a mesa na troca de turno. */
   const [flash, setFlash] = useState<{ key: number; text: string; kicker: string; mine: boolean; color: string } | null>(null);
 
@@ -804,9 +846,46 @@ export function YonkoTable({
   // Cada ação zera as marcações; a seleção só vale enquanto a carta continua minha e a vez livre.
   useEffect(() => {
     setPicked([]);
-    setSel(null);
+    // Dar ou tirar DON!! da carta escolhida não a solta: dá para seguir mexendo nela.
+    if (keepSel.current > 0) keepSel.current--;
+    else setSel(null);
     setTrayHidden(false);
   }, [s.actionCount]);
+  // Os DON!! marcados valem enquanto a vez está livre e eles continuam na fileira.
+  useEffect(() => {
+    setDonPicked((p) => {
+      if (!p.length) return p;
+      if (!myTurnIdle) return [];
+      const left = p.filter((i) => i < mine.donActive);
+      return left.length === p.length ? p : left;
+    });
+  }, [myTurnIdle, mine.donActive]);
+
+  /**
+   * Jogadas que saem em sequência (vários DON!! numa carta, os Counters marcados): a mesa aceita uma jogada por
+   * vez (online, cada uma é feita sobre a visão anterior), então a próxima só vai quando a resposta da anterior
+   * chega. Se a mesa não respondeu como esperado (a jogada deixou de valer, deu erro), o resto é descartado.
+   */
+  const queue = useRef<Action[]>([]);
+  const sendAll = (actions: Action[]) => {
+    queue.current = actions.slice(1);
+    if (actions[0]) dispatch(actions[0]);
+  };
+  useEffect(() => {
+    const next = queue.current[0];
+    if (!next) return;
+    if (!legal.some((a) => sameAction(a, next))) {
+      queue.current = [];
+      return;
+    }
+    queue.current = queue.current.slice(1);
+    dispatch(next);
+  }, [s.actionCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!game.error) return;
+    queue.current = [];
+    keepSel.current = 0;
+  }, [game.error]);
 
   // A leitura de uma carta ou do registro (celular) segura os bots.
   useEffect(() => {
@@ -818,7 +897,10 @@ export function YonkoTable({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (sheet !== null) setSheet(null);
-      else setSel(null);
+      else {
+        setSel(null);
+        setDonPicked([]);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -846,7 +928,7 @@ export function YonkoTable({
     return () => clearTimeout(timer);
   }, [turnKey, animate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const send = (a: Action) => dispatch(a);
+  const send = (a: Action) => sendAll([a]);
   /** Quem ataca: a carta arrastada como atacante ou a carta escolhida com um clique. */
   const attacker = drag?.kind === 'attacker' ? drag.uid : sel;
   const targets = attacker && myTurnIdle ? legal.filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack' && a.attacker === attacker).map((a) => a.target) : [];
@@ -854,6 +936,32 @@ export function YonkoTable({
   const canCounter = (uid: string) => myPending?.kind === 'counter' && myPending.options.includes(uid);
   const canAttackWith = (uid: string) => myTurnIdle && legal.some((a) => a.type === 'attack' && a.attacker === uid);
   const canAttachDon = myTurnIdle && legal.some((a) => a.type === 'attachDon');
+  /** A carta (Líder ou Personagem) pode receber DON!! agora? */
+  const canReceiveDon = (uid: string) => myTurnIdle && legal.some((a) => a.type === 'attachDon' && a.target === uid);
+  /** Anexa vários DON!! ativos de uma vez (uma jogada do motor para cada). */
+  const attachDons = (target: string, count: number) => {
+    const n = Math.min(count, mine.donActive);
+    setDonPicked([]);
+    if (target === sel) keepSel.current = n;
+    if (n > 0) sendAll(Array.from({ length: n }, (): Action => ({ type: 'attachDon', player: me, target })));
+  };
+  /**
+   * Toque num DON!! ativo: marca ou desmarca só ele. Com "DON!! em um toque" (`donQuickPick`), marca ele e os
+   * anteriores da fileira (tocar no 3º marca 3), e tocar no último marcado desmarca só ele.
+   */
+  const onDon = (index: number) => {
+    if (!canAttachDon || index < 0 || index >= mine.donActive) return;
+    const cur = donPicked.length;
+    const next = donQuickPick
+      ? Array.from({ length: index === cur - 1 ? index : index + 1 }, (_, i) => i)
+      : donPicked.includes(index)
+        ? donPicked.filter((i) => i !== index)
+        : [...donPicked, index].sort((a, b) => a - b);
+    // Marcar sobe um pouco o tom (uma ficha a mais na pilha); desmarcar desce.
+    audio.play('don-pick', { pitch: next.length < cur ? -3 : Math.min(6, next.length - 1) });
+    setDonPicked(next);
+    setSel(null);
+  };
 
   /** Destinos válidos para o que está sendo arrastado: o campo (carta da mão), o alvo (atacante) ou a carta (DON!!). */
   const dropValid = (d: Pick<Drag, 'kind' | 'uid'>, over: string | null): boolean => {
@@ -865,27 +973,67 @@ export function YonkoTable({
   };
   const canAct = (uid: string) => legal.some((a) => (a.type === 'attack' && a.attacker === uid) || (a.type === 'activate' && a.uid === uid));
 
+  /**
+   * As cartas apagadas, como na mesa de dois. No seu turno, o Líder e os Personagens em pé que não têm o que
+   * fazer (não atacam nem têm habilidade para ativar: acabaram de entrar, é o primeiro turno, um efeito proíbe),
+   * para os que ainda agem saltarem à vista; enquanto a jogada não está com você (um ataque em andamento, um efeito
+   * resolvendo) vale a última lista deste turno, para a mesa não piscar. No turno de um oponente, os Personagens
+   * dele que entraram neste turno e não atacam nele (os com [Rush] não: ver `enteredWithoutRush`).
+   */
+  const actable = useMemo(() => {
+    if (!myTurnIdle) return null;
+    const out = new Set<string>();
+    for (const a of legal) {
+      if (a.type === 'attack') out.add(a.attacker);
+      else if (a.type === 'activate') out.add(a.uid);
+    }
+    return out;
+  }, [myTurnIdle, legal]);
+  const lastActable = useRef<{ turn: number; uids: Set<string> } | null>(null);
+  if (actable) lastActable.current = { turn: s.turn, uids: actable };
+  const canActNow = actable ?? (lastActable.current?.turn === s.turn ? lastActable.current.uids : null);
+  const inert = (uid: string): Highlight => {
+    if (s.phase !== 'main') return null;
+    if (s.activePlayer !== me) return enteredWithoutRush(s, uid) ? 'inert' : null;
+    if (!canActNow || canActNow.has(uid)) return null;
+    const at = locate(s, uid);
+    return at && at.player === me && at.zone !== 'stage' && !at.fc.rested ? 'inert' : null;
+  };
+
   const select = myPending?.kind === 'selectTargets' ? myPending : null;
   const pickOrder = useMemo(() => (select?.ordered ? new Map(picked.map((u, i) => [u, i + 1])) : null), [select?.ordered, picked]);
+  /**
+   * As cartas de uma escolha que não estão na mesa nem na mão de quem joga (a busca no deck, o descarte, a Vida, a
+   * mão de um oponente). Com todas as opções fora da mesa (ou cartas mostradas por uma busca), a escolha abre numa
+   * janela (`PickModal`); com parte na mesa, as de fora vão numa prateleira sobre a faixa.
+   */
+  const offTable = select ? [...new Set([...(select.shown ?? []), ...select.options])].filter((u) => !locate(s, u) && !mine.hand.includes(u)) : [];
+  const pickWindow = select !== null && (Boolean(select.shown?.length) || select.options.every((u) => offTable.includes(u)));
+  /** "Não escolher" com cartas à escolha: o primeiro toque só arma, o segundo confirma (o toque sem querer não sai como escolha vazia). */
+  const skip = useSkipGuard(myPending);
 
   const highlight = (uid: string): Highlight => {
     if (drag) {
       if (uid === drag.uid) return 'selected';
-      if (drag.kind === 'attacker') return dropValid(drag, uid) ? 'target' : null;
-      if (drag.kind === 'don') return dropValid(drag, uid) ? 'option' : null;
+      if (drag.kind === 'attacker') return dropValid(drag, uid) ? 'target' : inert(uid);
+      if (drag.kind === 'don') return dropValid(drag, uid) ? 'option' : inert(uid);
     }
-    if (select) return picked.includes(uid) ? 'selected' : select.options.includes(uid) ? 'option' : select.shown?.includes(uid) ? 'disabled' : null;
-    if (myPending?.kind === 'block') return myPending.options.includes(uid) ? 'option' : battle?.attacker === uid ? 'attacker' : battle?.target === uid ? 'target' : null;
+    if (select) return picked.includes(uid) ? 'selected' : select.options.includes(uid) ? 'option' : select.shown?.includes(uid) ? 'disabled' : inert(uid);
+    if (myPending?.kind === 'block' && myPending.options.includes(uid)) return 'option';
     if (myPending?.kind === 'counter' && myPending.options.includes(uid)) {
+      // Marcada para usar (ou o Evento escolhido): o contorno da escolha no lugar da cor do valor.
+      if (picked.includes(uid) || sel === uid) return 'selected';
       if (cardDef(s, uid).category === 'event') return 'counterEvent';
       return counterValue(s, uid) >= 2000 ? 'counter2' : 'counter1';
     }
-    if (battle) return battle.attacker === uid ? 'attacker' : battle.target === uid ? 'target' : null;
-    if (!myTurnIdle) return null;
+    if (battle) return battle.attacker === uid ? 'attacker' : battle.target === uid ? 'target' : inert(uid);
+    if (!myTurnIdle) return inert(uid);
     if (sel === uid) return 'selected';
     if (targets.includes(uid)) return 'target';
+    // DON!! marcados: quem pode recebê-los brilha.
+    if (donPicked.length && canReceiveDon(uid)) return 'option';
     if (mine.hand.includes(uid)) return canPlay(uid) ? 'playable' : null;
-    return canAct(uid) ? 'ready' : null;
+    return canAct(uid) ? 'ready' : inert(uid);
   };
 
   /** No toque não há mouse para apontar: a carta que não tem o que fazer agora abre para ler. */
@@ -896,9 +1044,11 @@ export function YonkoTable({
     if (s.cards[uid] && cardDef(s, uid).id !== HIDDEN_CARD) setInspect(uid);
     if (select) {
       if (!select.options.includes(uid)) return read(uid);
-      // Uma carta só: o toque já responde. Várias: marca e desmarca, e a faixa confirma.
-      if (select.max === 1) return send({ type: 'choose', player: me, uids: [uid] });
-      setPicked((p) => (p.includes(uid) ? p.filter((u) => u !== uid) : p.length < select.max ? [...p, uid] : p));
+      // O toque marca e desmarca (numa escolha de uma carta só, tocar em outra troca), e o botão confirma.
+      const next = picked.includes(uid) ? picked.filter((u) => u !== uid) : select.max === 1 ? [uid] : picked.length < select.max ? [...picked, uid] : picked;
+      setPicked(next);
+      // Sem "Confirmar ações": a escolha completa (todos os alvos que dá para marcar) sai na hora.
+      if (quickChoice && next.length > picked.length && next.length === Math.min(select.max, select.options.length)) send({ type: 'choose', player: me, uids: next });
       return;
     }
     if (myPending?.kind === 'block') {
@@ -907,17 +1057,25 @@ export function YonkoTable({
       return;
     }
     if (myPending?.kind === 'counter') {
-      if (myPending.options.includes(uid)) send({ type: 'counter', player: me, uid });
-      else read(uid);
+      if (!myPending.options.includes(uid)) return read(uid);
+      // "Counter sem confirmação" usa na hora. Sem ela, os Counters de Personagem (só o valor) são marcados e vão
+      // todos de uma vez no botão da faixa; o Evento [Counter], com custo e efeito próprios, é escolhido e usado
+      // sozinho, no botão dele.
+      if (quickCounter) send({ type: 'counter', player: me, uid });
+      else if (cardDef(s, uid).category !== 'event') setPicked((p) => (p.includes(uid) ? p.filter((u) => u !== uid) : [...p, uid]));
+      else setSel(sel === uid ? null : uid);
       return;
     }
     if (!myTurnIdle) return read(uid);
     if (sel && targets.includes(uid)) return send({ type: 'attack', player: me, attacker: sel, target: uid });
+    // DON!! marcados: o toque no Líder ou num Personagem anexa todos.
+    if (donPicked.length && canReceiveDon(uid)) return attachDons(uid, donPicked.length);
     const own = s.cards[uid]?.owner === me && (mine.hand.includes(uid) || locate(s, uid)?.player === me);
     if (!own) return read(uid);
     // O segundo toque na mesma carta da mão a joga.
     if (sel === uid && mine.hand.includes(uid) && canPlay(uid)) return send({ type: 'playCard', player: me, uid });
     setSel(sel === uid ? null : uid);
+    setDonPicked([]);
   };
 
   const inspectCard = (uid: string) => {
@@ -936,11 +1094,13 @@ export function YonkoTable({
     if (!d.over || !dropValid(d, d.over)) return;
     if (d.kind === 'hand' && d.uid) send(canCounter(d.uid) ? { type: 'counter', player: me, uid: d.uid } : { type: 'playCard', player: me, uid: d.uid });
     else if (d.kind === 'attacker' && d.uid) send({ type: 'attack', player: me, attacker: d.uid, target: d.over });
-    else if (d.kind === 'don') send({ type: 'attachDon', player: me, target: d.over });
+    else if (d.kind === 'don') attachDons(d.over, d.count ?? 1);
   };
+  /** Os DON!! marcados, no formato da mesa de dois: arrastar um deles leva todos (`useTableGestures`). */
+  const donMode: Mode = donPicked.length ? { kind: 'don', picked: donPicked } : null;
   // Os gestos da mesa de dois: o toque longo (ou o clique segurado) abre a carta; arrastar joga, ataca ou anexa.
   const gestures = useTableGestures({
-    mode: null,
+    mode: donMode,
     dropValid,
     onCard,
     onDrop,
@@ -949,7 +1109,9 @@ export function YonkoTable({
     setZoom: (uid) => {
       if (uid) inspectCard(uid);
     },
-    setMode: () => undefined,
+    setMode: (m) => {
+      if (!m) setDonPicked([]);
+    },
   });
   /** A mesa de quem joga durante o arrasto de uma carta da mão: pode soltar aqui, e já está em cima. */
   const fieldDrop: DropState = drag?.kind === 'hand' && dropValid(drag, 'field') ? (drag.over === 'field' ? 'over' : 'ok') : null;
@@ -968,6 +1130,7 @@ export function YonkoTable({
             icon: 'deck',
             mine: true,
             text: t('yonko.mulligan'),
+            peek: true,
             buttons: [
               { label: t('yonko.mulliganKeep'), kind: 'primary', onClick: () => send({ type: 'mulligan', player: me, redraw: false }) },
               { label: t('yonko.mulliganRedraw'), onClick: () => send({ type: 'mulligan', player: me, redraw: true }) },
@@ -980,7 +1143,7 @@ export function YonkoTable({
             mine: true,
             text: p.curve ? t('yonko.curve') : promptText(tryT, p),
             sub: p.curve ? t('yonko.curveHint') : undefined,
-            tray: p.shown,
+            peek: true,
             buttons: [...labels.map((label, index): Btn => ({ label, kind: labels.length <= 2 && index === 0 ? 'primary' : undefined, onClick: () => send({ type: 'option', player: me, index }) })), ...cancel],
           };
         }
@@ -1000,19 +1163,31 @@ export function YonkoTable({
           };
         }
         case 'selectTargets': {
-          const offTable = [...new Set([...(p.shown ?? []), ...p.options])].filter((u) => !locate(s, u) && !mine.hand.includes(u));
           const n = picked.length;
-          const ready = n >= p.min && n <= p.max;
+          // O mínimo nunca passa do que há para escolher.
+          const need = Math.min(p.min, p.options.length);
+          const choose = (uids: string[]) => send({ type: 'choose', player: me, uids });
           const buttons: Btn[] = [];
-          if (p.max > 1) buttons.push({ label: t('yonko.confirm', { n }), kind: 'primary', disabled: !ready, onClick: () => send({ type: 'choose', player: me, uids: picked }) });
-          else if (p.min === 0) buttons.push({ label: t('yonko.none'), onClick: () => send({ type: 'choose', player: me, uids: [] }) });
+          if (p.max === 0) buttons.push({ label: t('game.continue'), kind: 'primary', onClick: () => choose([]) });
+          else {
+            // "Não escolher" à parte do "Confirmar", e com o segundo toque: a escolha vazia não sai sem querer.
+            if (p.min === 0 && p.ordered) buttons.push({ label: t('game.keepOrder'), onClick: () => choose([]) });
+            else if (p.min === 0) buttons.push({ label: skip.armed ? t('game.skipChoiceArmed') : t('game.skipChoice'), small: skip.armed ? t('game.skipChoiceArmedSub') : undefined, onClick: () => skip.press(() => choose([])) });
+            buttons.push({
+              label: p.max > 1 ? t('game.confirmCount', { n, max: p.max }) : t('game.confirm'),
+              kind: 'primary',
+              disabled: n < need || (n === 0 && p.options.length > 0),
+              onClick: () => choose(picked),
+            });
+          }
           return {
             icon: p.intent === 'harm' ? 'swords' : 'check',
             mine: true,
             text: promptText(tryT, p),
             chip: p.options.length ? t('yonko.options', { n: p.options.length }) : t('yonko.noOptions'),
-            sub: p.max > 1 ? t('yonko.pickRange', { min: p.min, max: p.max }) : undefined,
-            tray: offTable.length ? offTable : undefined,
+            sub: pickWindow ? undefined : p.max > 1 ? t('yonko.pickRange', { min: p.min, max: p.max }) : p.max === 1 && !quickChoice ? t('yonko.pickOne') : undefined,
+            peek: pickWindow,
+            tray: !pickWindow && offTable.length ? offTable : undefined,
             buttons: [...buttons, ...cancel],
           };
         }
@@ -1024,16 +1199,42 @@ export function YonkoTable({
             chip: t('yonko.options', { n: p.options.length }),
             buttons: [{ label: t('yonko.noBlock'), kind: 'primary', onClick: () => send({ type: 'choose', player: me, uids: [] }) }],
           };
-        case 'counter':
+        case 'counter': {
+          // Os Counters marcados (sem "Counter sem confirmação"): o botão usa todos e encerra a etapa, como na
+          // mesa de dois, com o resultado previsto do ataque. O Evento [Counter] escolhido é usado sozinho.
+          const marked = picked.filter((u) => p.options.includes(u));
+          const event = sel !== null && p.options.includes(sel) ? sel : null;
+          const amount = marked.reduce((sum, u) => sum + counterValue(s, u), 0);
+          const atk = getPower(s, battle!.attacker) ?? 0;
+          const total = (getPower(s, battle!.target) ?? 0) + amount;
+          const buttons: Btn[] = marked.length
+            ? [
+                {
+                  label: t('game.useCounters', { amount }),
+                  small: t('game.resultSub', { result: atk >= total ? t('game.attackPasses') : t('game.defended'), atk, def: total }),
+                  kind: 'primary',
+                  onClick: () => sendAll([...marked.map((uid): Action => ({ type: 'counter', player: me, uid })), { type: 'pass', player: me }]),
+                },
+                { label: t('yonko.cancel'), onClick: () => setPicked([]) },
+              ]
+            : event
+              ? [
+                  { label: t('yonko.play', { cost: playCost(s, event) }), kind: 'primary', onClick: () => send({ type: 'counter', player: me, uid: event }) },
+                  { label: t('yonko.cancel'), onClick: () => setSel(null) },
+                ]
+              : [{ label: t('yonko.pass'), kind: 'primary', onClick: () => send({ type: 'pass', player: me }) }];
           return {
             icon: 'shield',
             mine: true,
-            text: p.bystander
-              ? t('yonko.counterBystander', { attacker: s.players[attackerOwner ?? me].name, target: s.players[defender ?? me].name })
-              : t('yonko.counter', { attacker: name(battle!.attacker), power: getPower(s, battle!.attacker), target: name(battle!.target), defense: getPower(s, battle!.target) }),
-            sub: p.bystander ? t('yonko.counterBystanderHint') : p.options.length ? t('yonko.counterHint') : t('yonko.counterNone'),
-            buttons: [{ label: t('yonko.pass'), kind: 'primary', onClick: () => send({ type: 'pass', player: me }) }],
+            text: event
+              ? name(event)
+              : p.bystander
+                ? t('yonko.counterBystander', { attacker: s.players[attackerOwner ?? me].name, target: s.players[defender ?? me].name })
+                : t('yonko.counter', { attacker: name(battle!.attacker), power: getPower(s, battle!.attacker), target: name(battle!.target), defense: getPower(s, battle!.target) }),
+            sub: event ? undefined : p.bystander ? t('yonko.counterBystanderHint') : !p.options.length ? t('yonko.counterNone') : quickCounter ? t('yonko.counterHint') : t('yonko.counterMarkHint'),
+            buttons,
           };
+        }
         case 'lifeCard': {
           const trigger = legal.some((a) => a.type === 'answer' && a.yes);
           return {
@@ -1061,6 +1262,16 @@ export function YonkoTable({
     if (!myTurnIdle) {
       const active = s.players[s.activePlayer];
       return { icon: 'bot', mine: false, waiting: s.phase !== 'gameover', text: s.activePlayer === me ? t('yonko.resolving') : t('yonko.turnOf', { name: active.name }), buttons: [] };
+    }
+    if (donPicked.length) {
+      return {
+        icon: 'check',
+        mine: true,
+        don: donPicked.length,
+        text: t('yonko.donPicked', { n: donPicked.length }),
+        sub: t('game.donTapTarget'),
+        buttons: [{ label: t('yonko.cancel'), onClick: () => setDonPicked([]) }],
+      };
     }
     if (sel && mine.hand.includes(sel)) {
       const why = playError(s, me, sel);
@@ -1096,8 +1307,19 @@ export function YonkoTable({
               onClick: () => send(a),
             };
           }),
-          ...(attach ? [{ label: t('yonko.attachDon'), onClick: () => send({ type: 'attachDon', player: me, target: sel }) }] : []),
-          ...(detach ? [{ label: t('yonko.detachDon'), onClick: () => send({ type: 'detachDon', player: me, target: sel }) }] : []),
+          ...(attach ? [{ label: t('yonko.attachDon'), onClick: () => attachDons(sel, 1) }] : []),
+          ...(attach && mine.donActive > 1 ? [{ label: t('yonko.attachAll', { n: mine.donActive }), onClick: () => attachDons(sel, mine.donActive) }] : []),
+          ...(detach
+            ? [
+                {
+                  label: t('yonko.detachDon'),
+                  onClick: () => {
+                    keepSel.current = 1;
+                    send({ type: 'detachDon', player: me, target: sel });
+                  },
+                },
+              ]
+            : []),
           { label: t('yonko.cancel'), onClick: () => setSel(null) },
         ],
       };
@@ -1170,6 +1392,11 @@ export function YonkoTable({
   // A carta da Vida que saiu: a janela no centro, com o [Trigger] quando há.
   const lifeCard = myPending?.kind === 'lifeCard' && s.cards[myPending.card] ? myPending.card : null;
   const trashOf = sheet && typeof sheet === 'object' ? sheet.trash : null;
+  /**
+   * As janelas de pergunta aparecem: nenhuma recolhida em "Ver a mesa", nenhuma folha aberta e, como na mesa de
+   * dois, nenhuma carta parada no centro (a pergunta espera a animação da jogada que a causou).
+   */
+  const windows = !trayHidden && !sheet && !motion.busy;
   const sheetTitle =
     sheet === 'log' ? t('yonko.log') : sheet === 'card' ? t('yonko.card') : sheet === 'options' ? t('yonko.tableOptions') : trashOf !== null ? t('game.trashOf', { name: who(trashOf), n: s.players[trashOf].trash.length }) : '';
 
@@ -1292,12 +1519,18 @@ export function YonkoTable({
             <div className="yk-center">
               <div className={['yk-banner', banner.mine ? 'mine' : '', banner.waiting ? 'waiting' : '', clash ? 'in-battle' : ''].join(' ')} style={vars({ '--pc': seatColor(s, actor) })} aria-live="polite">
                 <span className="yk-banner-who">
+                  {banner.don ? (
+                    <span className="yk-banner-don" aria-hidden="true">
+                      <span className="don-card" />
+                      <b>×{banner.don}</b>
+                    </span>
+                  ) : null}
                   <Avatar s={s} id={actor} />
                   <span className="yk-banner-icon">
                     <Icon name={banner.icon} size={14} />
                   </span>
                 </span>
-                <div className="yk-banner-text" key={`${s.actionCount}:${sel ?? ''}`}>
+                <div className="yk-banner-text" key={`${s.actionCount}:${sel ?? ''}:${donPicked.length ? 'don' : ''}`}>
                   <p>
                     <b>{banner.text}</b>
                     {banner.waiting && (
@@ -1344,8 +1577,9 @@ export function YonkoTable({
                     </button>
                   )}
                   {banner.buttons.map((b, i) => (
-                    <button key={`${i}:${b.label}`} type="button" className={['yk-btn', b.kind ?? ''].join(' ')} disabled={b.disabled} title={b.title} onClick={b.onClick}>
+                    <button key={`${i}:${b.label}`} type="button" className={['yk-btn', b.kind ?? '', b.small ? 'two' : ''].join(' ')} disabled={b.disabled} title={b.title} onClick={b.onClick}>
                       {b.label}
+                      {b.small && <small>{b.small}</small>}
                     </button>
                   ))}
                 </div>
@@ -1390,7 +1624,7 @@ export function YonkoTable({
                   {mine.out ? <span className="yk-tag out">{t('yonko.tagOut')}</span> : defender === me ? <span className="yk-tag">{t('yonko.tagTarget')}</span> : null}
                   {!mine.out && <SeatClock status={extras.status?.(me)} t={t} />}
                 </span>
-                <DonRow ps={mine} t={t} draggable={canAttachDon} dragging={drag?.kind === 'don' ? drag.dons : undefined} />
+                <DonRow ps={mine} t={t} draggable={canAttachDon} dragging={drag?.kind === 'don' ? drag.dons : undefined} picked={donPicked} onDon={onDon} />
                 <button type="button" className={['yk-end', 'small', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
                   {t('yonko.endTurn')}
                 </button>
@@ -1426,7 +1660,10 @@ export function YonkoTable({
               <div className={['drag-ghost', `ghost-${drag.kind}`, drag.over && drag.over !== 'hand' ? 'over' : ''].join(' ')} style={{ left: drag.x, top: drag.y }}>
                 {drag.kind === 'don' ? (
                   <div className="don-stack">
-                    <span className="don-card" style={vars({ '--k': 0 })} />
+                    {Array.from({ length: Math.min(drag.count ?? 1, 4) }, (_, i) => (
+                      <span key={i} className="don-card" style={vars({ '--k': i })} />
+                    ))}
+                    {(drag.count ?? 1) > 1 && <b>×{drag.count}</b>}
                   </div>
                 ) : (
                   drag.uid && s.cards[drag.uid] && <CardView state={s} uid={drag.uid} />
@@ -1450,7 +1687,49 @@ export function YonkoTable({
 
         {motion.layer}
 
-        {myPending?.kind === 'confirm' && !trayHidden && !sheet && (
+        {myPending?.kind === 'mulligan' && windows && (
+          <MulliganModal s={s} me={me} t={t} place={placeOf(me)} onAnswer={(redraw) => send({ type: 'mulligan', player: me, redraw })} onCard={inspectCard} onPeek={() => setTrayHidden(true)} />
+        )}
+
+        {myPending?.kind === 'option' && windows && myPending.curve && (
+          <CurveModal s={s} me={me} t={t} labels={optionLabels(tryT, myPending)} place={placeOf(me)} onPick={(index) => send({ type: 'option', player: me, index })} onPeek={() => setTrayHidden(true)} />
+        )}
+
+        {myPending?.kind === 'option' && windows && !myPending.curve && (
+          <OptionModal
+            s={s}
+            me={me}
+            t={t}
+            pending={myPending}
+            prompt={promptText(tryT, myPending)}
+            labels={optionLabels(tryT, myPending)}
+            onPick={(index) => send({ type: 'option', player: me, index })}
+            onCard={inspectCard}
+            onPeek={() => setTrayHidden(true)}
+            onCancel={cancelAllowed(s, me) ? () => send({ type: 'cancel', player: me }) : undefined}
+          />
+        )}
+
+        {select && pickWindow && windows && (
+          <PickModal
+            s={s}
+            me={me}
+            t={t}
+            pending={select}
+            prompt={promptText(tryT, select)}
+            cards={offTable}
+            picked={picked}
+            quick={quickChoice}
+            highlight={highlight}
+            onCard={onCard}
+            onRead={inspectCard}
+            onChoose={(uids) => send({ type: 'choose', player: me, uids })}
+            onPeek={() => setTrayHidden(true)}
+            onCancel={cancelAllowed(s, me) ? () => send({ type: 'cancel', player: me }) : undefined}
+          />
+        )}
+
+        {myPending?.kind === 'confirm' && windows && (
           <AskEffect
             s={s}
             me={me}
@@ -1464,7 +1743,7 @@ export function YonkoTable({
           />
         )}
 
-        {lifeCard && !trayHidden && !sheet && <LifeReveal s={s} me={me} uid={lifeCard} trigger={legal.some((a) => a.type === 'answer' && a.yes)} t={t} onAnswer={(yes) => send({ type: 'answer', player: me, yes })} onPeek={() => setTrayHidden(true)} />}
+        {lifeCard && windows && <LifeReveal s={s} me={me} uid={lifeCard} trigger={legal.some((a) => a.type === 'answer' && a.yes)} t={t} onAnswer={(yes) => send({ type: 'answer', player: me, yes })} onPeek={() => setTrayHidden(true)} />}
 
         {sheet && (
           <div className="yk-sheet-back" onClick={() => setSheet(null)}>

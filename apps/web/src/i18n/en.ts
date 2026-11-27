@@ -2511,6 +2511,7 @@ export default {
   'engine.optLifeTopFaceUp': 'Add to the top of Life (face-up)',
   'engine.optPeekOwnLife': 'Look at your Life',
   'engine.optPeekOpponentLife': "Look at your opponent's Life",
+  'engine.optPeekLifeOf': "Look at {player}'s Life",
   'engine.optDontPeek': "Don't look",
   // ---- table with more than two players (Yonko) ----
   'engine.whoseDonToRest': '{source}: rest 1 active DON!! of which opponent?',

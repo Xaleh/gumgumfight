@@ -190,8 +190,10 @@ export function execDeckStep(state: GameState, frame: EffectFrame, step: DeckSte
       return true;
     }
     case 'revealOpponentTop': {
-      const card = state.players[opponentOf(state, frame.controller)].deck[0];
+      const revealer = opponentOf(state, frame.controller);
+      const card = state.players[revealer].deck[0];
       frame.last = card ? [card] : [];
+      if (step.vs !== undefined) frame.lastOf = { cards: { ...frame.lastOf?.cards, [revealer]: frame.last }, tail: frame.last };
       if (card) log(state, frame.controller, lg('revealsOppDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck do oponente.`, { player: ps.name, card: cardDef(state, card).name }), { uids: [card] });
       return true;
     }

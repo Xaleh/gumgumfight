@@ -2514,6 +2514,7 @@ const ptBR = {
   'engine.optLifeTopFaceUp': 'Colocar no topo da Vida (virada para cima)',
   'engine.optPeekOwnLife': 'Olhar a sua Vida',
   'engine.optPeekOpponentLife': 'Olhar a Vida do oponente',
+  'engine.optPeekLifeOf': 'Olhar a Vida de {player}',
   'engine.optDontPeek': 'Não olhar',
   // ---- mesa com mais de dois jogadores (Yonko) ----
   'engine.whoseDonToRest': '{source}: virar 1 DON!! ativo de qual oponente?',

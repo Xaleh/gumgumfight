@@ -9,6 +9,7 @@ import { conditionHolds } from './conditions';
 import { forgetCard, targetCandidates } from './options';
 import { markRevealed } from './cancel';
 import { setExpiry } from './turn';
+import { FAR_TURN } from './constants';
 import { pushEffect } from './stack';
 import { pushAbilities } from './triggers';
 import { execStep } from './exec-step';
@@ -105,8 +106,10 @@ export function eachOpponent(step: EffectStep): boolean {
       return step.side === 'opponent';
     case 'arrangeLife':
       return step.whose === 'opponent';
+    // "your or your opponent's Life cards" é uma carta só, de uma Vida à escolha (a própria ou a de um oponente):
+    // o passo roda uma vez, com uma opção por Vida.
     case 'peekLife':
-      return step.whose !== 'own';
+      return step.whose === 'opponent';
     case 'handAllToDeck':
     case 'negateOnPlay':
       return step.who === 'opponent';
@@ -213,18 +216,30 @@ function chosenMatches(state: GameState, card: string, filter: CardFilter): bool
   return matchesFilter(cardDef(state, card), rest);
 }
 
+/**
+ * "A carta revelada" (ou escolhida) do passo anterior, para o "If the revealed card …". Numa mesa de mais de dois,
+ * um passo que revela a carta de cada oponente guarda a de cada um (`frame.lastOf`): o passo seguinte que também
+ * roda contra cada oponente olha a carta daquele oponente (só quem revelou um Evento perde a Vida), e o que não
+ * mira um oponente só (um alvo em campo) vale se a carta de algum deles serve, como as condições de patamar.
+ */
+function revealedCards(frame: EffectFrame, step: EffectStep): string[] {
+  const of = frame.lastOf;
+  // Um passo com alvo depois da revelação troca `frame.last`: aí vale o alvo, não as cartas reveladas.
+  if (!of || of.tail.join() !== (frame.last ?? []).join()) return frame.last?.length ? [frame.last[0]] : [];
+  if (step.vs !== undefined) return (of.cards[step.vs] ?? []).slice(0, 1);
+  return Object.values(of.cards).flatMap((cards) => cards.slice(0, 1));
+}
+
 export function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   if (step.if?.lastDone && !frame.last?.length) return false;
   if (step.if?.searchMissed && frame.searched) return false;
   if (step.if?.lastKOd && !(frame.koTargets ?? []).some((u) => state.players[ownerOf(state, u)].trash.includes(u))) return false;
   if (step.if?.revealedHasChosenCost) {
-    const card = frame.last?.[0];
-    if (!card || frame.chosenCost === undefined || (cardDef(state, card).cost ?? 0) !== frame.chosenCost) return false;
+    if (frame.chosenCost === undefined || !revealedCards(frame, step).some((card) => (cardDef(state, card).cost ?? 0) === frame.chosenCost)) return false;
   }
   const filter = step.if?.chosenMatches;
   if (filter) {
-    const card = frame.last?.[0];
-    if (!card || !chosenMatches(state, card, filter)) return false;
+    if (!revealedCards(frame, step).some((card) => chosenMatches(state, card, filter))) return false;
   }
   return conditionHolds(state, frame.controller, frame.source, step.if);
 }
@@ -343,6 +358,14 @@ export function useOwnEffect(state: GameState, frame: EffectFrame, timing: 'main
 /** Registra um modificador; "until the end of your opponent's next turn" calcula o turno em que acaba. */
 export function addModifier(state: GameState, controller: PlayerId, m: Modifier) {
   setExpiry(state, controller, m, m.duration);
+  // "will not become active in your opponent's next Refresh Phase", numa mesa de mais de dois: vale até a próxima
+  // Renovação do dono da carta, que a consome (`refreshDrawDon`). Pela duração comum acabaria no começo do turno de
+  // quem usou o efeito, que pode chegar antes dessa Renovação (um [On K.O.] no turno do oponente, um [Trigger]).
+  if (m.kind === 'skipRefresh' && isMultiplayer(state) && ownerOf(state, m.uid) !== controller) {
+    m.untilTurn = FAR_TURN;
+    delete m.untilStartOf;
+    delete m.untilEndOf;
+  }
   state.modifiers.push(m);
 }
 

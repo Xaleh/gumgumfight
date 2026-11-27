@@ -177,6 +177,7 @@ export function execHandStep(state: GameState, frame: EffectFrame, step: HandSte
       for (let k = 0; k < step.count && pool.length; k++) picked.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
       frame.last = picked;
       frame.revealed = picked;
+      if (step.vs !== undefined) frame.lastOf = { cards: { ...frame.lastOf?.cards, [opp.id]: picked }, tail: picked };
       if (picked.length) log(state, frame.controller, lg('reveals', `${opp.name} revela ${picked.map((u) => cardDef(state, u).name).join(', ')}.`, { player: opp.name, cards: picked.map((u) => cardDef(state, u).name).join(', ') }), { uids: picked });
       return true;
     }

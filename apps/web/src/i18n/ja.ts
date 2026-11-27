@@ -2509,6 +2509,7 @@ export default {
   'engine.optLifeTopFaceUp': 'ライフの上に加える（表向き）',
   'engine.optPeekOwnLife': '自分のライフを見る',
   'engine.optPeekOpponentLife': '相手のライフを見る',
+  'engine.optPeekLifeOf': '{player}のライフを見る',
   'engine.optDontPeek': '見ない',
   // ---- 3人以上の卓（四皇） ----
   'engine.whoseDonToRest': '{source}：どの相手のアクティブのドン!!を1枚レストにしますか？',
