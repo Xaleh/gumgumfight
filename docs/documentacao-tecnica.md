@@ -819,7 +819,10 @@ As URLs apontam para `https://optcgapi.com/media/static/Card_Images/<ID>.jpg` (o
 `audio.ts` (Web Audio API) tem dois canais com volume próprio, efeitos e música, ligados às configurações
 `sfxVolume` e `musicVolume`. O primeiro toque ou tecla destrava o áudio (os navegadores exigem um gesto) e
 pré-carrega os efeitos; a música só é baixada quando pedida e toca num `AudioBufferSourceNode` em loop (emenda
-sem corte), com crossfade na troca. `game/useMatchAudio.ts` deriva os sons da diferença entre o estado anterior e o
+sem corte), com crossfade na troca. Com a aba escondida o contexto é suspenso; na volta, e a cada gesto enquanto não
+estiver `running`, o `resume()` é tentado de novo, e a recusa do aparelho é engolida (no iPhone, com uma ligação em
+curso ou outro app segurando o áudio, o WebKit rejeita com `InvalidStateError: Failed to start the audio device`).
+Com o contexto suspenso os efeitos são descartados, para não tocarem todos juntos na volta. `game/useMatchAudio.ts` deriva os sons da diferença entre o estado anterior e o
 novo da partida (como `Motion.tsx` faz com as animações), então valem para a partida contra o bot, online,
 espectador e replay (mudos nos pulos e no replay em 8×); `App.tsx` toca a música do menu fora da mesa e a mesa troca
 para a da partida. Os arquivos (MP3) ficam em `assets/audio`, com a origem e a licença de cada um em
