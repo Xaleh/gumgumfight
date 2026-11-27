@@ -1359,6 +1359,10 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
   (`friendLink.ts` lê como convite; sem o `convite`, `/?yonko=` continua sendo o link da mesa, que abre a entrada do
   Yonko). Tocar no aviso ou em **Entrar** chama `POST /api/yonko/tables/join` com o deck do Yonko, sem a confirmação
   do deck: a sala de espera mostra o deck e a partida só começa depois do "Estou pronto".
+- **Foto**: `GET /api/friends` traz `me` (apelido e foto, como os amigos me veem) e, em cada amigo aceito e em quem
+  mandou um convite, `picture`: o endereço da foto enviada no jogo (`customPictureOf`), ou null. A foto do Google
+  nunca sai daqui. `GET /api/users/:id/picture` abre para o dono, os amigos aceitos e os admins. No navegador,
+  `FriendAvatar` desenha o círculo (foto ou inicial numa cor de carta, aro do status).
 - Pedido de amizade e aceite também geram push (`friends`, `/?amigos=1` abre a folha). Endereços lidos em
   `apps/web/src/friendLink.ts`; a folha e a faixa em `components/Friends.tsx`.
 
@@ -2129,7 +2133,7 @@ Quem chama, na coluna da direita:
 | POST | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie | Pública |
 | POST | `/api/auth/logout` | Sai (apaga a sessão) | Sessão |
 | PUT · DELETE | `/api/auth/me/picture` | Troca a foto da conta (`{ image }` data URL) / volta para a do Google | Sessão |
-| GET | `/api/users/:id/picture` | Foto enviada por um usuário | Dono ou Admin |
+| GET | `/api/users/:id/picture` | Foto enviada por um usuário | Dono, amigo aceito ou Admin |
 | PUT · DELETE | `/api/auth/me/playmat-logo` | Logo de quem transmite no playmat da mesa lateral (`{ image }` data URL) / volta para a padrão | Streamer |
 | GET | `/api/users/:id/playmat-logo` | Logo do playmat enviada por um usuário | Dono (com o perfil que transmite) ou Admin |
 | GET | `/api/admin/users?q=` | Contas e perfis | Admin |

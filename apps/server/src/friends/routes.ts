@@ -5,6 +5,7 @@
 // desfaz a amizade quando quiser.
 //
 // O que um amigo vê do outro: o nome público (`players.name`, nunca o nome da conta Google), a
+// foto que a pessoa enviou no jogo (nunca a do Google; sem foto enviada, o navegador mostra a inicial), a
 // recompensa e o status (online, jogando, offline) que o lobby já conhece pela presença (menu
 // aberto, sala de espera, fila, partida). Nunca qual partida nem o código de uma sala: o código
 // só chega a quem foi convidado. Quem não é amigo (pedido pendente) não vê o status.
@@ -22,7 +23,7 @@
 
 import { formatLabel } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { accountOwnerKey, getUser, type User } from '../auth/store';
+import { accountOwnerKey, customPictureOf, getUser, type User } from '../auth/store';
 import type { DB } from '../db';
 import { fail } from '../errors';
 import type { Lobby } from '../online/lobby';
@@ -133,15 +134,17 @@ export function registerFriendRoutes(app: FastifyInstance, { db, user, lobby, yo
     const order = { playing: 0, online: 1, offline: 2 } as const;
     const friends = all
       .filter((f) => f.status === 'accepted')
-      .map((f) => ({ ...person(f.other), status: presence(f.other), since: f.acceptedAt }))
+      .map((f) => ({ ...person(f.other), picture: customPictureOf(db, f.other), status: presence(f.other), since: f.acceptedAt }))
       .sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name));
     return {
       code: friendCode(db, me.id),
+      // Como os amigos me veem: o apelido e a foto enviada no jogo (null: a inicial).
+      me: { name: nameOf(me.id), picture: customPictureOf(db, me.id) },
       max: MAX_FRIENDS,
       friends,
       incoming: all.filter((f) => f.status === 'pending' && !f.mine).map((f) => ({ ...person(f.other), at: f.createdAt })),
       outgoing: all.filter((f) => f.status === 'pending' && f.mine).map((f) => ({ ...person(f.other), at: f.createdAt })),
-      invites: invitesFor(me.id).map((i) => ({ from: { id: i.from, name: nameOf(i.from) }, kind: i.kind, code: i.code, format: i.format, at: new Date(i.at).toISOString() })),
+      invites: invitesFor(me.id).map((i) => ({ from: { id: i.from, name: nameOf(i.from), picture: customPictureOf(db, i.from) }, kind: i.kind, code: i.code, format: i.format, at: new Date(i.at).toISOString() })),
     };
   });
 

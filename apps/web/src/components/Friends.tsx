@@ -10,7 +10,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, type FriendInvite, type FriendList, type FriendPresence } from '../api';
 import { useAuth } from '../auth';
-import { type MessageKey, useT } from '../i18n';
+import { type MessageKey, useLocale, useT } from '../i18n';
+import { fmtBerries } from '../i18n/format';
 import { poll } from '../poll';
 import { friendLink } from '../friendLink';
 import { Icon } from './Icons';
@@ -55,6 +56,26 @@ export function useFriends(loggedIn: boolean) {
 /** Pedidos recebidos e convites: o número no item "Amigos" do menu. */
 export const friendsBadge = (data: FriendList | null) => (data ? data.incoming.length + data.invites.length : 0);
 
+/** Cor do círculo de quem não tem foto: uma das cores das cartas, sempre a mesma para o mesmo nome. */
+const TONES = ['red', 'green', 'blue-card', 'purple', 'teal', 'yellow', 'black'];
+const toneOf = (name: string) => TONES[[...name].reduce((sum, ch) => (sum * 31 + ch.codePointAt(0)!) % 9973, 7) % TONES.length];
+
+/**
+ * A foto de um jogador em círculo, como a arte dos Líderes: a foto que ele enviou no jogo ou, sem ela, a inicial
+ * do nome numa cor de carta. Com `status`, o aro e o ponto dizem se está online, jogando ou fora.
+ */
+export function FriendAvatar({ name, picture, status }: { name: string; picture?: string | null; status?: FriendPresence }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className={['friend-avatar', status ?? ''].join(' ')} style={{ ['--tone' as string]: `var(--${toneOf(name)})` }} aria-hidden="true">
+      <span className="friend-avatar-face">
+        {picture && !failed ? <img src={picture} alt="" loading="lazy" onError={() => setFailed(true)} /> : name.trim().slice(0, 1).toUpperCase() || '?'}
+      </span>
+      {status && <i className="friend-avatar-dot" />}
+    </span>
+  );
+}
+
 const STATUS_KEY: Record<FriendPresence, MessageKey> = {
   playing: 'friends.statusPlaying',
   online: 'friends.statusOnline',
@@ -68,9 +89,7 @@ export function FriendInvites({ invites, onJoin, onDecline }: { invites: FriendI
     <>
       {invites.map((i) => (
         <div key={i.code} className="home-banner friend-invite" role="status">
-          <span className="play-ico">
-            <Icon name="user" size={16} />
-          </span>
+          <FriendAvatar name={i.from.name} picture={i.from.picture} />
           <div className="home-banner-text">
             <strong>{t('friends.inviteKicker')}</strong>
             <span>{t('friends.inviteBanner', { name: i.from.name, format: i.kind === 'yonko' ? t('friends.inviteYonko') : i.format })}</span>
@@ -128,6 +147,7 @@ export function FriendsSheet({
   onClose: () => void;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [code, setCode] = useState(initialCode ?? '');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(linked ? t('friends.linkAdd') : null);
@@ -194,14 +214,18 @@ export function FriendsSheet({
           ) : (
             <>
               <section className="friends-me">
-                <div className="friends-code">
-                  <span className="muted small">{t('friends.myCode')}</span>
+                <FriendAvatar name={data.me.name} picture={data.me.picture} />
+                <div className="friends-me-who">
+                  <span className="friends-kicker">{t('friends.myCode')}</span>
                   <strong className="friend-code">{data.code}</strong>
+                  <span className="friends-me-name">{data.me.name}</span>
                 </div>
-                <button type="button" className="btn-outline" onClick={() => void copy()}>
+                <button type="button" className="btn primary friends-copy" onClick={() => void copy()}>
+                  <Icon name="copy" size={16} />
                   {copied ? t('friends.copied') : t('friends.copyLink')}
                 </button>
-                <p className="muted small">{t('friends.shareHint')}</p>
+                <p>{t('friends.shareHint')}</p>
+                {!data.me.picture && <p className="friends-photo-hint">{t('friends.photoHint')}</p>}
               </section>
 
               <form
@@ -227,16 +251,26 @@ export function FriendsSheet({
                   </button>
                 </div>
               </form>
-              {notice && <p className="home-notice">{notice}</p>}
+              {notice && (
+                <p className="home-notice friends-notice" role="status">
+                  {notice}
+                </p>
+              )}
               {error && <p className="error">{error}</p>}
 
               {data.incoming.length > 0 && (
-                <section>
-                  <h4>{t('friends.incoming')}</h4>
+                <section className="friends-requests">
+                  <h4>
+                    {t('friends.incoming')} <span className="friends-count">{data.incoming.length}</span>
+                  </h4>
                   <ul className="friends-list">
                     {data.incoming.map((f) => (
                       <li key={f.id}>
-                        <span className="friend-name">{f.name}</span>
+                        <FriendAvatar name={f.name} />
+                        <span className="friend-name">
+                          {f.name}
+                          <small>{t('friends.wants')}</small>
+                        </span>
                         <span className="btn-row">
                           <button type="button" className="btn" disabled={busy} onClick={() => void act(() => api.friends.remove(f.id))}>
                             {t('friends.decline')}
@@ -258,27 +292,35 @@ export function FriendsSheet({
 
               <section>
                 <h4>
-                  {t('friends.listTitle')} {data.friends.length > 0 && <span className="muted small">· {t('friends.onlineCount', { n: online })}</span>}
+                  {t('friends.listTitle')} {data.friends.length > 0 && <span className={['friends-count', online ? 'on' : ''].join(' ')}>{t('friends.onlineCount', { n: online })}</span>}
                 </h4>
                 {data.friends.length === 0 ? (
-                  <p className="muted small">{t('friends.empty')}</p>
+                  <div className="friends-empty">
+                    <Icon name="user" size={26} />
+                    <p className="muted small">{t('friends.empty')}</p>
+                  </div>
                 ) : (
                   <ul className="friends-list">
                     {data.friends.map((f) => (
                       <li key={f.id} className={`friend-${f.status}`}>
-                        <span className={`friend-dot ${f.status}`} aria-hidden="true" />
+                        <FriendAvatar name={f.name} picture={f.picture} status={f.status} />
                         <span className="friend-name">
                           {f.name}
-                          <small className="muted">{t(STATUS_KEY[f.status])}</small>
+                          <small>
+                            <span className={`friend-status ${f.status}`}>{t(STATUS_KEY[f.status])}</span>
+                            {f.bounty > 0 && <span className="friend-bounty">{fmtBerries(f.bounty, locale)}</span>}
+                          </small>
                         </span>
                         <span className="btn-row">
                           <button
                             type="button"
-                            className="btn-outline"
+                            className="friend-remove"
                             disabled={busy}
+                            aria-label={`${t('friends.remove')}: ${f.name}`}
+                            title={t('friends.remove')}
                             onClick={() => window.confirm(t('friends.removeConfirm', { name: f.name })) && void act(() => api.friends.remove(f.id))}
                           >
-                            {t('friends.remove')}
+                            <Icon name="close" size={16} />
                           </button>
                           <button
                             type="button"
@@ -324,7 +366,11 @@ export function FriendsSheet({
                   <ul className="friends-list">
                     {data.outgoing.map((f) => (
                       <li key={f.id}>
-                        <span className="friend-name">{f.name}</span>
+                        <FriendAvatar name={f.name} />
+                        <span className="friend-name">
+                          {f.name}
+                          <small>{t('friends.waiting')}</small>
+                        </span>
                         <button type="button" className="btn" disabled={busy} onClick={() => void act(() => api.friends.remove(f.id))}>
                           {t('friends.cancelRequest')}
                         </button>
@@ -388,10 +434,12 @@ export function TableFriends({ invite, full }: { invite: (friendId: string) => P
           <ul className="friends-list">
             {data.friends.map((f) => (
               <li key={f.id} className={`friend-${f.status}`}>
-                <span className={`friend-dot ${f.status}`} aria-hidden="true" />
+                <FriendAvatar name={f.name} picture={f.picture} status={f.status} />
                 <span className="friend-name">
                   {f.name}
-                  <small className="muted">{t(STATUS_KEY[f.status])}</small>
+                  <small>
+                    <span className={`friend-status ${f.status}`}>{t(STATUS_KEY[f.status])}</span>
+                  </small>
                 </span>
                 <button type="button" className="btn small primary" disabled={full || f.status === 'playing' || Boolean(sent[f.id])} onClick={() => void call(f.id)}>
                   {sent[f.id] === 'sent' ? t('friends.inviteSent') : t('friends.invite')}

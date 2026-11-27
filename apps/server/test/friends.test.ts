@@ -198,6 +198,45 @@ describe('Amigos: status online', () => {
   });
 });
 
+describe('Amigos: foto', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
+
+  it('o amigo vê a foto enviada no jogo, nunca a do Google; quem não é amigo não a abre', async () => {
+    const { app, db } = setup();
+    const a = login(db);
+    // A conta de B tem foto do Google; a de A, nenhuma.
+    const g = upsertGoogleUser(db, { sub: 'friend-foto', email: 'foto@example.com', emailVerified: true, name: 'Conta Com Foto', picture: 'https://lh3.googleusercontent.com/a/foto-do-google' });
+    const b: Who = { id: g.id, headers: { cookie: `gg_session=${createSession(db, g.id)}`, 'x-deck-owner': 'browser-friend-foto-0123456789abcdef' } };
+    const codeB = (await list(app, b)).code;
+    await call(app, 'POST', '/api/friends/requests', a, { code: codeB });
+    // Pedido pendente: sem foto, e o endereço da foto não abre.
+    const url = (await call(app, 'PUT', '/api/auth/me/picture', b, { image: png })).json().user.picture as string;
+    expect(url).toMatch(new RegExp(`^/api/users/${b.id}/picture`));
+    expect((await list(app, b)).incoming[0].picture).toBeUndefined();
+    expect((await call(app, 'GET', url, a)).statusCode).toBe(404);
+
+    await call(app, 'POST', `/api/friends/${a.id}/accept`, b);
+    expect((await list(app, a)).friends[0].picture).toBe(url);
+    expect((await call(app, 'GET', url, a)).headers['content-type']).toBe('image/png');
+    expect((await call(app, 'GET', url, login(db))).statusCode).toBe(404);
+
+    // Sem foto enviada, o amigo não recebe nada (a do Google fica só com o dono).
+    expect((await call(app, 'DELETE', '/api/auth/me/picture', b)).json().user.picture).toContain('googleusercontent');
+    const after = await list(app, a);
+    expect(after.friends[0].picture).toBeNull();
+    expect(JSON.stringify(after)).not.toContain('googleusercontent');
+
+    // O convite leva a foto de quem convida.
+    await call(app, 'PUT', '/api/auth/me/picture', b, { image: png });
+    const room = await privateRoom(app, b);
+    await call(app, 'POST', `/api/friends/${a.id}/invite`, b, { roomId: room.roomId, token: room.token });
+    expect((await list(app, a)).invites[0].from.picture).toMatch(new RegExp(`^/api/users/${b.id}/picture`));
+    // Desfeita a amizade, a foto deixa de abrir.
+    await call(app, 'DELETE', `/api/friends/${b.id}`, a);
+    expect((await call(app, 'GET', url, a)).statusCode).toBe(404);
+  });
+});
+
 describe('Amigos: convite para partida', () => {
   it('convida um amigo para a sala privada; o convite leva o código e some quando a sala começa', async () => {
     const { app, db, sent } = setup();
@@ -210,7 +249,7 @@ describe('Amigos: convite para partida', () => {
     await flush();
     expect(to(sent, 'b')).toEqual([expect.objectContaining({ title: 'Convite para partida', url: `/?convite=${room.code}`, tag: `invite-${a.id}` })]);
     const invite = (await list(app, b)).invites;
-    expect(invite).toEqual([expect.objectContaining({ code: room.code, format: 'Extra Grand Battle', from: { id: a.id, name: expect.stringMatching(/^Pirata /) } })]);
+    expect(invite).toEqual([expect.objectContaining({ code: room.code, format: 'Extra Grand Battle', from: expect.objectContaining({ id: a.id, name: expect.stringMatching(/^Pirata /) }) })]);
     // Quem não foi convidado não vê o convite.
     expect((await list(app, a)).invites).toEqual([]);
 
@@ -273,7 +312,7 @@ describe('Amigos: convite para a mesa do Yonko', () => {
     expect(to(sent, 'b')).toEqual([
       expect.objectContaining({ title: 'Convite para partida', body: expect.stringContaining('mesa do Yonko'), url: `/?yonko=${table.code}&convite=1`, tag: `invite-${a.id}` }),
     ]);
-    expect((await list(app, b)).invites).toEqual([expect.objectContaining({ kind: 'yonko', code: table.code, format: 'Yonko', from: { id: a.id, name: expect.stringMatching(/^Pirata /) } })]);
+    expect((await list(app, b)).invites).toEqual([expect.objectContaining({ kind: 'yonko', code: table.code, format: 'Yonko', from: expect.objectContaining({ id: a.id, name: expect.stringMatching(/^Pirata /) }) })]);
     expect((await list(app, a)).invites).toEqual([]);
 
     // Quem foi convidado senta com o código; o convite some, e quem já está na mesa também pode chamar os amigos dele.

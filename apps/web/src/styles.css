@@ -22281,36 +22281,173 @@ div.dk-tile-main {
 /* ---- Amigos (Friends.tsx): folha, lista com status e faixa de convite ---- */
 .friends-sheet .sheet-body {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 .friends-sheet h4 {
-  margin: 4px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 10px;
   font-size: 15px;
 }
+/* Contador ao lado do título de uma seção ("1 online", pedidos recebidos). */
+.friends-count {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.friends-count.on {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  color: var(--ok);
+}
+/* A foto em círculo, como a arte dos Líderes: aro branco e, por fora, o aro do status. */
+.friend-avatar {
+  --ring: var(--line);
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 46px;
+}
+.friend-avatar-face {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px var(--ring), 0 4px 10px rgba(var(--shadow-rgb), 0.18);
+  background: var(--tone, var(--navy));
+  color: #fff;
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 22px;
+  line-height: 1;
+}
+.friend-avatar-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.friend-avatar.online {
+  --ring: var(--ok);
+}
+.friend-avatar.playing {
+  --ring: var(--gold);
+}
+.friend-avatar.offline .friend-avatar-face {
+  filter: saturate(0.55);
+  opacity: 0.8;
+}
+.friend-avatar-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 13px;
+  height: 13px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--ring);
+}
+.friend-avatar.offline .friend-avatar-dot {
+  background: var(--muted);
+}
+/* O meu cartão: a foto como os amigos a veem, o código e o botão de copiar o link. */
 .friends-me {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 2px solid var(--line);
+  gap: 10px 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: radial-gradient(120% 140% at 100% 0%, rgba(247, 205, 72, 0.18), transparent 55%), linear-gradient(135deg, #12304b 0%, #1b456b 100%);
+  border: 2px solid rgba(247, 205, 72, 0.5);
+  color: var(--cream);
+}
+.friends-me .friend-avatar {
+  --ring: var(--brand-yellow);
+  width: 58px;
+  height: 58px;
+}
+.friends-me .friend-avatar-face {
+  font-size: 28px;
+}
+.friends-me-who {
+  flex: 1 1 170px;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.friends-kicker {
+  color: var(--brand-yellow);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.friend-code {
+  color: #fff;
+  font-family: Bangers, Impact, sans-serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 4px;
+}
+.friends-me-name {
+  overflow: hidden;
+  color: rgba(253, 245, 224, 0.8);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friends-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  margin-left: auto;
 }
 .friends-me p {
   flex-basis: 100%;
   margin: 0;
+  color: rgba(253, 245, 224, 0.78);
+  font-size: 13px;
 }
-.friends-code {
-  display: grid;
-  flex: 1 1 auto;
+.friends-me .friends-photo-hint {
+  color: rgba(253, 245, 224, 0.62);
+  font-size: 12px;
 }
-.friend-code {
-  font-size: 22px;
-  letter-spacing: 3px;
-  font-variant-numeric: tabular-nums;
+/* No celular o botão não cabe ao lado do código: ocupa a linha inteira. */
+@media (max-width: 480px) {
+  .friends-copy {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
 }
 .friends-add {
   --mode: var(--accent);
+}
+.friends-notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+}
+/* Pedidos recebidos: em destaque, pedem resposta. */
+.friends-requests {
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
 }
 .friends-list {
   list-style: none;
@@ -22323,13 +22460,15 @@ div.dk-tile-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
+  gap: 10px 12px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 16px;
+  background: var(--panel);
   border: 1px solid var(--line);
 }
 .friends-list .btn-row {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-left: auto;
 }
@@ -22337,36 +22476,85 @@ div.dk-tile-main {
 .friends-list .btn-outline {
   min-height: 40px;
 }
+.friends-list li > .btn {
+  margin-left: auto;
+}
 .friend-name {
-  flex: 1 1 140px;
+  flex: 1 1 120px;
   min-width: 0;
   font-weight: 800;
   overflow-wrap: anywhere;
 }
 .friend-name small {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 700;
 }
-.friend-dot {
-  width: 10px;
-  height: 10px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--muted);
+.friend-status.online {
+  color: var(--ok);
 }
-.friend-dot.online {
-  background: var(--ok);
+.friend-status.playing {
+  color: var(--gold);
 }
-.friend-dot.playing {
-  background: var(--gold);
+.friend-bounty {
+  font-variant-numeric: tabular-nums;
+}
+.friend-bounty::before {
+  content: '·';
+  margin-right: 8px;
 }
 .friend-offline .friend-name {
-  opacity: 0.75;
+  opacity: 0.8;
+}
+/* Remover da lista: discreto, longe do peso do "Convidar" (pede confirmação). */
+.friend-remove {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.friend-remove:hover:not(:disabled),
+.friend-remove:focus-visible {
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  color: var(--danger-text);
+}
+.friend-remove:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.friends-empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 22px 16px;
+  border-radius: 16px;
+  border: 2px dashed var(--line);
+  color: var(--muted);
+  text-align: center;
+}
+.friends-empty p {
+  margin: 0;
 }
 .home-banner.friend-invite .btn-row {
   display: flex;
   gap: 8px;
   margin-left: auto;
+}
+.home-banner.friend-invite .friend-avatar {
+  --ring: var(--note-line);
 }
 /* Formatos do convite: abrem embaixo do amigo, na folha (1 contra 1 em cada formato e a mesa do Yonko). */
 .friend-formats {
@@ -22414,9 +22602,6 @@ div.dk-tile-main {
 .table-friends .friends-list {
   margin-top: 10px;
   grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
-}
-.table-friends .friends-list .btn {
-  margin-left: auto;
 }
 
 /* ------------------------------------------------------------------ Sandbox de regras */

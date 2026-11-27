@@ -557,10 +557,12 @@ export interface FriendPerson {
   /** Nome público (o apelido do jogador, nunca o da conta Google). */
   name: string;
   bounty: number;
+  /** A foto que a pessoa enviou no jogo (nunca a do Google); só vem de amigos aceitos. Sem ela, a inicial do nome. */
+  picture?: string | null;
 }
 
 export interface FriendInvite {
-  from: { id: string; name: string };
+  from: { id: string; name: string; picture?: string | null };
   /** Sala privada de dois jogadores ou mesa do Yonko. */
   kind: 'room' | 'yonko';
   /** Código da sala privada ou da mesa (o convite entra direto nela). */
@@ -572,6 +574,8 @@ export interface FriendInvite {
 export interface FriendList {
   /** Meu código de amigo (8 letras) e o teto de amigos. */
   code: string;
+  /** Como os amigos me veem: o apelido e a foto enviada no jogo. */
+  me: { name: string; picture: string | null };
   max: number;
   friends: Array<FriendPerson & { status: FriendPresence; since: string | null }>;
   incoming: Array<FriendPerson & { at: string }>;

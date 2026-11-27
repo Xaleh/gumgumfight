@@ -741,6 +741,10 @@ Com login Google, o item **Amigos** do menu abre a lista de amigos:
   **Offline**. Só
   amigos aceitos veem o status, e nunca qual partida nem o código da sala. O nome mostrado é o apelido do jogador,
   nunca o da conta Google.
+- **Foto:** cada amigo aparece com a foto em círculo, como a arte dos Líderes, com o aro na cor do status. É a foto
+  que a pessoa enviou em "Trocar foto"; a do Google nunca vai para os amigos. Sem foto enviada, aparece a inicial do
+  apelido numa cor de carta. O cartão do topo da folha mostra como os amigos veem você, e a linha do amigo traz
+  também a recompensa dele.
 - **Convidar escolhendo o formato:** **Convidar** abre os formatos embaixo do amigo: **1 contra 1** nas regras da
   Sala privada como estão escolhidas nela, em cada formato (Standard, Extra Grand Battle, All Blue) e no Livre, ou
   **Yonko · mesa de 4**. Cada opção diz com qual deck você vai; a que o deck equipado não vale fica apagada, com o
@@ -1071,8 +1075,9 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
   já tinha perfil, as partidas do navegador vão para ele.
 - **Foto da conta**: no menu da conta, "Trocar foto" (ou o clique no avatar) envia uma imagem própria no lugar da
   foto do Google. O navegador recorta o centro e reduz para 256×256 JPEG antes de enviar; o servidor aceita JPEG, PNG
-  ou WebP (até 256 KB, tipo conferido pelos primeiros bytes) e guarda a imagem em `users.custom_picture`. Só o
-  próprio usuário e os admins a veem (`/api/users/:id/picture`). "Usar a foto do Google" volta para a original.
+  ou WebP (até 256 KB, tipo conferido pelos primeiros bytes) e guarda a imagem em `users.custom_picture`. O
+  próprio usuário, os amigos aceitos dele (a folha de amigos) e os admins a veem (`/api/users/:id/picture`). A foto
+  do Google continua só com o dono. "Usar a foto do Google" volta para a original.
 - **Logo no playmat** (perfis Streamer, Organizador e Admin): assistindo a uma partida na mesa lateral, o menu da partida tem
   "Logo no playmat" para trocar a logo do Uai Uai no Mi, no centro do playmat, pela logo de quem transmite. Ela fica
   guardada na conta (`users.playmat_logo`, até 512 KB) e aparece só na tela de quem enviou; os outros espectadores

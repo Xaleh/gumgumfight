@@ -176,6 +176,12 @@ export function setCustomPicture(db: DB, id: string, picture: { data: Uint8Array
 const lastPictureVersion = (db: DB, id: string) =>
   (db.prepare('SELECT custom_picture_at AS v FROM users WHERE id = ?').get(id) as { v: number | null } | undefined)?.v ?? 0;
 
+/** Endereço da foto que a pessoa enviou no jogo (nunca a do Google), ou null. É a que os amigos dela veem. */
+export function customPictureOf(db: DB, id: string): string | null {
+  const u = getUser(db, id);
+  return u?.customPicture ? u.picture : null;
+}
+
 export function getCustomPicture(db: DB, id: string): { data: Uint8Array; type: string } | null {
   const r = db.prepare('SELECT custom_picture AS data, custom_picture_type AS type FROM users WHERE id = ? AND custom_picture IS NOT NULL').get(id) as
     | { data: Uint8Array; type: string }
