@@ -27,7 +27,7 @@ export interface Tournament {
    */
   spoilerSet: string | null;
   /**
-   * Quem transmite (Streamer e Admin) pode ver as mãos dos dois jogadores ao vivo, sem o atraso
+   * Quem transmite (Streamer, Organizador e Admin) pode ver as mãos dos dois jogadores ao vivo, sem o atraso
    * mínimo de 1 min. Decisão do organizador: sem isso, as mãos chegam sempre atrasadas.
    */
   liveHands: boolean;

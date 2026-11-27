@@ -651,7 +651,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const room = watchable(req.params.id);
     if (!room || room.status === 'waiting') return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const account = user(req);
-    if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers e administradores.'));
+    if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers, organizadores e administradores.'));
     if (!room.handsAllowed) {
       return reply.code(403).send(fail('handsTournamentOnly', 'As mãos dos jogadores só aparecem nas partidas de torneio e nas salas privadas que liberaram as mãos.'));
     }
@@ -702,7 +702,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
       view = broadcastView(found.broadcast, room, found.user);
     } else if (req.query.hands === '1') {
       const account = user(req);
-      if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers e administradores.'));
+      if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers, organizadores e administradores.'));
       if (!room.handsAllowed) {
         return reply.code(403).send(fail('handsTournamentOnly', 'As mãos dos jogadores só aparecem nas partidas de torneio e nas salas privadas que liberaram as mãos.'));
       }
@@ -717,7 +717,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   // ---------------------------------------------------------------- modo transmissão
 
-  /** Conta que pode transmitir (a que vê as mãos: streamer, admin ou dev), ou responde 401/403. */
+  /** Conta que pode transmitir (a que vê as mãos: streamer, organizer, admin ou dev), ou responde 401/403. */
   const broadcaster = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const account = user(req);
     if (!account) {
@@ -725,7 +725,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
       return null;
     }
     if (!seesHands(account.role)) {
-      void reply.code(403).send(fail('broadcastForbidden', 'O modo transmissão é só para os perfis Streamer e Admin.'));
+      void reply.code(403).send(fail('broadcastForbidden', 'O modo transmissão é só para os perfis Streamer, Organizador e Admin.'));
       return null;
     }
     return account;
