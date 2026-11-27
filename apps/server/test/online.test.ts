@@ -1508,7 +1508,7 @@ describe('modo espectador', () => {
     expect((await app.inject(`/api/online/rooms/${roomId}/replay`)).statusCode).toBe(200);
   }, 120_000);
 
-  it('ver mãos: só streamer ou admin, só em partida de torneio e nunca na própria partida', async () => {
+  it('ver mãos: só streamer, organizador ou admin, só em partida de torneio e nunca na própria partida', async () => {
     const { app, db } = setup();
     const nami = login(db, 'nami', 'streamer');
     const usopp = login(db, 'usopp');
@@ -1516,6 +1516,8 @@ describe('modo espectador', () => {
     const { roomId, code } = created.json();
     await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: BOB, payload: { code, deckId: 'st02-kid' } });
     const admin = login(db, 'robin', 'admin');
+    // O Organizador tem as permissões do Streamer.
+    const organizer = login(db, 'franky', 'organizer');
     await app.listen({ port: 0, host: '127.0.0.1' });
     const { port } = app.server.address() as { port: number };
     const open = async (cookie?: string, hands = true) => {
@@ -1536,6 +1538,8 @@ describe('modo espectador', () => {
     expect(await open(nami.cookie)).toBe(403); // nami joga esta partida
     expect(await open(nami.cookie, false)).toBe(200);
     expect(await open(admin.cookie)).toBe(200);
+    expect(await open(organizer.cookie)).toBe(200);
+    expect((await app.inject({ url: '/api/broadcast', headers: { cookie: organizer.cookie } })).statusCode).toBe(200);
     expect(await open(undefined, false)).toBe(200);
     // A lista avisa quem joga a partida, para assistir sem pedir as mãos.
     const byCode = async (cookie: string) => (await app.inject({ url: `/api/online/watch/${code}`, headers: { cookie } })).json().mine;

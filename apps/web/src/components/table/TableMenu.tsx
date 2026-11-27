@@ -2,7 +2,7 @@
 // chamar o Judge, desistir, sair, e as opções da mesa (playmat, velocidade do bot, mão do bot, configurações).
 
 import { useRef, useState } from 'react';
-import { isAdmin, type LiveRoom } from '../../api';
+import { type LiveRoom, seesHands } from '../../api';
 import { useAuth } from '../../auth';
 import { useT } from '../../i18n';
 import { playmatLogo } from '../../picture';
@@ -195,7 +195,7 @@ export function TableMenu({
 }
 
 /**
- * A logo de quem transmite (perfis Streamer e Admin) no centro do playmat da mesa lateral, no lugar da padrão:
+ * A logo de quem transmite (perfis Streamer, Organizador e Admin) no centro do playmat da mesa lateral, no lugar da padrão:
  * enviar, trocar ou voltar para a padrão. Fica guardada na conta e só aparece na tela de quem enviou.
  */
 function PlaymatLogoField() {
@@ -204,7 +204,7 @@ function PlaymatLogoField() {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!user || !(user.role === 'streamer' || isAdmin(user.role))) return null;
+  if (!user || !seesHands(user.role)) return null;
   const run = async (work: () => Promise<void>) => {
     setBusy(true);
     setError(null);

@@ -135,9 +135,11 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   (largada e mão inicial) e as perguntas dos bots são respondidas pelo botão em destaque da faixa de ação até
   "Encerrar turno" acender; o turno passa para um bot; e as opções da mesa abrem com a escolha das animações, que
   desligadas valem na hora (a mesa leva `anim-off`). Entrou com o redesenho da mesa (playmats, animações de voo).
-- Nos dois projetos a partida corre com as animações completas. Depois de encerrar o turno, o teste espera a faixa de
-  troca de turno atravessar a mesa na vez do bot e sair, e só então o jogador desliga as animações. (Até 2026-11-27 o
-  `iphone` as desligava ainda na preparação, por causa do diagnóstico descrito abaixo.)
+- `yonko.spec.ts`, arrasto (só no `desktop`): joga até ter uma carta que dá para jogar, arrasta-a da mão até a mesa
+  de quem joga (a mesa mostra que aceita a carta) e a carta sai da mão.
+- No teste da mesa local, nos dois projetos a partida corre com as animações completas. Depois de encerrar o turno, o
+  teste espera a faixa de troca de turno atravessar a mesa na vez do bot e sair, e só então o jogador desliga as
+  animações. (Até 2026-11-27 o `iphone` as desligava ainda na preparação, por causa do diagnóstico descrito abaixo.)
 
 **O diagnóstico do PR do Yonko (26/11/2026) mediu o CSS de antes da correção.** O PR do redesenho do Yonko
 (Xaleh/gumgumfight#244) rodou variantes do teste no WebKit do CI e concluiu que a faixa de troca de turno ainda

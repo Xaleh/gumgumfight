@@ -999,7 +999,7 @@ function migrateAuth(db: DB) {
       ALTER TABLE users ADD COLUMN custom_picture_at INTEGER;
     `);
   }
-  // Logo de quem transmite (perfis Streamer e Admin) no centro do playmat da mesa lateral, no lugar da logo
+  // Logo de quem transmite (perfis Streamer, Organizador e Admin) no centro do playmat da mesa lateral, no lugar da logo
   // padrão e só na tela dele: a imagem, o tipo e a versão (ms).
   if (!userCols.includes('playmat_logo')) {
     db.exec(`

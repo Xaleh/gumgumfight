@@ -4175,6 +4175,162 @@ button.hint-pill::after,
   display: none;
 }
 
+/*
+ * Pergunta de sim ou não no desktop (usar um efeito, pagar um custo): a carta que pergunta fica ao lado, com o
+ * nome, a pergunta, o custo e o texto dela; as duas respostas do mesmo tamanho, e "Ver a mesa" e "Cancelar"
+ * num rodapé discreto. A mesa atrás escurece sem desfocar, para dar para ler o campo e a mão. Sem animação
+ * própria: a entrada é a de toda janela.
+ */
+.modal-backdrop.ask-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.modal-card.ask {
+  width: min(620px, 100%);
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid var(--line);
+  /* um toque da cor da carta no canto dela */
+  background:
+    radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--card-color, transparent) 20%, transparent), transparent 62%),
+    var(--surface);
+  box-shadow:
+    0 0 0 1px rgba(var(--shadow2-rgb), 0.12),
+    0 24px 70px rgba(var(--shadow2-rgb), 0.5);
+}
+.ask-main {
+  display: flex;
+  gap: 20px;
+  padding: 20px 22px 20px 20px;
+}
+.ask-art {
+  --cw: 164px;
+  flex: none;
+  align-self: flex-start;
+  border-radius: 9px;
+  box-shadow: 0 10px 24px rgba(var(--shadow2-rgb), 0.4);
+}
+.ask-art .card {
+  cursor: zoom-in;
+}
+.ask-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ask-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ask-name::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--card-color, var(--muted));
+}
+.modal-card.ask h3 {
+  margin: 4px 0 0;
+  font-size: 23px;
+  line-height: 1.2;
+}
+.ask-cost {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.ask-cost b {
+  flex: none;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brown);
+  background: var(--brand-yellow);
+}
+.ask-cannot {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.ask-cannot b {
+  display: block;
+  font-size: 14px;
+  color: var(--danger-text);
+}
+.ask-text {
+  margin: 12px 0 0;
+  border-left: 3px solid var(--card-color, var(--line));
+  border-radius: 4px 12px 12px 4px;
+  padding: 9px 12px;
+  background: rgba(var(--shadow-rgb), 0.07);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-line;
+  /* o texto inteiro; só rola numa carta de texto muito longo */
+  max-height: 150px;
+  overflow-y: auto;
+}
+.ask-answers {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+.ask-answers .btn {
+  flex: 1 1 0;
+  min-height: 48px;
+}
+.ask-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding: 7px 12px;
+  background: rgba(var(--shadow-rgb), 0.07);
+}
+.ask-foot .btn {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ask-foot .btn:hover:not(:disabled) {
+  background: var(--panel2);
+  color: var(--text);
+}
+.ask-foot .btn.cancel {
+  margin-left: auto;
+  color: var(--danger-text);
+}
+.ask-foot .btn.cancel:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.ask-foot .cancel-hint {
+  margin: 0 0 0 auto;
+  text-align: right;
+}
+
 .mulligan-hand {
   display: flex;
   justify-content: center;
@@ -19517,6 +19673,8 @@ div.dk-tile-main {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* O dedo arrasta as cartas (a tela não rola nem dá zoom por baixo). */
+  touch-action: none;
 }
 /* A rosa dos ventos no meio da mesa, por baixo de tudo. */
 .yk-board::before {
@@ -19715,7 +19873,6 @@ div.dk-tile-main {
 .yk-card {
   display: inline-flex;
   flex: none;
-  touch-action: manipulation;
 }
 .yk-slot {
   width: 100%;
@@ -20087,6 +20244,7 @@ div.dk-tile-main {
   background: rgba(13, 24, 41, 0.96);
   border: 1.5px solid var(--brand-yellow);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+  touch-action: pan-y;
 }
 .yk-btn {
   min-height: 38px;
@@ -20625,6 +20783,156 @@ div.dk-tile-main {
   min-height: 46px;
 }
 
+/* ---- arrastar: a carta da mão para o campo, o atacante até o alvo, um DON!! até uma carta ---- */
+.yk.dragging {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.yk-don-cards > .don-card[data-drag] {
+  cursor: grab;
+  touch-action: none;
+}
+.yk-don-cards > .don-card[data-drag]:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 2px rgba(255, 215, 90, 0.9), 0 6px 12px rgba(0, 0, 0, 0.45);
+}
+.yk-don-cards > .don-card.dragging {
+  opacity: 0.3;
+}
+.yk-hand .hand-card.ghosted {
+  opacity: 0.28;
+}
+/* A mesa de quem joga aceita a carta arrastada: contorno tracejado; com a carta em cima, aceso. */
+.yk-me.drop-ok,
+.yk-me.drop-over {
+  border-style: dashed;
+  border-color: var(--sky);
+  box-shadow: inset 0 0 0 1px rgba(79, 211, 255, 0.35), 0 10px 26px rgba(0, 0, 0, 0.38);
+}
+.yk-me.drop-over {
+  background-color: rgba(79, 211, 255, 0.1);
+  box-shadow: inset 0 0 0 2px rgba(79, 211, 255, 0.7), 0 0 30px rgba(79, 211, 255, 0.35), 0 10px 26px rgba(0, 0, 0, 0.38);
+}
+
+/* ---- a carta que saiu da Vida, no centro da mesa ---- */
+.yk-reveal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: radial-gradient(circle at 50% 42%, rgba(4, 9, 16, 0.55), rgba(4, 9, 16, 0.86));
+}
+.yk-reveal {
+  width: min(440px, 100%);
+  max-height: 96vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px 14px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #1a3250, #0f1c30);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
+  text-align: center;
+}
+.yk-reveal.trigger {
+  border-color: var(--brand-yellow);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65), 0 0 0 6px rgba(247, 205, 72, 0.12);
+}
+.yk-reveal-kicker {
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 26px;
+  letter-spacing: 1.5px;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--cream);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+}
+.yk-reveal.trigger .yk-reveal-kicker {
+  color: var(--brand-yellow);
+  text-shadow: 0 3px 0 var(--brown);
+}
+.yk-reveal-card {
+  --cw: clamp(140px, 26vh, 230px);
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 6px 0 2px;
+}
+.yk-reveal-card .card {
+  position: relative;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
+.yk-reveal.trigger .yk-reveal-card .card {
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55), 0 0 0 3px var(--brand-yellow), 0 0 34px rgba(247, 205, 72, 0.55);
+}
+.yk-reveal-rays {
+  display: none;
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(247, 205, 72, 0.22) 0 9deg, transparent 9deg 22.5deg);
+  mask-image: radial-gradient(circle, #000 35%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle, #000 35%, transparent 70%);
+}
+.yk-reveal.trigger .yk-reveal-rays {
+  display: block;
+}
+.yk-reveal h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+.yk-reveal p {
+  margin: 0;
+  max-width: 46ch;
+}
+.yk-reveal-text {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(247, 205, 72, 0.1);
+  border: 1px solid rgba(247, 205, 72, 0.4);
+  color: var(--cream);
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-align: left;
+}
+.yk-reveal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+.yk-reveal-actions .yk-btn {
+  flex: 1 1 150px;
+  min-height: 46px;
+  font-size: 15px;
+}
+.yk-reveal-actions .yk-btn small {
+  font-weight: 700;
+  opacity: 0.75;
+}
+.yk-reveal-peek {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.yk-reveal-peek:hover {
+  color: var(--text);
+}
+
 /* A faixa de troca de turno leva a cor de quem joga. */
 .yk .yk-flash.sweep.theirs b {
   color: color-mix(in srgb, var(--pc) 45%, #fff);
@@ -20669,8 +20977,16 @@ div.dk-tile-main {
   animation: yk-stamp 0.45s cubic-bezier(0.2, 1.2, 0.4, 1) backwards;
 }
 .yk:not(.anim-off) .yk-sheet-back,
-.yk:not(.anim-off) .yk-result-back {
+.yk:not(.anim-off) .yk-result-back,
+.yk:not(.anim-off) .yk-reveal-back {
   animation: fade-in 0.2s ease-out;
+}
+.yk:not(.anim-off) .yk-reveal {
+  animation: pop-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+/* A carta sai da Vida virada e desvira. */
+.yk:not(.anim-off) .yk-reveal-card .card {
+  animation: yk-flip-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
 }
 .yk:not(.anim-off) .yk-sheet,
 .yk:not(.anim-off) .yk-result {
@@ -20722,7 +21038,8 @@ div.dk-tile-main {
 .yk.anim-full .yk-hearts.low {
   animation: yk-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1), blink 1.4s ease-in-out 0.4s infinite;
 }
-.yk.anim-full .yk-result-rays {
+.yk.anim-full .yk-result-rays,
+.yk.anim-full .yk-reveal-rays {
   animation: yk-spin 18s linear infinite;
 }
 .yk.anim-full .yk-result-crown .yk-av {
@@ -20735,8 +21052,23 @@ div.dk-tile-main {
   .yk.anim-full .yk-dots i,
   .yk.anim-full .yk-end.ready::after,
   .yk.anim-full .yk-hearts.low,
-  .yk.anim-full .yk-result-rays {
+  .yk.anim-full .yk-result-rays,
+  .yk.anim-full .yk-reveal-rays {
     animation: none;
+  }
+}
+@keyframes yk-flip-in {
+  0% {
+    transform: perspective(900px) rotateY(180deg) scale(0.6);
+    filter: brightness(0.35);
+  }
+  55% {
+    transform: perspective(900px) rotateY(0deg) scale(1.06);
+    filter: brightness(1.25);
+  }
+  100% {
+    transform: none;
+    filter: none;
   }
 }
 @keyframes yk-seat-in {
@@ -20830,6 +21162,7 @@ div.dk-tile-main {
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: none;
+    touch-action: pan-y;
   }
   .yk-hand {
     flex: none;

@@ -3,9 +3,10 @@
 // embaixo com a mão em leque, e ao lado a carta em destaque e o registro. No celular os oponentes viram abas,
 // com uma mesa aberta por vez.
 //
-// É uma tela própria, não uma adaptação da mesa de dois jogadores (`GameScreen`): aqui tudo é por clique (sem
-// arrastar). As animações são as da mesa de dois (`useBoardMotion`: cartas e DON!! voando, a vitrine no centro,
-// o impacto do ataque) e seguem a opção "Animações" do jogador: completas, suaves ou desligadas. A mesa recebe
+// É uma tela própria, não uma adaptação da mesa de dois jogadores (`GameScreen`), mas divide com ela os gestos
+// (`useTableGestures`: o clique, o toque longo que abre a carta, e arrastar a carta da mão para o campo, o
+// atacante até o alvo e um DON!! até uma carta) e as animações (`useBoardMotion`: cartas e DON!! voando, a vitrine
+// no centro, o impacto do ataque), que seguem a opção "Animações" do jogador: completas, suaves ou desligadas. A mesa recebe
 // o jogo de fora: a partida local contra bots (`useYonkoGame`, em `LocalYonkoTable`) ou a mesa online
 // (`useYonkoOnline`, em `YonkoOnline.tsx`).
 
@@ -36,13 +37,14 @@ import { listText, logText, msgText, winReasonText } from '../game/engineText';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { useYonkoGame, type YonkoSetup } from '../game/useYonkoGame';
 import { useBoardSize } from '../hooks/useBoardSize';
-import { useLongPress } from '../hooks/useLongPress';
 import { type Translate, useT, useTryT } from '../i18n';
-import { AnimationsSeg, useSettings, VolumeControl } from '../settings';
+import { AnimationsSeg, cardText, useSettings, VolumeControl } from '../settings';
 import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight, PickOrderContext } from './CardView';
 import { Icon } from './Icons';
 import { useBoardMotion } from './Motion';
+import type { Drag } from './table/shared';
+import { useTableGestures } from './table/useTableGestures';
 
 type TryT = ReturnType<typeof useTryT>;
 /** O que a mesa precisa do jogo: a visão de quem joga, a jogada e o último erro. */
@@ -139,38 +141,35 @@ interface BannerView {
   mine: boolean;
   /** A mesa espera outra pessoa (ou um bot): a faixa mostra os três pontinhos. */
   waiting?: boolean;
+  /** A pergunta abre numa janela (a carta da Vida): o botão do olho a recolhe para olhar a mesa. */
+  peek?: boolean;
 }
 
-/** Carta da mesa: `CardView` com o toque longo (celular) abrindo a carta para ler. */
+/**
+ * Carta da mesa: `CardView` num invólucro que segura o menu de contexto do toque longo. O toque longo (abre a
+ * carta para ler) e o arrasto são da mesa inteira (`useTableGestures`, em `YonkoTable`).
+ */
 function TableCard({
   s,
   uid,
   fc,
   highlight,
   onClick,
-  onInspect,
   onHover,
+  drag,
 }: {
   s: GameState;
   uid: string;
   fc?: FieldCard;
   highlight: Highlight;
   onClick?: () => void;
-  onInspect: (uid: string) => void;
   onHover: (uid: string | null) => void;
+  /** Arrastável: 'hand' (jogar, ou usar de Counter) ou 'attacker' (atacar). */
+  drag?: 'hand' | 'attacker';
 }) {
-  const press = useLongPress<HTMLSpanElement>(() => onInspect(uid));
   return (
-    <span
-      className="yk-card"
-      {...press.handlers}
-      onClickCapture={(e) => {
-        // O clique que vem depois de um toque longo é do toque: a carta já abriu para ler.
-        if (press.consume()) e.stopPropagation();
-      }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <CardView state={s} uid={uid} fc={fc} highlight={highlight} onClick={onClick} onHover={onHover} />
+    <span className="yk-card" onContextMenu={(e) => e.preventDefault()}>
+      <CardView state={s} uid={uid} fc={fc} highlight={highlight} onClick={onClick} onHover={onHover} drag={drag} />
     </span>
   );
 }
@@ -194,6 +193,9 @@ interface CardHandlers {
   onInspect: (uid: string) => void;
   onHover: (uid: string | null) => void;
 }
+
+/** O que está sendo arrastado pode ser solto aqui? (para o destaque da mesa de quem joga) */
+type DropState = null | 'ok' | 'over';
 
 /**
  * A Vida empilhada como na mesa de dois (cartas deitadas, as viradas para cima com a frente à mostra) e, por
@@ -235,7 +237,7 @@ function LifeStack({ s, id, h, t }: { s: GameState; id: PlayerId; h: CardHandler
 }
 
 /** O deck de DON!!, os DON!! em campo em cartas (ativos em pé, virados deitados) e a conta dos ativos. */
-function DonRow({ ps, t }: { ps: PlayerState; t: Translate }) {
+function DonRow({ ps, t, draggable, dragging }: { ps: PlayerState; t: Translate; draggable?: boolean; dragging?: number[] }) {
   const total = ps.donActive + ps.donRested;
   return (
     <div className="yk-don" title={t('yonko.donTitle')}>
@@ -245,7 +247,11 @@ function DonRow({ ps, t }: { ps: PlayerState; t: Translate }) {
       </span>
       <span className="yk-don-cards" data-anchor={`don-${ps.id}`} style={vars({ '--n': Math.max(total, 1) })}>
         {Array.from({ length: total }, (_, i) => (
-          <span key={i} className={['don-card', i >= ps.donActive ? 'rested' : ''].join(' ')} />
+          <span
+            key={i}
+            className={['don-card', i >= ps.donActive ? 'rested' : '', dragging?.includes(i) ? 'dragging' : ''].join(' ')}
+            {...(draggable && i < ps.donActive ? { 'data-drag': 'don', 'data-don': i } : {})}
+          />
         ))}
       </span>
       <span className="yk-don-count" aria-label={t('yonko.don', { n: donOnField(ps), active: ps.donActive })}>
@@ -370,7 +376,7 @@ function Opponent({
   const leader = cardDef(s, ps.leader.uid);
   const card = (fc: FieldCard) => (
     <div key={fc.uid} className="field-card">
-      <TableCard s={s} uid={fc.uid} fc={fc} highlight={h.highlight(fc.uid)} onClick={() => h.onCard(fc.uid)} onInspect={h.onInspect} onHover={h.onHover} />
+      <TableCard s={s} uid={fc.uid} fc={fc} highlight={h.highlight(fc.uid)} onClick={() => h.onCard(fc.uid)} onHover={h.onHover} />
     </div>
   );
   return (
@@ -522,11 +528,55 @@ function Result({
 }
 
 /**
+ * A carta que saiu da Vida, grande no centro da mesa, com o [Trigger] dela (quando há) e a escolha: ativar ou
+ * levar para a mão. Toda carta que sai da Vida passa por aqui, com ou sem [Trigger]: os oponentes só veem que uma
+ * carta da Vida está sendo olhada. "Ver a mesa" recolhe a janela; a faixa de ação fica com os mesmos botões.
+ */
+function LifeReveal({ s, uid, trigger, t, onAnswer, onPeek }: { s: GameState; uid: string; trigger: boolean; t: Translate; onAnswer: (yes: boolean) => void; onPeek: () => void }) {
+  const { locale } = useSettings();
+  const def = cardDef(s, uid);
+  const text = def.abilities.some((a) => a.timing === 'trigger') ? cardText(def, locale).trigger : null;
+  const title = text ? t('game.triggerRevealed') : t('game.lifeCard');
+  return (
+    <div className="yk-reveal-back">
+      <div className={['yk-reveal', text ? 'trigger' : ''].join(' ')} role="dialog" aria-modal="true" aria-label={`${title}: ${def.name}`}>
+        <div className="yk-reveal-kicker">{title}</div>
+        <div className="yk-reveal-card" key={uid}>
+          <span className="yk-reveal-rays" aria-hidden="true" />
+          <CardView state={s} uid={uid} />
+        </div>
+        <h3>{def.name}</h3>
+        {text ? <p className="yk-reveal-text">{text}</p> : <p className="muted small">{t('game.noTriggerHint')}</p>}
+        <div className="yk-reveal-actions">
+          {trigger && (
+            <button type="button" className="yk-btn primary" onClick={() => onAnswer(true)}>
+              {t('game.activateTrigger')}
+            </button>
+          )}
+          <button type="button" className={['yk-btn', trigger ? '' : 'primary'].join(' ')} onClick={() => onAnswer(false)}>
+            {trigger ? (
+              <>
+                {t('game.noActivate')} <small>{t('game.goesToHand')}</small>
+              </>
+            ) : (
+              t('game.putInHand')
+            )}
+          </button>
+        </div>
+        <button type="button" className="yk-reveal-peek" onClick={onPeek} title={t('game.peekTitle')}>
+          {t('game.peek')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * A seta do ataque, do atacante ao alvo: durante a batalha e, com um atacante escolhido, até o alvo sob o
  * mouse. Atravessa as mesas, então fica por cima do tabuleiro inteiro. Com um dos dois fora da tela (no
  * celular, a mesa de outra aba), não aparece.
  */
-function BattleArrow({ from, to, aim }: { from: string | null; to: string | null; aim: boolean }) {
+function BattleArrow({ from, to, point, aim }: { from: string | null; to: string | null; point?: { x: number; y: number }; aim: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [path, setPath] = useState<{ d: string; key: string } | null>(null);
   const [, setTick] = useState(0);
@@ -540,7 +590,7 @@ function BattleArrow({ from, to, aim }: { from: string | null; to: string | null
   // Mede as cartas depois do layout (a cada desenho da mesa: as cartas mudam de lugar a cada jogada).
   useLayoutEffect(() => {
     const svg = svgRef.current;
-    if (!svg || !from || !to) {
+    if (!svg || !from || (!to && !point)) {
       if (path) setPath(null);
       return;
     }
@@ -552,7 +602,7 @@ function BattleArrow({ from, to, aim }: { from: string | null; to: string | null
       return { x: r.left + r.width / 2 - base.left, y: r.top + r.height / 2 - base.top };
     };
     const a = center(from);
-    const b = center(to);
+    const b = to ? center(to) : point ? { x: point.x - base.left, y: point.y - base.top } : null;
     const len = a && b ? Math.hypot(b.x - a.x, b.y - a.y) : 0;
     if (!a || !b || len < 12) {
       if (path) setPath(null);
@@ -563,7 +613,7 @@ function BattleArrow({ from, to, aim }: { from: string | null; to: string | null
     const cx = (a.x + b.x) / 2 - ((b.y - a.y) / len) * bend;
     const cy = (a.y + b.y) / 2 + ((b.x - a.x) / len) * bend;
     const d = `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
-    if (d !== path?.d) setPath({ d, key: `${from}>${to}` });
+    if (d !== path?.d) setPath({ d, key: `${from}>${to ?? 'ptr'}` });
   });
 
   // A carta atacante vira ao atacar e as cartas voam ao pousar: mede de novo logo depois.
@@ -574,7 +624,7 @@ function BattleArrow({ from, to, aim }: { from: string | null; to: string | null
   }, [from, to]);
 
   return (
-    <svg ref={svgRef} className={['attack-arrow', 'yk-arrow', aim ? 'aim locked' : 'battle'].join(' ')} aria-hidden="true">
+    <svg ref={svgRef} className={['attack-arrow', 'yk-arrow', aim ? (to ? 'aim locked' : 'aim') : 'battle'].join(' ')} aria-hidden="true">
       <defs>
         <marker id="yk-arrow-head" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
           <path d="M0 0 L10 5 L0 10 L2.5 5 Z" fill="#ff4d2e" stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
@@ -640,8 +690,10 @@ export function YonkoTable({
   /** Celular: a mesa de oponente aberta e a gaveta aberta. */
   const [tab, setTab] = useState<PlayerId | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
-  /** As cartas de uma escolha (deck, descarte, Vida) recolhidas para olhar a mesa. */
+  /** As cartas de uma escolha (deck, descarte) ou a carta da Vida recolhidas para olhar a mesa. */
   const [trayHidden, setTrayHidden] = useState(false);
+  /** O que está sendo arrastado: uma carta da mão, um atacante ou um DON!! ativo. */
+  const [drag, setDrag] = useState<Drag | null>(null);
   const [resultOpen, setResultOpen] = useState(true);
   /** A faixa que cruza a mesa na troca de turno. */
   const [flash, setFlash] = useState<{ key: number; text: string; kicker: string; mine: boolean; color: string } | null>(null);
@@ -702,14 +754,33 @@ export function YonkoTable({
   }, [turnKey, animate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = (a: Action) => dispatch(a);
-  const targets = sel && myTurnIdle ? legal.filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack' && a.attacker === sel).map((a) => a.target) : [];
+  /** Quem ataca: a carta arrastada como atacante ou a carta escolhida com um clique. */
+  const attacker = drag?.kind === 'attacker' ? drag.uid : sel;
+  const targets = attacker && myTurnIdle ? legal.filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack' && a.attacker === attacker).map((a) => a.target) : [];
   const canPlay = (uid: string) => legal.some((a) => a.type === 'playCard' && a.uid === uid);
+  const canCounter = (uid: string) => myPending?.kind === 'counter' && myPending.options.includes(uid);
+  const canAttackWith = (uid: string) => myTurnIdle && legal.some((a) => a.type === 'attack' && a.attacker === uid);
+  const canAttachDon = myTurnIdle && legal.some((a) => a.type === 'attachDon');
+
+  /** Destinos válidos para o que está sendo arrastado: o campo (carta da mão), o alvo (atacante) ou a carta (DON!!). */
+  const dropValid = (d: Pick<Drag, 'kind' | 'uid'>, over: string | null): boolean => {
+    if (!over) return false;
+    if (d.kind === 'hand') return over === 'field' && d.uid !== null && (canPlay(d.uid) || canCounter(d.uid));
+    if (d.kind === 'attacker') return legal.some((a) => a.type === 'attack' && a.attacker === d.uid && a.target === over);
+    if (d.kind === 'don') return legal.some((a) => a.type === 'attachDon' && a.target === over);
+    return false;
+  };
   const canAct = (uid: string) => legal.some((a) => (a.type === 'attack' && a.attacker === uid) || (a.type === 'activate' && a.uid === uid));
 
   const select = myPending?.kind === 'selectTargets' ? myPending : null;
   const pickOrder = useMemo(() => (select?.ordered ? new Map(picked.map((u, i) => [u, i + 1])) : null), [select?.ordered, picked]);
 
   const highlight = (uid: string): Highlight => {
+    if (drag) {
+      if (uid === drag.uid) return 'selected';
+      if (drag.kind === 'attacker') return dropValid(drag, uid) ? 'target' : null;
+      if (drag.kind === 'don') return dropValid(drag, uid) ? 'option' : null;
+    }
     if (select) return picked.includes(uid) ? 'selected' : select.options.includes(uid) ? 'option' : select.shown?.includes(uid) ? 'disabled' : null;
     if (myPending?.kind === 'block') return myPending.options.includes(uid) ? 'option' : battle?.attacker === uid ? 'attacker' : battle?.target === uid ? 'target' : null;
     if (myPending?.kind === 'counter' && myPending.options.includes(uid)) {
@@ -766,6 +837,29 @@ export function YonkoTable({
     if (uid) setInspect(uid);
   };
   const h: CardHandlers = { highlight, onCard, onInspect: inspectCard, onHover };
+
+  /** Soltou o que arrastava num destino válido: joga a carta (ou a usa de Counter), ataca ou anexa o DON!!. */
+  const onDrop = (d: Drag) => {
+    if (!d.over || !dropValid(d, d.over)) return;
+    if (d.kind === 'hand' && d.uid) send(canCounter(d.uid) ? { type: 'counter', player: me, uid: d.uid } : { type: 'playCard', player: me, uid: d.uid });
+    else if (d.kind === 'attacker' && d.uid) send({ type: 'attack', player: me, attacker: d.uid, target: d.over });
+    else if (d.kind === 'don') send({ type: 'attachDon', player: me, target: d.over });
+  };
+  // Os gestos da mesa de dois: o toque longo (ou o clique segurado) abre a carta; arrastar joga, ataca ou anexa.
+  const gestures = useTableGestures({
+    mode: null,
+    dropValid,
+    onCard,
+    onDrop,
+    setDrag,
+    setLifted: () => undefined,
+    setZoom: (uid) => {
+      if (uid) inspectCard(uid);
+    },
+    setMode: () => undefined,
+  });
+  /** A mesa de quem joga durante o arrasto de uma carta da mão: pode soltar aqui, e já está em cima. */
+  const fieldDrop: DropState = drag?.kind === 'hand' && dropValid(drag, 'field') ? (drag.over === 'field' ? 'over' : 'ok') : null;
 
   const name = (uid: string) => cardDef(s, uid).name;
   const who = (id: PlayerId) => (id === me ? t('yonko.you') : s.players[id].name);
@@ -849,7 +943,7 @@ export function YonkoTable({
             icon: 'eye',
             mine: true,
             text: t('yonko.lifeCard', { card: name(p.card) }),
-            tray: [p.card],
+            peek: true,
             buttons: [
               ...(trigger ? [{ label: t('yonko.lifeTrigger'), kind: 'primary' as const, onClick: () => send({ type: 'answer', player: me, yes: true }) }] : []),
               { label: t('yonko.lifeToHand'), kind: trigger ? undefined : ('primary' as const), onClick: () => send({ type: 'answer', player: me, yes: false }) },
@@ -926,7 +1020,7 @@ export function YonkoTable({
 
   const fieldCard = (fc: FieldCard) => (
     <div key={fc.uid} className="field-card">
-      <TableCard s={s} uid={fc.uid} fc={fc} highlight={highlight(fc.uid)} onClick={() => onCard(fc.uid)} onInspect={inspectCard} onHover={onHover} />
+      <TableCard s={s} uid={fc.uid} fc={fc} highlight={highlight(fc.uid)} onClick={() => onCard(fc.uid)} onHover={onHover} drag={canAttackWith(fc.uid) ? 'attacker' : undefined} />
     </div>
   );
   const leave = () => {
@@ -974,14 +1068,17 @@ export function YonkoTable({
   };
 
   // A seta: a batalha em curso ou, com um atacante escolhido, o alvo sob o mouse.
-  const aimAt = !battle && sel && hovered && targets.includes(hovered) ? hovered : null;
+  const dragAttack = !battle && drag?.kind === 'attacker' ? drag : null;
+  const aimAt = !battle && !drag && sel && hovered && targets.includes(hovered) ? hovered : null;
+  // A carta da Vida que saiu: a janela no centro, com o [Trigger] quando há.
+  const lifeCard = myPending?.kind === 'lifeCard' && s.cards[myPending.card] ? myPending.card : null;
   const trashOf = sheet && typeof sheet === 'object' ? sheet.trash : null;
   const sheetTitle =
     sheet === 'log' ? t('yonko.log') : sheet === 'card' ? t('yonko.card') : sheet === 'options' ? t('yonko.tableOptions') : trashOf !== null ? t('game.trashOf', { name: who(trashOf), n: s.players[trashOf].trash.length }) : '';
 
   return (
     <PickOrderContext.Provider value={pickOrder}>
-      <div className={['yk', `anim-${animations}`, s.phase === 'gameover' ? 'over' : ''].join(' ')}>
+      <div className={['yk', `anim-${animations}`, s.phase === 'gameover' ? 'over' : '', drag ? 'dragging' : ''].join(' ')} onPointerDown={gestures.onPointerDown} onClickCapture={gestures.onClickCapture}>
         <header className="yk-top">
           <button type="button" className="yk-back" onClick={leave} aria-label={t('yonko.exit')}>
             <Icon name="chevron" size={18} />
@@ -1139,7 +1236,7 @@ export function YonkoTable({
                 )}
                 <div className="yk-banner-actions">
                   {banner.chip && <span className="yk-chip">{banner.chip}</span>}
-                  {banner.tray && (
+                  {(banner.tray || banner.peek) && (
                     <button type="button" className="yk-btn ghost" aria-pressed={trayHidden} onClick={() => setTrayHidden((v) => !v)} title={t('game.peekTitle')} aria-label={t('game.peekTitle')}>
                       <Icon name="eye" size={16} />
                     </button>
@@ -1158,7 +1255,7 @@ export function YonkoTable({
                 {banner.tray && !trayHidden && (
                   <div className="yk-tray" style={vars({ '--n': banner.tray.length })}>
                     {banner.tray.map((uid) => (
-                      <TableCard key={uid} s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onInspect={inspectCard} onHover={onHover} />
+                      <TableCard key={uid} s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onHover={onHover} />
                     ))}
                   </div>
                 )}
@@ -1177,7 +1274,8 @@ export function YonkoTable({
             </div>
 
             <section
-              className={['yk-mat', 'yk-me', s.activePlayer === me && s.phase === 'main' ? 'playing' : '', defender === me ? 'focus' : '', mine.out ? 'out' : ''].join(' ')}
+              className={['yk-mat', 'yk-me', s.activePlayer === me && s.phase === 'main' ? 'playing' : '', defender === me ? 'focus' : '', mine.out ? 'out' : '', fieldDrop ? `drop-${fieldDrop}` : ''].join(' ')}
+              data-drop="field"
               style={vars({ '--pc': seatColor(s, me), '--i': opponents.length })}
               aria-label={t('yonko.yourTable')}
             >
@@ -1195,27 +1293,49 @@ export function YonkoTable({
                   {mine.out ? <span className="yk-tag out">{t('yonko.tagOut')}</span> : defender === me ? <span className="yk-tag">{t('yonko.tagTarget')}</span> : null}
                   {!mine.out && <SeatClock status={extras.status?.(me)} t={t} />}
                 </span>
-                <DonRow ps={mine} t={t} />
+                <DonRow ps={mine} t={t} draggable={canAttachDon} dragging={drag?.kind === 'don' ? drag.dons : undefined} />
                 <button type="button" className={['yk-end', 'small', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
                   {t('yonko.endTurn')}
                 </button>
               </div>
             </section>
 
-            <section className="yk-hand" aria-label={t('yonko.yourHand', { n: hand.length })}>
+            <section className="yk-hand" data-drop="hand" aria-label={t('yonko.yourHand', { n: hand.length })}>
               <div className="yk-hand-fan" data-anchor={`hand-${me}`} style={vars({ '--n': Math.max(hand.length, 1) })} onPointerMove={onHandMove} onPointerLeave={() => setPeek(null)}>
                 {hand.map((uid, i) => {
                   const offset = i - (hand.length - 1) / 2;
                   return (
-                    <div key={uid} className={['hand-card', uid === peeked ? 'peek' : '', uid === sel ? 'sel' : ''].join(' ')} data-hand-uid={uid} style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}>
-                      <TableCard s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onInspect={inspectCard} onHover={() => undefined} />
+                    <div
+                      key={uid}
+                      className={['hand-card', uid === peeked && !drag ? 'peek' : '', uid === sel ? 'sel' : '', drag?.kind === 'hand' && drag.uid === uid ? 'ghosted' : ''].join(' ')}
+                      data-hand-uid={uid}
+                      style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}
+                    >
+                      <TableCard s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onHover={() => undefined} drag="hand" />
                     </div>
                   );
                 })}
               </div>
             </section>
 
-            <BattleArrow from={battle?.attacker ?? (aimAt ? sel : null)} to={battle?.target ?? aimAt} aim={!battle} />
+            <BattleArrow
+              from={battle?.attacker ?? dragAttack?.uid ?? (aimAt ? sel : null)}
+              to={battle?.target ?? dragAttack?.over ?? aimAt}
+              point={dragAttack && !dragAttack.over ? { x: dragAttack.x, y: dragAttack.y } : undefined}
+              aim={!battle}
+            />
+
+            {drag && drag.kind !== 'attacker' && (
+              <div className={['drag-ghost', `ghost-${drag.kind}`, drag.over && drag.over !== 'hand' ? 'over' : ''].join(' ')} style={{ left: drag.x, top: drag.y }}>
+                {drag.kind === 'don' ? (
+                  <div className="don-stack">
+                    <span className="don-card" style={vars({ '--k': 0 })} />
+                  </div>
+                ) : (
+                  drag.uid && s.cards[drag.uid] && <CardView state={s} uid={drag.uid} />
+                )}
+              </div>
+            )}
 
           </div>
 
@@ -1232,6 +1352,8 @@ export function YonkoTable({
         </div>
 
         {motion.layer}
+
+        {lifeCard && !trayHidden && !sheet && <LifeReveal s={s} uid={lifeCard} trigger={legal.some((a) => a.type === 'answer' && a.yes)} t={t} onAnswer={(yes) => send({ type: 'answer', player: me, yes })} onPeek={() => setTrayHidden(true)} />}
 
         {sheet && (
           <div className="yk-sheet-back" onClick={() => setSheet(null)}>
@@ -1265,7 +1387,7 @@ export function YonkoTable({
               ) : trashOf !== null && s.players[trashOf].trash.length ? (
                 <div className="yk-trash-grid">
                   {[...s.players[trashOf].trash].reverse().map((uid) => (
-                    <TableCard key={uid} s={s} uid={uid} highlight={null} onClick={() => setInspect(uid)} onInspect={inspectCard} onHover={onHover} />
+                    <TableCard key={uid} s={s} uid={uid} highlight={null} onClick={() => setInspect(uid)} onHover={onHover} />
                   ))}
                 </div>
               ) : (
