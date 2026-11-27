@@ -9,7 +9,7 @@ import { label } from './support/i18n';
 import { concede, endTurn, expectHiddenOpponentHand, expectResult, joinQueue, playToFirstTurn } from './support/online';
 
 test.describe('fila online', () => {
-  test('casual: fila, turnos, volta depois de recarregar e desistência', async ({ page, newPlayer }) => {
+  test('casual: fila, turnos, volta depois de recarregar e desistência @iphone', async ({ page, newPlayer }) => {
     const other = await newPlayer();
     await openHome(page);
     await openHome(other);
@@ -43,7 +43,7 @@ test.describe('fila online', () => {
     }
   });
 
-  test('ranqueada: duas contas, desistência e bounty', async ({ page, newPlayer }) => {
+  test('ranqueada: duas contas, desistência e bounty @iphone', async ({ page, newPlayer }) => {
     const other = await newPlayer();
     await login(page, 'Ana E2E');
     await login(other, 'Bia E2E');
