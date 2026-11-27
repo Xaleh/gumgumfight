@@ -38,7 +38,8 @@ do bot e o Safari do iPhone.
   `tsc -p e2e` no `npm run typecheck` e o job **Testes de ponta a ponta (Playwright)** no workflow, com o relatório e os
   traces como artefato quando falha.
 - `bot-match.spec.ts`: menu → partida contra o bot (fácil, jogador começa) → mulligan → **Auto** (o bot joga pelos dois
-  lados) até o fim de jogo; o replay baixado tem a partida inteira; volta ao menu. E desistir pelo menu da mesa (`@iphone`).
+  lados) até o fim de jogo; o replay baixado tem a partida inteira; volta ao menu. E desistir pelo menu da mesa. Os dois
+  são `@iphone` (a partida inteira, desde 2026-11-27: são dezenas de faixas de troca de turno com as animações completas).
 - `boosters.spec.ts` (`@iphone`): abrir os 6 boosters de uma coleção — um com dois toques (seleciona e abre), os outros
   de uma vez, pulando a animação —, 72 cartas reveladas, e os boosters abertos continuam desenhados, dentro da fileira e
   na ordem (no celular, numa linha só): o bug do Safari de novembro (`.sealed-pack` em `styles.css`).
@@ -99,8 +100,8 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   voltam ao menu.
 - `online.spec.ts`, ranqueada: duas contas de teste, a ranqueada fica liberada, os dois entram na fila, um desiste e o
   bounty de quem venceu sobe (`/api/players/me`).
-- Só no desktop por enquanto: no iPhone a mesa usa outro arranjo. (A queda do WebKit, acima, também pesava; foi
-  resolvida.)
+- Os dois são `@iphone` desde 2026-11-27. Ficavam só no desktop por causa do arranjo da mesa no celular e da queda do
+  WebKit (acima); os passos (`e2e/support/online.ts`) valem para os dois arranjos sem mudança.
 
 ### Fase 3 — Torneio: criar e jogar ✅
 
@@ -114,8 +115,7 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   "Derrota." na página das duas, sem o organizador lançar o placar); o organizador encerra a última rodada e cada uma vê
   a classificação final (1º lugar com 1V 0D e 2º com 0V 1D).
 - `@iphone`: a inscrição pelo convite no celular (o organizador cria, o jogador escolhe o deck e se inscreve, o
-  organizador vê o inscrito). A partida do torneio no iPhone fica de fora enquanto a queda da mesa no WebKit (acima)
-  não for resolvida.
+  organizador vê o inscrito). E, desde 2026-11-27, o torneio inteiro, com a partida na sala online.
 - Com as três fases, o A1 fica `[x]`.
 
 ### Depois do A1 — a mesa com o mouse e o teclado
