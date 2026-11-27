@@ -8152,6 +8152,10 @@ html.queue-pill-open #root::after {
 .wait-tip {
   flex: 1;
   min-width: 0;
+  /* a imagem do item (ilustração, Líder ou carta) à esquerda e o texto ao lado */
+  display: flex;
+  align-items: center;
+  gap: 14px;
   /* Três linhas de texto: o cartão não muda de altura (e a janela não pula) a cada dica. */
   min-height: calc(1.1em + 3 * 1.4 * 14px);
 }
@@ -8169,11 +8173,101 @@ html.queue-pill-open #root::after {
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
-/* Spoiler novo: a carta à esquerda (abre ampliada ao toque) e o nome ao lado. */
-.wait-tip.spoiler {
+/* Dica de regra: a ilustração própria (`TipArt`). */
+.tip-art {
+  flex: none;
+  display: block;
+  width: 76px;
+  height: 76px;
+}
+/* Histórico com o Líder: a arte dele; no confronto, os dois Líderes, um sobre a borda do outro. */
+.wait-tip > .leader-art {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  margin: 3px;
+}
+.wait-tip-duo {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
+  padding: 3px;
+}
+.wait-tip-duo .leader-art + .leader-art {
+  margin-left: -10px;
+}
+/* Meta da semana: os três Líderes lado a lado, com a fatia de cada um. */
+.wait-tip.meta .wait-tip-text {
+  flex: 1;
+}
+.wait-tip-leaders {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0 3px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  text-align: center;
+}
+.wait-tip-leaders li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.wait-tip-leaders b {
+  margin-top: 3px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.wait-tip-leaders span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Celular: imagens um pouco menores, para o texto ao lado não quebrar em linhas demais. */
+@media (max-width: 480px) {
+  .wait-tip {
+    gap: 12px;
+  }
+  .tip-art {
+    width: 60px;
+    height: 60px;
+  }
+  .wait-tip > .leader-art {
+    width: 52px;
+    height: 52px;
+    font-size: 22px;
+  }
+  .wait-tip-duo .leader-art {
+    width: 40px;
+    height: 40px;
+    font-size: 17px;
+  }
+}
+/* Tela estreita: a ilustração sobe para cima do texto, que fica com a largura toda. */
+@media (max-width: 380px) {
+  .wait-tip.rule,
+  .wait-tip.deck,
+  .wait-tip.matchup {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .tip-art {
+    width: 64px;
+    height: 64px;
+  }
+  /* três Líderes em colunas estreitas: a arte encolhe para não encostar uma na outra */
+  .wait-tip-leaders .leader-art {
+    width: 40px;
+    height: 40px;
+    font-size: 17px;
+  }
 }
 .wait-tip-card {
   --cw: 54px;

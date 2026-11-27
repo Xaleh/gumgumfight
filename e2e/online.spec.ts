@@ -53,6 +53,8 @@ test.describe('fila online', () => {
     const wait = page.getByRole('dialog', { name: label('menu.onlineSearching') });
     const tip = wait.getByRole('region', { name: label('wait.tipsLabel'), exact: true }).locator('p');
     await expect(tip).toBeVisible();
+    // O cartão abre numa dica de regra, com a ilustração dela.
+    await expect(wait.locator('svg.tip-art')).toBeVisible();
     const firstTip = (await tip.textContent()) ?? '';
     await wait.getByRole('button', { name: label('wait.next'), exact: true }).click();
     await expect(tip).not.toHaveText(firstTip);

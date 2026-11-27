@@ -23,14 +23,21 @@ export const RULE_TIPS = [
   'wait.tip.fiveCharacters',
 ] as const satisfies readonly MessageKey[];
 
+/** Um Líder num item do cartão: o nome e o que a arte dele precisa (`LeaderArt`). */
+export interface TipLeader {
+  name: string;
+  image?: string;
+  colors: string[];
+}
+
 export type WaitTip =
-  | { kind: 'rule'; key: MessageKey }
+  | { kind: 'rule'; key: (typeof RULE_TIPS)[number] }
   /** Líderes mais jogados na semana, com a fatia (0..100) de cada um. */
-  | { kind: 'meta'; leaders: Array<{ name: string; pct: number }> }
+  | { kind: 'meta'; leaders: Array<TipLeader & { pct: number }> }
   /** Vitórias do jogador com o Líder do deck, contra outras pessoas. */
-  | { kind: 'deck'; name: string; games: number; wins: number; pct: number }
+  | { kind: 'deck'; leader: TipLeader; games: number; wins: number; pct: number }
   /** Melhor (`best`) ou pior confronto do jogador com o Líder do deck. */
-  | { kind: 'matchup'; best: boolean; name: string; opp: string; games: number; pct: number }
+  | { kind: 'matchup'; best: boolean; leader: TipLeader; opp: TipLeader; games: number; pct: number }
   /** Spoiler novo: a carta e há quantos dias chegou (0 = hoje, pelo calendário do jogador). */
   | { kind: 'spoiler'; card: ApiCard; daysAgo: number };
 
@@ -43,12 +50,18 @@ export const MATCHUP_MIN_GAMES = 3;
 
 const pct = (wins: number, games: number) => Math.round((wins / games) * 100);
 
+/** O Líder `id` com o nome e a arte que vieram junto das estatísticas (sem eles, o próprio número da carta). */
+const leaderOf = (cards: StatsOverview['cards'], id: string): TipLeader => {
+  const info = cards[id];
+  return { name: info?.name ?? id, colors: info?.colors ?? [], ...(info?.imageUrl ? { image: info.imageUrl } : {}) };
+};
+
 /** O meta da semana: os Líderes mais jogados e a fatia de cada um (null: sem partidas). */
 export function metaTip(stats: Pick<StatsOverview, 'leaders' | 'cards'> | null): WaitTip | null {
   const total = stats?.leaders.reduce((n, l) => n + l.games, 0) ?? 0;
   if (!stats || !total) return null;
   const top = [...stats.leaders].sort((a, b) => b.games - a.games).slice(0, META_TOP);
-  return { kind: 'meta', leaders: top.map((l) => ({ name: stats.cards[l.leader]?.name ?? l.leader, pct: pct(l.games, total) })) };
+  return { kind: 'meta', leaders: top.map((l) => ({ ...leaderOf(stats.cards, l.leader), pct: pct(l.games, total) })) };
 }
 
 /**
@@ -57,10 +70,10 @@ export function metaTip(stats: Pick<StatsOverview, 'leaders' | 'cards'> | null):
  */
 export function deckTips(stats: Pick<StatsOverview, 'summary' | 'matchups' | 'cards'> | null, leader: string): WaitTip[] {
   if (!stats) return [];
-  const name = stats.cards[leader]?.name ?? leader;
+  const mine = leaderOf(stats.cards, leader);
   const out: WaitTip[] = [];
   const { games, wins } = stats.summary;
-  if (games >= DECK_MIN_GAMES) out.push({ kind: 'deck', name, games, wins, pct: pct(wins, games) });
+  if (games >= DECK_MIN_GAMES) out.push({ kind: 'deck', leader: mine, games, wins, pct: pct(wins, games) });
   const rows = stats.matchups
     .filter((m) => m.leader === leader && m.games >= MATCHUP_MIN_GAMES)
     // Da maior para a menor taxa de vitória; no empate, o confronto com mais partidas.
@@ -68,8 +81,8 @@ export function deckTips(stats: Pick<StatsOverview, 'summary' | 'matchups' | 'ca
   const tip = (m: (typeof rows)[number], best: boolean): WaitTip => ({
     kind: 'matchup',
     best,
-    name,
-    opp: stats.cards[m.oppLeader]?.name ?? m.oppLeader,
+    leader: mine,
+    opp: leaderOf(stats.cards, m.oppLeader),
     games: m.games,
     pct: pct(m.wins, m.games),
   });
