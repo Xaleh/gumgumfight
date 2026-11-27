@@ -15,6 +15,7 @@ import friendsPtBR from './friends/pt-BR';
 import monitorPtBR from './monitor/pt-BR';
 import dailyPtBR from './daily/pt-BR';
 import analysisPtBR from './analysis/pt-BR';
+import waitPtBR from './wait/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -3184,6 +3185,8 @@ const ptBR = {
   ...dailyPtBR,
   // ==== Análise da partida: revisão do replay terminado (i18n/analysis) ====
   ...analysisPtBR,
+  // ==== Espera por oponente: busca minimizada, dicas e mão de teste (i18n/wait) ====
+  ...waitPtBR,
 } as const;
 
 

@@ -831,6 +831,8 @@ export const api = {
   /** Versões do deck, da mais nova para a mais antiga (roadmap C2). */
   deckVersions: (id: string) => get<{ deckId: string; total: number; versions: DeckVersion[] }>(`/api/decks/${encodeURIComponent(id)}/versions`),
   cards: () => get<ApiCard[]>('/api/cards'),
+  /** Spoilers que chegaram nos últimos `days` dias, do mais novo para o mais antigo (cartão de dicas da espera). */
+  recentSpoilers: () => get<{ days: number; cards: Array<ApiCard & { addedAt: string }> }>('/api/spoilers/recent'),
   coverage: () => get<{ total: CoverageRow; sets: CoverageRow[] }>('/api/coverage'),
   /** Perfil Dev: lacunas do leitor automático (resumo, cartas e as novas com ⚙). */
   cardGaps: () => get<GapSummary>('/api/dev/card-gaps'),

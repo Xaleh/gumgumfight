@@ -129,6 +129,9 @@ function migrate(db: DB) {
   const cols = (db.prepare('PRAGMA table_info(cards)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   // raw: resposta original da API, para poder remapear sem baixar de novo.
   if (!cols.includes('raw')) db.exec('ALTER TABLE cards ADD COLUMN raw TEXT');
+  // added_at: quando a carta entrou no banco pela primeira vez (as regravações não mexem nela). NULL = carta que já
+  // estava aqui antes desta coluna, de data desconhecida. É por ela que se sabe qual spoiler é novo (`recentSpoilers`).
+  if (!cols.includes('added_at')) db.exec('ALTER TABLE cards ADD COLUMN added_at TEXT');
   const deckCols = (db.prepare('PRAGMA table_info(decks)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!deckCols.includes('kind')) db.exec("ALTER TABLE decks ADD COLUMN kind TEXT NOT NULL DEFAULT 'builtin'");
   // arts: JSON { número da carta: arte alternativa } (fora de `cards`, para não mudar o deck nas estatísticas).
@@ -1432,8 +1435,8 @@ export function upsertCards(
   const setData = db.prepare("UPDATE cards SET data = ?, updated_at = datetime('now') WHERE id = ?");
   const from = { official: !opts.provisional, feed: opts.provisional && opts.feedArts === true };
   const write = db.prepare(`
-    INSERT INTO cards (id, set_code, name, category, data, provisional, source, raw, updated_at)
-    VALUES (@id, @set_code, @name, @category, @data, @provisional, @source, @raw, datetime('now'))
+    INSERT INTO cards (id, set_code, name, category, data, provisional, source, raw, updated_at, added_at)
+    VALUES (@id, @set_code, @name, @category, @data, @provisional, @source, @raw, datetime('now'), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       set_code = excluded.set_code, name = excluded.name, category = excluded.category,
       data = excluded.data, provisional = excluded.provisional, source = excluded.source,
@@ -1509,6 +1512,22 @@ export function pendingSpoilers(db: DB): string[] {
       id: string;
     }>
   ).map((r) => r.id);
+}
+
+/**
+ * Spoilers novos: cartas ainda não lançadas que entraram no banco nos últimos `days` dias, da mais nova para a
+ * mais antiga (`addedAt` em ISO, UTC). A carta que vira oficial sai da lista; a que já estava no banco antes da
+ * coluna `added_at` não tem data e nunca entra.
+ */
+export function recentSpoilers(db: DB, days: number, limit: number) {
+  const rows = db
+    .prepare(
+      `SELECT ${CARD_COLUMNS}, c.added_at FROM ${CARD_FROM}
+       WHERE c.provisional = 1 AND c.source LIKE '${SPOILER_SOURCE}%' AND c.added_at >= datetime('now', ?)
+       ORDER BY c.added_at DESC, c.id LIMIT ?`,
+    )
+    .all(`-${days} days`, limit) as unknown as Array<CardRow & { added_at: string }>;
+  return rows.map((r) => ({ card: toCard(r), addedAt: `${r.added_at.replace(' ', 'T')}Z` }));
 }
 
 /** Coleções (pelo número da carta, como nas regras de spoilers) que ainda têm cartas de spoiler. */

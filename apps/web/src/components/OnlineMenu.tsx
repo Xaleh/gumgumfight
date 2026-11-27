@@ -16,7 +16,7 @@ export function roomCodeFromUrl(): string | null {
 /** Por quanto tempo a fila casual procura só o Líder escolhido (igual ao servidor). */
 export const LEADER_PICK_MS = 60_000;
 
-const fmtWait = (ms: number) => {
+export const fmtWait = (ms: number) => {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
@@ -48,6 +48,9 @@ const transient = (e: unknown) => !(e instanceof ApiError) || e.status >= 500 ||
  * `onEnter` com o assento. A busca só termina com a partida, com "Cancelar" ou com uma
  * recusa do servidor (vai para `onError`): falhas de rede não a interrompem, e quem saiu
  * da fila porque a página ficou parada (celular em segundo plano) volta para ela sozinho.
+ *
+ * Quem chama é a raiz do app (`MainApp`): a busca acompanha o jogador pelas telas, e os
+ * componentes a leem por `useAppQueue` (`QueueDock.tsx`, onde fica também a janela da espera).
  */
 export function useQueue(onEnter: (seat: OnlineSeat) => void, onError: (e: unknown) => void) {
   const [queue, setQueue] = useState<QueueState | null>(null);
@@ -137,38 +140,6 @@ export function useQueue(onEnter: (seat: OnlineSeat) => void, onError: (e: unkno
       setQueue(null);
     },
   };
-}
-
-/** Janela "Procurando oponente…" enquanto espera na fila. */
-export function QueueWait({ queue, onCancel }: { queue: QueueState; onCancel: () => void }) {
-  const t = useT();
-  return (
-    <div className="modal-backdrop page-sheet">
-      <div className="modal-card queue-wait" role="dialog" aria-modal="true" aria-labelledby="queue-wait-title">
-        <div className="modal-kicker">{queue.kind === 'ranked' ? t('menu.onlineRanked') : t('menu.onlineCasual')}</div>
-        <h2 id="queue-wait-title">
-          {t('menu.onlineSearching')}<span className="dots" />
-        </h2>
-        <p className="queue-time">{fmtWait(queue.waited)}</p>
-        {queue.leader && (
-          <div className="queue-leader">
-            <LeaderArt name={queue.leader.name} image={queue.leader.imageUrl} colors={queue.leader.colors} size="small" />
-            <p className="small">
-              {queue.leaderWait > 0
-                ? t('menu.queueLeaderSearching', { name: queue.leader.name, time: fmtWait(queue.leaderWait + 999) })
-                : t('menu.queueLeaderExpired', { name: queue.leader.name })}
-            </p>
-          </div>
-        )}
-        <p className="muted small">{queue.players > 1 ? t('menu.onlineQueuePlayers', { n: queue.players }) : t('menu.onlineQueueAlone')}</p>
-        <div className="btn-row center">
-          <button className="btn" onClick={onCancel}>
-            {t('common.cancel')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 /**

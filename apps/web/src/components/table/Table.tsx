@@ -39,6 +39,7 @@ import { BoardLayoutEditor } from '../BoardLayoutEditor';
 import { effectiveLayout, panelWidth } from '../../game/boardLayout';
 import { LateralBoard } from '../LateralBoard';
 import { StaticCardZoom } from '../CardInfo';
+import { QueueChip } from '../QueueDock';
 import { CardView, type Highlight, PickOrderContext } from '../CardView';
 import { DiceRoll } from '../DiceRoll';
 import { GameResult } from '../GameResult';
@@ -775,6 +776,8 @@ export function Table({
         )}
       </div>
       {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} onJudge={spectator.onJudge} />}
+      {/* Replay aberto por quem espera na fila: a busca minimizada (ao assistir, ela fica na barra do espectador). */}
+      {!(spectator && online) && <QueueChip />}
       {online && !watching && <SpectatorCount online={online} />}
       {online && !watching && <HandsSharedTag online={online} />}
       {human !== null && !isOnline && !tutorial && (

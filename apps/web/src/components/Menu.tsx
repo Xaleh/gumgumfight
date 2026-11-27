@@ -34,7 +34,9 @@ import { LeaderArt } from './LeaderArt';
 import { DeckConfirm } from './DeckConfirm';
 import { DeckPicker, RANDOM_DECK } from './DeckPicker';
 import { useFavoriteToggle } from './DeckTile';
-import { LeaderPicker, QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
+import { LeaderPicker, roomCodeFromUrl } from './OnlineMenu';
+import { useAppQueue } from './QueueDock';
+import { rememberRoomDeck } from '../roomDeck';
 import { type FriendLink, FriendInvites, friendsBadge, FriendsSheet, type InviteOption, useFriends } from './Friends';
 import { compactRules, savedDeckId, savedRules as savedYonkoRules, yonkoDeckOf } from './Yonko';
 import { ReplayLoader } from './ReplayLoader';
@@ -546,7 +548,13 @@ export function Menu({
     },
     [refreshActive],
   );
-  const { queue, enqueue, cancel } = useQueue(onOnline, fail);
+  // A fila mora na raiz do app (acompanha o jogador pelas telas); a recusa do servidor aparece aqui, junto dos modos.
+  const { queue, enqueue, error: queueError, clearError: clearQueueError } = useAppQueue();
+  useEffect(() => {
+    if (queueError === null) return;
+    fail(queueError);
+    clearQueueError();
+  }, [queueError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -646,14 +654,16 @@ export function Menu({
   const waiting = active.find((r) => r.status === 'waiting');
   const manualCards = d0?.unscripted ?? 0;
   const onlineBlocked = !onlineDeck || busy || Boolean(playing) || Boolean(queue);
-  const onlineNote = !d0 ? t('menu.pickDeck') : !onlineDeck ? t('menu.deckNotValidIn', { format: fmt }) : playing ? t('menu.finishCurrent') : null;
+  /** Na fila, os outros modos ficam desligados: a partida que chega tiraria o jogador do meio de outra. */
+  const queueNote = queue ? t('wait.inQueueNote') : null;
+  const onlineNote = !d0 ? t('menu.pickDeck') : !onlineDeck ? t('menu.deckNotValidIn', { format: fmt }) : playing ? t('menu.finishCurrent') : queueNote;
   const privateNote = !d0
     ? t('menu.pickDeck')
     : !privateDeck
       ? t('menu.deckNotValidIn', { format: modeLabel(privateMode) })
       : playing
         ? t('menu.finishCurrent')
-        : null;
+        : queueNote;
   /** Cartas de spoiler (ainda não lançadas) no deck: a ranqueada só aceita cartas lançadas. */
   const spoilerCards = d0?.spoilers?.length ?? 0;
   const rankedNote =
@@ -694,6 +704,7 @@ export function Menu({
       case 'private':
         return run(async () => {
           const r = await api.online.createRoom(deckId, privateMode, shareHands);
+          rememberRoomDeck(r.roomId, deckId);
           onOnline({ roomId: r.roomId, token: r.token });
         });
       case 'join':
@@ -765,6 +776,7 @@ export function Menu({
     const mode = duelModes[Number(option.slice('duel:'.length))];
     if (!mode || !playsIn(d0, mode)) return;
     const r = await api.online.createRoom(d0.id, mode, false);
+    rememberRoomDeck(r.roomId, d0.id);
     const seat = { roomId: r.roomId, token: r.token };
     // A sala já existe: mesmo se o aviso falhar, a pessoa vai para ela (o código continua lá para mandar).
     await api.friends.invite(friend.id, seat).catch(() => undefined);
@@ -1068,7 +1080,7 @@ export function Menu({
                   <button
                     type="button"
                     className="btn-outline"
-                    disabled={!d0?.valid || busy || code.length !== 6 || Boolean(playing)}
+                    disabled={!d0?.valid || busy || code.length !== 6 || Boolean(playing) || Boolean(queue)}
                     onClick={() => ask('join')}
                   >
                     {t('menu.joinRoom')}
@@ -1089,9 +1101,9 @@ export function Menu({
               badge={modeLabel(botMode)}
               desc={t('menu.botDesc')}
               live={(broadcasting || (botLevel === 'team' && botRooms && user)) && stats ? <Live>{t('menu.botLive', { n: stats.playing.bot })}</Live> : <Live off>{t('menu.botLocal')}</Live>}
-              note={!d0 || botReady ? null : t('menu.bothDecksValid', { format: modeLabel(botMode) })}
+              note={!d0 || botReady ? queueNote : t('menu.bothDecksValid', { format: modeLabel(botMode) })}
               action={loading ? t('common.loading') : t('menu.battle')}
-              disabled={!botReady || loading}
+              disabled={!botReady || loading || Boolean(queue)}
               onAction={() => ask('bot')}
             >
               <button type="button" className="mode-learn" onClick={onLearn}>
@@ -1274,7 +1286,6 @@ export function Menu({
         </div>
       </footer>
 
-      {queue && <QueueWait queue={queue} onCancel={cancel} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
       {showFriends && (

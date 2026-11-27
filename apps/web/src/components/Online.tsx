@@ -5,7 +5,11 @@ import { errorMessage, modeLabel, type OnlineRoomInfo, type RoomQueue } from '..
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
 import { type MessageKey, type Translate, useLocale, useT, useTryT } from '../i18n';
 import { fmtBerries, fmtNumber } from '../i18n/format';
+import { roomDeck } from '../roomDeck';
 import { useSettings } from '../settings';
+import { QueueChip, useQueueMinimized } from './QueueDock';
+import { useWaitDeck, WaitHandSheet } from './WaitHandTest';
+import { WaitTips } from './WaitTips';
 
 /** Nome de cada liga da ranqueada: chave do dicionário (mostrar com `tierName`). */
 export const TIER_LABEL: Record<string, MessageKey> = {
@@ -327,6 +331,12 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
   const t = useT();
   const { room, conn } = online;
   const [copied, setCopied] = useState(false);
+  // Enquanto o oponente não chega: o cartão de dicas e, na sala aberta pela tela inicial, a mão de teste do deck.
+  const seated = room?.status === 'waiting' && room.you !== null;
+  const myLeader = seated ? room.players[room.you!]?.leader : null;
+  const deckId = seated ? roomDeck(room.id) : null;
+  const [hand, setHand] = useState(false);
+  const deck = useWaitDeck(hand ? deckId : null);
   const link = room?.code ? `${location.origin}/?sala=${room.code}` : '';
   const copy = async () => {
     try {
@@ -366,6 +376,7 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
                 {t('online.waitingOpponent')}
                 <span className="dots" />
               </p>
+              {seated && <WaitTips leader={myLeader} />}
             </>
           ) : room?.status === 'waiting' ? (
             <>
@@ -387,11 +398,17 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
                 <button className="btn primary" onClick={copy}>
                   {copied ? t('online.linkCopied') : t('online.shareLink')}
                 </button>
+                {deckId && (
+                  <button className="btn" onClick={() => setHand(true)}>
+                    {t('wait.handTest')}
+                  </button>
+                )}
               </div>
               <p className="muted small waiting-dots">
                 {t('online.waitingOpponent')}
                 <span className="dots" />
               </p>
+              {seated && <WaitTips leader={myLeader} />}
             </>
           ) : (
             <p className="muted waiting-dots">
@@ -406,6 +423,7 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
           </div>
         </section>
       </div>
+      {hand && seated && <WaitHandSheet deck={deck.data} failed={deck.failed} onClose={() => setHand(false)} />}
     </div>
   );
 }
@@ -451,10 +469,17 @@ export function SpectatorBar({
 }) {
   const t = useT();
   const n = online.room?.spectators ?? 1;
+  // Quem assiste enquanto espera na fila: a busca minimizada entra aqui, com as outras etiquetas, e a de quem
+  // assiste encolhe para o olho e o número (no celular a fileira já vai até a faixa do oponente).
+  const queued = useQueueMinimized();
   return (
     <div className="spectator-bar">
-      <span className="spectator-tag" title={t('online.watchingTitle', { n })}>
-        {t('online.watching', { n })}
+      {/* Na mesma linha: nas mesas em que a barra é uma coluna, a etiqueta da fila não empurra o resto para baixo. */}
+      <span className="spectator-tags">
+        <span className="spectator-tag" title={t('online.watchingTitle', { n })} aria-label={queued ? t('online.watchingTitle', { n }) : undefined}>
+          {queued ? t('wait.watchingShort', { n }) : t('online.watching', { n })}
+        </span>
+        <QueueChip />
       </span>
       {canHands && (
         <button className={['auto-toggle', online.hands ? 'on' : ''].join(' ')} onClick={onToggleHands} title={t('online.handsTitle')}>

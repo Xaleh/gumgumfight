@@ -7976,6 +7976,313 @@ tr.clickable:hover td {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Espera por oponente: a janela ganha o cartão de dicas, a mão de teste e "Minimizar"; minimizada, a busca vira
+ * uma pílula presa à tela, que acompanha o jogador pelo app (`QueueDock.tsx`).
+ *
+ * Animações (a opção "Animações" do jogador, em `anim-full` / `anim-soft` / `anim-off`): o pulso do ponto e a
+ * barrinha do tempo, que se repetem, só existem em `anim-full`; as entradas curtas valem em `anim-full` e
+ * `anim-soft`; em `anim-off` nada se move.
+ */
+.queue-actions {
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.queue-hint {
+  margin: 14px 0 2px;
+}
+/* A janela da espera e a pergunta "Sair da fila?": um pouco mais de borda que a janela padrão. */
+.modal-card.queue-wait,
+.queue-leave .modal-card {
+  padding: 22px 20px 20px;
+}
+.queue-leave .modal-card p {
+  margin: 0 0 18px;
+}
+/* Com a pílula embaixo, o fim da página ganha espaço para o último conteúdo rolar por cima dela (`QueueDock`).
+   Depois do `#root`, e não no `body`: os dois têm a altura da tela, e a página transborda deles. */
+html.queue-pill-open #root::after {
+  content: '';
+  display: block;
+  height: calc(76px + env(safe-area-inset-bottom));
+}
+.queue-pill {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  /* acima da barra do site (40), abaixo das janelas (50) */
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 11px 20px 11px 16px;
+  border: 1px solid rgba(253, 245, 224, 0.28);
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--cream);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(var(--shadow2-rgb), 0.35);
+  cursor: pointer;
+}
+/* Nas telas de mesa (assistir, replay) as bordas são todas da partida: lá a busca minimizada é uma etiqueta no
+   canto da mesa, do tamanho das vizinhas ("Assistindo", chat), e não a pílula solta. */
+.queue-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #12304b;
+  color: #fdf5e0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.18);
+  cursor: pointer;
+}
+.spectator-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.queue-chip b {
+  font-variant-numeric: tabular-nums;
+  color: #f2b733;
+}
+.queue-chip .queue-pill-dot {
+  width: 7px;
+  height: 7px;
+}
+.queue-chip:focus-visible {
+  outline: 2px solid #f2b733;
+  outline-offset: 2px;
+}
+.queue-chip.anim-full .queue-pill-dot {
+  animation: queue-pill-pulse 1.6s ease-in-out infinite;
+}
+.queue-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.queue-pill b {
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+.queue-pill:hover {
+  filter: brightness(1.15);
+}
+.queue-pill:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.queue-pill-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  /* fixo (e não `--ok`): a pílula é sempre azul-marinho, nos dois temas */
+  background: #3bc985;
+}
+.queue-pill.anim-full,
+.queue-pill.anim-soft {
+  animation: queue-pill-in 0.22s ease-out;
+}
+.queue-pill.anim-full .queue-pill-dot {
+  animation: queue-pill-pulse 1.6s ease-in-out infinite;
+}
+@keyframes queue-pill-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+}
+@keyframes queue-pill-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+/* A pergunta "Sair da fila?" fica por cima de qualquer janela da tela aberta. */
+.modal-backdrop.queue-leave {
+  z-index: 95;
+}
+.queue-stopped {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 12px 12px 12px 20px;
+  line-height: 1.4;
+  border-radius: 16px;
+  background: var(--navy);
+  color: var(--cream);
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(var(--shadow2-rgb), 0.35);
+}
+
+/* Cartão de dicas da espera (fila e sala privada): `WaitTips.tsx`. */
+.wait-tips {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 14px 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  text-align: left;
+  overflow: hidden;
+}
+.wait-tip {
+  flex: 1;
+  min-width: 0;
+  /* Três linhas de texto: o cartão não muda de altura (e a janela não pula) a cada dica. */
+  min-height: calc(1.1em + 3 * 1.4 * 14px);
+}
+.wait-tip-kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wait-tip p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+/* Spoiler novo: a carta à esquerda (abre ampliada ao toque) e o nome ao lado. */
+.wait-tip.spoiler {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wait-tip-card {
+  --cw: 54px;
+  --ch: calc(var(--cw) * 1.396);
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: zoom-in;
+}
+.wait-tip-card:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.wait-tip-text {
+  min-width: 0;
+}
+.wait-tip-name {
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.wait-tip-name small {
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.wait-tip-next {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.wait-tip-next svg {
+  transform: rotate(-90deg);
+}
+.wait-tip-next:hover {
+  background: var(--bg2);
+}
+.wait-tip-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--gold);
+  transform-origin: left;
+  animation: wait-tip-timer linear both;
+}
+.wait-tips.anim-full .wait-tip,
+.wait-tips.anim-soft .wait-tip {
+  animation: wait-tip-in 0.25s ease-out;
+}
+@keyframes wait-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes wait-tip-timer {
+  from {
+    transform: scaleX(0);
+  }
+}
+/* Sala privada à espera do oponente: o cartão não estica a coluna da sala. */
+.online-wait .wait-tips {
+  max-width: 460px;
+  margin: 18px auto;
+}
+.wait-hand-status {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.wait-hand-sheet .ht-hand {
+  --cw: 64px;
+}
+/* O painel da mão de teste nasceu na coluna estreita do construtor; na folha da espera ele tem espaço para respirar. */
+.wait-hand-sheet .hand-test {
+  padding: 14px;
+  gap: 12px;
+}
+.wait-hand-sheet .sheet-head {
+  padding: 18px 18px 10px 20px;
+}
+.wait-hand-sheet .sheet-body {
+  padding: 4px 20px 22px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .queue-pill,
+  .queue-pill .queue-pill-dot,
+  .queue-chip .queue-pill-dot,
+  .wait-tips .wait-tip {
+    animation: none;
+  }
+  .wait-tip-timer {
+    display: none;
+  }
+}
 .leader-pick-hint {
   margin: 0;
 }

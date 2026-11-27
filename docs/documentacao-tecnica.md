@@ -203,7 +203,7 @@ gumgumfight/
 ├── deploy/                      bootstrap-hostinger.sh, setup-vm.sh, remote-deploy.sh, ecosystem.config.cjs, HOSTINGER.md
 ├── e2e/                         testes de ponta a ponta (Playwright): playwright.config.ts, serve.ts (servidor com banco
 │                                temporário), support/ (textos pela chave do pt-BR, fixture de erros e de mais jogadores,
-│                                contas de teste no banco temporário, passos comuns, da fila online e do torneio),
+│                                contas de teste e spoilers novos no banco temporário, passos comuns, da fila online e do torneio),
 │                                *.spec.ts (bot, boosters, fila online, torneio)
 ├── scripts/build-release.sh     monta release/
 ├── docs/rules/                  base de regras (CR v1.2.1), interações, divergências do motor, mapeamento da DSL
@@ -787,6 +787,48 @@ mostra relógio local (`clock.remaining` − tempo desde o último snapshot, des
 partida não acabou, espera 3 s, consulta `/api/online/active` (jogador) ou `/api/online/rooms/:id` (espectador) e
 reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do protocolo na seção 11.
 
+### Espera por oponente (fila e sala privada)
+
+O estado da fila mora na raiz do app, não na tela inicial: `MainApp` (`App.tsx`) chama `useQueue`
+(`components/OnlineMenu.tsx`) e entrega a busca aos componentes por contexto (`QueueProvider` / `useAppQueue`, em
+`components/QueueDock.tsx`). As telas ficam num componente à parte (`Pages`, com `memo`), para a consulta à fila (a cada
+1,5 s) não redesenhar a tela aberta; só quem lê o contexto (a tela inicial) redesenha.
+
+- **`QueueDock`** desenha a busca por cima de qualquer tela, em três formas: a janela "Procurando oponente" (com o
+  cartão de dicas, "Mão de teste", "Minimizar" e "Cancelar"), a pílula minimizada (presa embaixo; com ela aberta, o
+  `#root` ganha um espaço no fim para o último conteúdo da página rolar por cima dela) e a folha da mão de teste.
+  Trocar de tela minimiza. Nas telas de mesa (`queueChipInTable`: assistir e replay) não há pílula solta, que
+  encostaria nos controles da partida: a busca minimizada é a etiqueta `QueueChip`, dentro do canto da própria mesa
+  (na barra do espectador, onde a etiqueta "Assistindo · N" encolhe para "👁 N", ou sob o botão do menu no replay).
+  Como a mesa também é usada fora do app principal (transmissão, replay embutido), a etiqueta lê o contexto sem
+  exigir o provedor. A forma da busca (`view`) mora no `MainApp` e vai no mesmo contexto.
+- **Quais telas mantêm a fila** (`queueScreens.ts`, `queuePolicy`): `keep` nas telas de navegar (`menu`, `stats`,
+  `profile`, `learn`, `tournaments`, `watch-list`, `watch` e `game` em modo replay); `leave` em `online` e
+  `yonko-online` (o jogador já tem um lugar numa sala, e o servidor tirou o bilhete: `lobby.leaveQueue`); `ask` em todas
+  as outras, inclusive uma tela nova ainda sem regra. O `setScreen` que as telas recebem passa por essa política: em
+  `ask`, a tela pedida fica guardada até o "Sair da fila e abrir" (`QueueLeaveConfirm`).
+- **Partida encontrada**: o `onEnter` do `useQueue` toca o efeito `turn`, vibra (`navigator.vibrate`, onde existe) e
+  abre a tela `online`. A recusa do servidor que encerra a busca aparece junto dos modos na tela inicial e, nas outras
+  telas, num aviso (`QueueStopped`).
+- **Cartão de dicas** (`components/WaitTips.tsx`, lógica em `waitTips.ts`): duas dicas de regra (`RULE_TIPS`, textos
+  em `i18n/wait`, embaralhadas a cada espera) e um item de dados, em ciclo. Os dados vêm de duas consultas feitas uma
+  vez ao abrir o cartão: `GET /api/stats?days=7` (os 3 Líderes mais jogados) e `GET /api/stats?mine=1&leader=&opponent=human`
+  (o histórico com o Líder do deck: o total a partir de 5 partidas, e o melhor e o pior confronto entre os que têm 3
+  ou mais). Sem resposta, o cartão fica só com as dicas.
+- **Spoilers novos**: a terceira consulta do cartão é `GET /api/spoilers/recent` (as cartas ainda não lançadas que
+  entraram no banco nos últimos 7 dias, até 40, da mais nova para a mais antiga, com `addedAt`). Havendo alguma, o
+  `nextTip` alterna: um item do ciclo de dicas e dados, um spoiler, cada lista no seu contador. O item mostra a
+  miniatura (`StaticCard`), o nome e há quantos dias do calendário do jogador a carta chegou (`daysAgo`); tocar abre o
+  `StaticCardZoom`, e o temporizador para enquanto ele está aberto. A data vem de `cards.added_at` (seção 7): o feed de
+  spoilers não traz o dia da revelação, então vale o dia em que a carta entrou neste servidor.
+- **Mão de teste** (`components/WaitHandTest.tsx`): o `HandTestPanel` do construtor com o deck da espera
+  (`GET /api/decks/:id`). Simulação local, sem relação com a mão da partida.
+- **Sala privada à espera** (`OnlineWaiting`, em `Online.tsx`): o mesmo cartão e, quando a sala foi aberta pela tela
+  inicial nesta aba, a mão de teste. O servidor não devolve o id do deck de quem espera, então o navegador guarda o par
+  sala/deck em `sessionStorage.gumgum.roomDeck` (`roomDeck.ts`). A sala de torneio à espera tem só o cartão.
+- **Animações** (`settings.animations`): em `full` e `soft` o cartão troca sozinho a cada 9 s, com uma entrada curta; a
+  barrinha do tempo e o pulso do ponto da pílula, que se repetem, só existem em `full`; em `off` nada troca sozinho.
+
 ### Polling (todas as consultas periódicas)
 
 Todas passam por `poll` (`apps/web/src/poll.ts`): a próxima consulta só é agendada quando a anterior termina (nunca
@@ -802,7 +844,7 @@ voltava (23/10/2026).
 | Menu (bloco "ao vivo") | `GET /api/online/live` | 15 s | aba visível |
 | Menu (bloco meta) | `GET /api/stats?days=7` | 5 min | aba visível |
 | Assistir partidas | `GET /api/online/live` | 5 s | sempre, enquanto a lista está aberta (cache no servidor + ETag/304) |
-| Fila casual/ranqueada | `GET /api/online/queue/:ticket` | 1,5 s | enquanto está na fila |
+| Fila casual/ranqueada | `GET /api/online/queue/:ticket` | 1,5 s | enquanto está na fila, em qualquer tela (`MainApp`) |
 | Página do torneio | `GET /api/tournaments/:id` | 5 s | torneio `running` (304 sem corpo quando nada mudou) |
 | Partida online | `ping` SSE (servidor → cliente) | 20 s | canal aberto |
 
@@ -881,7 +923,7 @@ baixadas quando tocam) + `public/`.
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
-| `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`. Índice `cards_set`. | importador, seed, sync de spoilers |
+| `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`, `added_at` (quando a carta entrou no banco pela primeira vez; as regravações não mexem nela, e é NULL nas cartas anteriores à coluna). Índice `cards_set`. | importador, seed, sync de spoilers; `added_at` é lida por `/api/spoilers/recent` |
 | `set_releases` | `set_code` | Coleções que viraram oficiais pela lista oficial da Bandai no dia do lançamento e que a optcgapi ainda não publicou: `source` (domínio da lista), `released_at` | `syncSpoilers` (entra quando a lista torna oficial, sai quando a API publica) |
 | `card_translations` | `(card_id, lang)` | `text`, `trigger` revisados à mão | seed (de `data/translations`) |
 | `card_engine_texts` | `card_id` | Texto para o motor: `text`, `trigger`, `base_key` (hash do texto oficial quando foi escrito; diferente = não vale), `author_id`, `author_name`, `updated_at` | `PUT/DELETE /api/dev/engine-texts/:id` |
@@ -2121,6 +2163,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/health` | Verificação de saúde | Pública |
 | GET | `/api/config` | Configurações públicas (imagens, Client ID do Google, chave das notificações, apoio) | Pública |
 | GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (por coleção) e uma carta | Pública |
+| GET | `/api/spoilers/recent` | Spoilers novos: `{ days: 7, cards }`, as cartas ainda não lançadas que entraram no banco nos últimos 7 dias (até 40, da mais nova para a mais antiga), cada uma com `addedAt` (ISO, UTC) | Pública |
 | GET | `/api/coverage` | Cobertura dos efeitos automatizados por coleção | Pública |
 | GET | `/api/translations/pending` | Cartas com tradução automática parcial | Pública |
 | GET | `/api/dev/card-gaps` | Lacunas do leitor: cartas ⚙ por coleção e por parte do leitor, ranking das frases que faltam (até 300) e o número de novas | Dev |

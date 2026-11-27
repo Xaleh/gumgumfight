@@ -1,6 +1,6 @@
-// Mão de teste do construtor: sorteia a mão inicial do deck, faz o mulligan e as compras dos primeiros
-// turnos, e mostra as chances calculadas no motor (`packages/engine/src/handtest.ts`). É só simulação
-// local: nada vai para o servidor nem decide partida.
+// Mão de teste do construtor (e da espera por oponente, `WaitHandTest.tsx`): sorteia a mão inicial do deck, faz o
+// mulligan e as compras dos primeiros turnos, e mostra as chances calculadas no motor
+// (`packages/engine/src/handtest.ts`). É só simulação local: nada vai para o servidor nem decide partida.
 
 import {
   canMulligan,
@@ -37,12 +37,15 @@ export function HandTestPanel({
   shown,
   onHover,
   onLongPress,
+  onOpen,
 }: {
   cards: Array<{ id: string; count: number }>;
   byId: Map<string, CardData>;
   shown: (card: CardData) => CardData;
-  onHover: (card: CardData | null, anchor?: HTMLElement) => void;
+  onHover?: (card: CardData | null, anchor?: HTMLElement) => void;
   onLongPress: (card: CardData) => void;
+  /** Clique numa carta da mão (a espera por oponente abre a carta ampliada; o construtor mostra ao passar o mouse). */
+  onOpen?: (card: CardData) => void;
 }) {
   const t = useT();
   const deck = useMemo(() => ({ cards }), [cards]);
@@ -123,7 +126,9 @@ export function HandTestPanel({
           <div className="ht-hand">
             {inHand.map((id, i) => {
               const card = byId.get(id);
-              return card ? <StaticCard key={`${i}-${id}`} card={shown(card)} onHover={onHover} onLongPress={onLongPress} /> : null;
+              if (!card) return null;
+              const face = shown(card);
+              return <StaticCard key={`${i}-${id}`} card={face} onHover={onHover} onLongPress={onLongPress} onClick={onOpen && (() => onOpen(face))} />;
             })}
           </div>
         </>
