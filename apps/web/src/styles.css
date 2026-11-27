@@ -15058,6 +15058,217 @@ a.sponsor-card:hover {
   }
 }
 
+/* ------------------------------------------------------------------ chat do lobby do torneio
+ * Tela estreita: barra presa embaixo (a última mensagem e as não lidas) que abre a conversa por cima.
+ * Tela larga (o mesmo corte de LobbyChat.tsx): coluna ao lado das mesas, que acompanha a rolagem.
+ * Nada aqui é animado. */
+.tour-lobby.has-chat .coverage-body {
+  /* espaço para a barra do chat não cobrir as últimas mesas */
+  padding-bottom: calc(78px + env(safe-area-inset-bottom));
+}
+.lobby-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.lobby-chat.dock {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  /* acima das mesas e do banner de chamados (5); abaixo da busca minimizada (45) e das janelas (50) */
+  z-index: 30;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.25);
+}
+.lobby-chat.dock.open {
+  height: min(460px, 68dvh);
+  padding: 10px;
+}
+/* No celular, letra de 16px no campo: abaixo disso o Safari do iPhone aproxima a tela ao focar. */
+.lobby-chat.dock .chat-input {
+  font-size: 16px;
+}
+@media (min-width: 700px) {
+  .lobby-chat.dock {
+    left: auto;
+    right: 14px;
+    width: 420px;
+  }
+}
+.lobby-chat-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lobby-chat-ico {
+  font-size: 22px;
+  line-height: 1;
+}
+.lobby-chat-bar-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lobby-chat-bar-text .small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lobby-chat-badge {
+  flex: none;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 22px;
+  text-align: center;
+}
+.lobby-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lobby-chat-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.lobby-chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.lobby-chat-log > p {
+  margin: 0;
+}
+.lobby-chat-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.lobby-chat-msg p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  line-height: 1.35;
+}
+.lobby-chat-msg time {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.lobby-chat-who {
+  font-weight: 800;
+}
+.lobby-chat-msg.mine .lobby-chat-who {
+  color: var(--accent);
+}
+.lobby-chat-role {
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  /* cores fixas: legíveis no tema claro e no escuro */
+  background: #2f6db5;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.lobby-chat-role.organizer {
+  background: #f7cd48;
+  color: #3d1308;
+}
+.lobby-chat-text::before {
+  content: ': ';
+}
+.lobby-chat-del {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: -3px -4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 24px;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.lobby-chat-del:hover,
+.lobby-chat-del:focus-visible {
+  opacity: 1;
+  color: var(--danger);
+  background: var(--panel);
+}
+.lobby-chat-new {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(var(--shadow-rgb), 0.25);
+}
+.lobby-chat .error,
+.lobby-chat-hint {
+  margin: 0;
+}
+.lobby-chat-hint {
+  text-align: center;
+}
+@media (min-width: 1100px) {
+  .tour-lobby.has-chat .coverage-body {
+    max-width: 1340px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 14px;
+    align-items: start;
+    padding-bottom: 14px;
+  }
+  .lobby-chat.wide {
+    position: sticky;
+    top: 14px;
+    /* cabe na tela já no topo da página, abaixo do cabeçalho do lobby */
+    height: min(640px, calc(100dvh - 90px));
+    padding: 12px;
+    border-radius: 16px;
+  }
+}
+
 /* ---------------------------------------------------------------- apps conectados (Configurações) */
 .apps-section {
   display: flex;

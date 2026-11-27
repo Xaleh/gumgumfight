@@ -823,6 +823,21 @@ function migrateTournaments(db: DB) {
       at            TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS tournament_interventions_match ON tournament_interventions(tournament_id, match_id);
+
+    -- Chat do lobby do torneio (ver tournaments/chat.ts). O texto já entra censurado; a mensagem apagada
+    -- fica na tabela (removed_at / removed_by) e some do chat.
+    CREATE TABLE IF NOT EXISTS tournament_chat (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      user_id       TEXT NOT NULL,
+      name          TEXT NOT NULL,              -- apelido na hora da mensagem
+      role          TEXT NOT NULL,              -- papel na hora: organizer | judge | player
+      text          TEXT NOT NULL,
+      sent_at       TEXT NOT NULL,
+      removed_at    TEXT,
+      removed_by    TEXT
+    );
+    CREATE INDEX IF NOT EXISTS tournament_chat_feed ON tournament_chat(tournament_id, id);
   `);
   // Chamado de Judge com o relato do jogador e o desfecho escolhido pelo Judge (ver tournaments/store.ts):
   // reason/details = o motivo (CALL_REASONS) e o texto do jogador; play/play_turn/play_text = a jogada relatada (posição

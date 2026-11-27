@@ -1006,6 +1006,12 @@ export const api = {
     ready: (id: string, matchId: number, ready: boolean) =>
       send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/ready`, { ready }),
     lobby: (id: string) => get<TournamentLobby>(`/api/tournaments/${encodeURIComponent(id)}/lobby`),
+    /** Chat do lobby: as últimas mensagens (sem novidade, o navegador reaproveita a resposta pelo ETag). */
+    chat: (id: string) => get<LobbyChat>(`/api/tournaments/${encodeURIComponent(id)}/chat`),
+    /** Manda uma mensagem (o servidor censura palavrões) e devolve a conversa já com ela. */
+    chatSend: (id: string, text: string) => send<LobbyChat>('POST', `/api/tournaments/${encodeURIComponent(id)}/chat`, { text }),
+    /** Apaga uma mensagem: quem escreveu, um Judge ou o organizador. */
+    chatRemove: (id: string, messageId: number) => send<LobbyChat>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/chat/${messageId}`),
     addJudge: (id: string, player: string) => send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/judges`, { player }),
     removeJudge: (id: string, userId: string) =>
       send<TournamentDetail>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/judges/${encodeURIComponent(userId)}`),
@@ -1717,6 +1723,8 @@ export interface TournamentLobby {
   checkInOpen: boolean;
   checkedIn: number;
   roundComplete: boolean;
+  /** O lobby tem chat (a Sala do Tempo não tem). */
+  chat: boolean;
   viewer: { userId: string | null; manage: boolean; judge: boolean };
   judges: TournamentPlayerRef[];
   warningsPending: TournamentPlayerRef[];
@@ -1726,6 +1734,33 @@ export interface TournamentLobby {
   readyTables: number;
   /** Salas pedindo a presença do Judge agora (só o Judge e o organizador). */
   calls: Array<{ matchId: number; table: number; roomId: string | null; openedAt: string; names: string[]; reason: CallReason | null }>;
+}
+
+/** Mensagem do chat do lobby (já censurada pelo servidor). */
+export interface LobbyChatMessage {
+  id: number;
+  userId: string;
+  name: string;
+  /** O papel de quem escreveu, na hora da mensagem. */
+  role: 'organizer' | 'judge' | 'player';
+  text: string;
+  at: string;
+}
+
+/** Chat do lobby do torneio (`GET /api/tournaments/:id/chat`). */
+export interface LobbyChat {
+  /** Muda quando alguém escreve ou apaga. */
+  rev: string;
+  /**
+   * A conta pode escrever (`ok`) ou por que não: sem login, não participa do torneio (só inscritos,
+   * Judges e o organizador escrevem) ou o chat já fechou (um tempo depois do fim do torneio).
+   */
+  post: 'ok' | 'login' | 'participants' | 'closed';
+  /** Pode apagar as mensagens dos outros (Judge e organizador); a própria, qualquer um apaga. */
+  moderate: boolean;
+  /** Tamanho máximo de uma mensagem. */
+  max: number;
+  messages: LobbyChatMessage[];
 }
 
 /** O motivo de quem chama o Judge (um toque). */
