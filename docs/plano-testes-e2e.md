@@ -102,6 +102,9 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   mão de teste do deck da fila sorteia 5 e compra a sexta, a busca minimizada continua nas estatísticas, o construtor
   pergunta "Sair da fila?" (ficar mantém a busca; sair esvazia a fila no servidor) e a partida que chega leva quem
   estava nas estatísticas para a mesa.
+- `online.spec.ts`, spoilers novos na espera: `addSpoilers()` (`e2e/support/spoilers.ts`, com `spoiler-cli.ts`) grava
+  duas cartas de spoiler no banco temporário pelo `upsertCards` do servidor; o cartão alterna dica e spoiler, mostra
+  "Chegou hoje", a carta abre ampliada e o Esc fecha só ela. No fim as cartas saem do banco (`removeSpoilers()`).
 - `online.spec.ts`, ranqueada: duas contas de teste, a ranqueada fica liberada, os dois entram na fila, um desiste e o
   bounty de quem venceu sobe (`/api/players/me`).
 - Os dois são `@iphone` desde 2026-11-27. Ficavam só no desktop por causa do arranjo da mesa no celular e da queda do

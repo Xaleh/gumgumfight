@@ -7,6 +7,7 @@ import { openHome } from './support/app';
 import { expect, test } from './support/fixtures';
 import { label } from './support/i18n';
 import { concede, endTurn, expectHiddenOpponentHand, expectResult, joinQueue, playToFirstTurn } from './support/online';
+import { addSpoilers, NEW_SPOILERS, removeSpoilers } from './support/spoilers';
 
 test.describe('fila online', () => {
   test('casual: fila, turnos, volta depois de recarregar e desistência @iphone', async ({ page, newPlayer }) => {
@@ -104,6 +105,47 @@ test.describe('fila online', () => {
     await expect
       .poll(async () => ((await (await page.request.get('/api/online/stats')).json()) as { queue: { casual: Record<string, number> } }).queue.casual.standard)
       .toBe(0);
+  });
+
+  test('spoilers novos se alternam com as dicas na espera, e a carta abre ampliada @iphone', async ({ page }) => {
+    addSpoilers();
+    try {
+      await openHome(page);
+      await joinQueue(page, 'casual');
+      const wait = page.getByRole('dialog', { name: label('menu.onlineSearching') });
+      const tips = wait.getByRole('region', { name: label('wait.tipsLabel'), exact: true });
+      const next = wait.getByRole('button', { name: label('wait.next'), exact: true });
+      const spoiler = tips.getByText(label('wait.kickerSpoiler'), { exact: true });
+
+      // O cartão abre numa dica de regra; o item seguinte é o spoiler mais novo, e depois dele vem outra dica.
+      await expect(tips.locator('p')).toBeVisible();
+      await expect(spoiler).toBeHidden();
+      for (const name of NEW_SPOILERS) {
+        await next.click();
+        await expect(spoiler).toBeVisible();
+        await expect(tips.locator('.wait-tip-name')).toContainText(name);
+        await expect(tips.getByText(label('wait.spoilerToday'), { exact: false })).toBeVisible();
+        if (name !== NEW_SPOILERS.at(-1)) {
+          await next.click();
+          await expect(spoiler).toBeHidden();
+        }
+      }
+
+      // A carta abre ampliada, com o texto; o Esc fecha só ela, e a busca continua na janela.
+      const last = NEW_SPOILERS.at(-1)!;
+      await tips.getByRole('button', { name: label('wait.spoilerView', { name: last }), exact: true }).click();
+      const zoom = page.getByRole('dialog', { name: last, exact: true });
+      await expect(zoom.getByText('EB99-002', { exact: false })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(zoom).toBeHidden();
+      await expect(wait).toBeVisible();
+      await wait.getByRole('button', { name: label('common.cancel'), exact: true }).click();
+      await expect(wait).toBeHidden();
+    } finally {
+      removeSpoilers();
+      // Se o teste parou no meio, não deixa ninguém na fila para o teste seguinte ser pareado com ele.
+      await page.goto('about:blank').catch(() => undefined);
+    }
   });
 
   test('ranqueada: duas contas, desistência e bounty @iphone', async ({ page, newPlayer }) => {

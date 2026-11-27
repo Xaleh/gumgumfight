@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { StatsOverview } from '../src/api';
 import ptBR from '../src/i18n/pt-BR';
-import { DECK_MIN_GAMES, deckTips, MATCHUP_MIN_GAMES, metaTip, nextTip, RULE_TIPS, shuffled, TIP_START, type WaitTip } from '../src/waitTips';
+import { daysAgo, DECK_MIN_GAMES, deckTips, MATCHUP_MIN_GAMES, metaTip, nextTip, RULE_TIPS, shuffled, spoilerTips, TIP_START, type WaitTip } from '../src/waitTips';
 
 const card = (name: string) => ({ name, category: 'leader', colors: ['red'] });
 const cards = { L1: card('Luffy'), L2: card('Zoro'), L3: card('Nami'), L4: card('Sanji') };
@@ -81,17 +81,45 @@ describe('cartão de dicas da espera: itens de dados', () => {
   });
 });
 
+describe('cartão de dicas da espera: spoilers novos', () => {
+  const now = new Date(2026, 10, 27, 10, 0, 0);
+  const at = (y: number, m: number, d: number, h: number) => new Date(y, m, d, h, 0, 0).toISOString();
+
+  it('há quantos dias do calendário a carta chegou', () => {
+    expect(daysAgo(at(2026, 10, 27, 9), now)).toBe(0);
+    // Ontem à noite, há menos de 24 horas: já é "ontem".
+    expect(daysAgo(at(2026, 10, 26, 23), now)).toBe(1);
+    expect(daysAgo(at(2026, 10, 21, 8), now)).toBe(6);
+    // Relógio do navegador atrasado em relação ao servidor: nunca um número negativo.
+    expect(daysAgo(at(2026, 10, 28, 1), now)).toBe(0);
+    expect(daysAgo('sem data', now)).toBeNull();
+  });
+
+  it('as cartas da rota viram itens, na ordem em que vieram, sem a data dentro da carta', () => {
+    const card = (id: string, addedAt: string) => ({ id, name: id, category: 'character' as const, colors: ['red' as const], types: [], text: '', addedAt });
+    const tips = spoilerTips({ cards: [card('EB05-002', at(2026, 10, 27, 8)), card('EB05-001', at(2026, 10, 25, 8)), card('EB05-009', 'quebrada')] }, now);
+    expect(tips.map((t) => (t.kind === 'spoiler' ? [t.card.id, t.daysAgo] : null))).toEqual([
+      ['EB05-002', 0],
+      ['EB05-001', 2],
+    ]);
+    expect(tips[0].kind === 'spoiler' && 'addedAt' in tips[0].card).toBe(false);
+    expect(spoilerTips(null, now)).toEqual([]);
+  });
+});
+
 describe('cartão de dicas da espera: rotação', () => {
   const rules: WaitTip[] = RULE_TIPS.map((key) => ({ kind: 'rule', key }));
   const data: WaitTip[] = [
     { kind: 'meta', leaders: [] },
     { kind: 'deck', name: 'Luffy', games: 5, wins: 3, pct: 60 },
   ];
-  const run = (n: number, dataAt: (step: number) => readonly WaitTip[]) => {
+  const spoiler = (id: string): WaitTip => ({ kind: 'spoiler', card: { id, name: id, category: 'character', colors: ['red'], types: [], text: '' }, daysAgo: 0 });
+  const spoilers = [spoiler('EB05-001'), spoiler('EB05-002'), spoiler('EB05-003')];
+  const run = (n: number, dataAt: (step: number) => readonly WaitTip[], spoilersAt: (step: number) => readonly WaitTip[] = () => []) => {
     const out: Array<WaitTip | null> = [];
     let cursor = TIP_START;
     for (let i = 0; i < n; i++) {
-      const r = nextTip(cursor, rules, dataAt(i));
+      const r = nextTip(cursor, rules, dataAt(i), spoilersAt(i));
       cursor = r.cursor;
       out.push(r.tip);
     }
@@ -120,6 +148,32 @@ describe('cartão de dicas da espera: rotação', () => {
     const seen = run(7, (step) => (step >= 4 ? data : []));
     expect(seen.map((t) => t?.kind)).toEqual(['rule', 'rule', 'rule', 'rule', 'rule', 'meta', 'rule']);
     expect(seen.filter((t) => t?.kind === 'rule')).toEqual(rules.slice(0, 6));
+  });
+
+  it('spoilers novos se alternam com o resto, um de cada vez, e voltam ao primeiro', () => {
+    const seen = run(12, () => data, () => spoilers);
+    expect(seen.map((t) => t?.kind)).toEqual(['rule', 'spoiler', 'rule', 'spoiler', 'meta', 'spoiler', 'rule', 'spoiler', 'rule', 'spoiler', 'deck', 'spoiler']);
+    const cards = seen.flatMap((t) => (t?.kind === 'spoiler' ? [t.card.id] : []));
+    expect(cards).toEqual(['EB05-001', 'EB05-002', 'EB05-003', 'EB05-001', 'EB05-002', 'EB05-003']);
+    // O ciclo de regras e dados segue igual por baixo: nenhuma dica de regra é pulada.
+    expect(seen.filter((t) => t?.kind === 'rule')).toEqual(rules.slice(0, 4));
+  });
+
+  it('spoilers que chegam no meio da espera entram na vez seguinte', () => {
+    const seen = run(6, () => [], (step) => (step >= 2 ? spoilers : []));
+    expect(seen.map((t) => t?.kind)).toEqual(['rule', 'rule', 'rule', 'spoiler', 'rule', 'spoiler']);
+    expect(seen.filter((t) => t?.kind === 'rule')).toEqual(rules.slice(0, 4));
+  });
+
+  it('só spoilers: o cartão passa por eles', () => {
+    let cursor = TIP_START;
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const r = nextTip(cursor, [], [], spoilers);
+      cursor = r.cursor;
+      if (r.tip?.kind === 'spoiler') ids.push(r.tip.card.id);
+    }
+    expect(ids).toEqual(['EB05-001', 'EB05-002', 'EB05-003', 'EB05-001']);
   });
 
   it('sem nenhuma lista não há o que mostrar', () => {

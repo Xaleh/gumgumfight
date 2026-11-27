@@ -203,7 +203,7 @@ gumgumfight/
 ├── deploy/                      bootstrap-hostinger.sh, setup-vm.sh, remote-deploy.sh, ecosystem.config.cjs, HOSTINGER.md
 ├── e2e/                         testes de ponta a ponta (Playwright): playwright.config.ts, serve.ts (servidor com banco
 │                                temporário), support/ (textos pela chave do pt-BR, fixture de erros e de mais jogadores,
-│                                contas de teste no banco temporário, passos comuns, da fila online e do torneio),
+│                                contas de teste e spoilers novos no banco temporário, passos comuns, da fila online e do torneio),
 │                                *.spec.ts (bot, boosters, fila online, torneio)
 ├── scripts/build-release.sh     monta release/
 ├── docs/rules/                  base de regras (CR v1.2.1), interações, divergências do motor, mapeamento da DSL
@@ -810,6 +810,12 @@ O estado da fila mora na raiz do app, não na tela inicial: `MainApp` (`App.tsx`
   vez ao abrir o cartão: `GET /api/stats?days=7` (os 3 Líderes mais jogados) e `GET /api/stats?mine=1&leader=&opponent=human`
   (o histórico com o Líder do deck: o total a partir de 5 partidas, e o melhor e o pior confronto entre os que têm 3
   ou mais). Sem resposta, o cartão fica só com as dicas.
+- **Spoilers novos**: a terceira consulta do cartão é `GET /api/spoilers/recent` (as cartas ainda não lançadas que
+  entraram no banco nos últimos 7 dias, até 40, da mais nova para a mais antiga, com `addedAt`). Havendo alguma, o
+  `nextTip` alterna: um item do ciclo de dicas e dados, um spoiler, cada lista no seu contador. O item mostra a
+  miniatura (`StaticCard`), o nome e há quantos dias do calendário do jogador a carta chegou (`daysAgo`); tocar abre o
+  `StaticCardZoom`, e o temporizador para enquanto ele está aberto. A data vem de `cards.added_at` (seção 7): o feed de
+  spoilers não traz o dia da revelação, então vale o dia em que a carta entrou neste servidor.
 - **Mão de teste** (`components/WaitHandTest.tsx`): o `HandTestPanel` do construtor com o deck da espera
   (`GET /api/decks/:id`). Simulação local, sem relação com a mão da partida.
 - **Sala privada à espera** (`OnlineWaiting`, em `Online.tsx`): o mesmo cartão e, quando a sala foi aberta pela tela
@@ -912,7 +918,7 @@ baixadas quando tocam) + `public/`.
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
-| `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`. Índice `cards_set`. | importador, seed, sync de spoilers |
+| `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`, `added_at` (quando a carta entrou no banco pela primeira vez; as regravações não mexem nela, e é NULL nas cartas anteriores à coluna). Índice `cards_set`. | importador, seed, sync de spoilers; `added_at` é lida por `/api/spoilers/recent` |
 | `set_releases` | `set_code` | Coleções que viraram oficiais pela lista oficial da Bandai no dia do lançamento e que a optcgapi ainda não publicou: `source` (domínio da lista), `released_at` | `syncSpoilers` (entra quando a lista torna oficial, sai quando a API publica) |
 | `card_translations` | `(card_id, lang)` | `text`, `trigger` revisados à mão | seed (de `data/translations`) |
 | `card_engine_texts` | `card_id` | Texto para o motor: `text`, `trigger`, `base_key` (hash do texto oficial quando foi escrito; diferente = não vale), `author_id`, `author_name`, `updated_at` | `PUT/DELETE /api/dev/engine-texts/:id` |
@@ -2131,6 +2137,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/health` | Verificação de saúde | Pública |
 | GET | `/api/config` | Configurações públicas (imagens, Client ID do Google, chave das notificações, apoio) | Pública |
 | GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (por coleção) e uma carta | Pública |
+| GET | `/api/spoilers/recent` | Spoilers novos: `{ days: 7, cards }`, as cartas ainda não lançadas que entraram no banco nos últimos 7 dias (até 40, da mais nova para a mais antiga), cada uma com `addedAt` (ISO, UTC) | Pública |
 | GET | `/api/coverage` | Cobertura dos efeitos automatizados por coleção | Pública |
 | GET | `/api/translations/pending` | Cartas com tradução automática parcial | Pública |
 | GET | `/api/dev/card-gaps` | Lacunas do leitor: cartas ⚙ por coleção e por parte do leitor, ranking das frases que faltam (até 300) e o número de novas | Dev |

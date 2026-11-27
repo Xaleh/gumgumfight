@@ -402,3 +402,63 @@ describe('spoilers do optcgleaks', () => {
     expect(FEED_SOURCE).toBe('spoiler:feed:optcgleaks.com');
   });
 });
+
+describe('spoilers novos (/api/spoilers/recent)', () => {
+  const recent = async (db: DB) =>
+    (await buildApp(db, { server: { cardImages: true } }).inject('/api/spoilers/recent')).json() as { days: number; cards: Array<{ id: string; addedAt: string; imageUrl?: string }> };
+  const setAdded = (db: DB, id: string, when: string | null) =>
+    db.prepare(when === null ? 'UPDATE cards SET added_at = NULL WHERE id = ?' : `UPDATE cards SET added_at = datetime('now', '${when}') WHERE id = ?`).run(id);
+
+  it('só os spoilers dos últimos 7 dias, do mais novo para o mais antigo', async () => {
+    const { db, dir } = setup();
+    seedSpoilers(db, dir);
+    setAdded(db, 'OP18-001', '-2 days');
+    setAdded(db, 'OP18-022', '-1 hours');
+    // Fora da janela.
+    setAdded(db, 'EB05-001', '-8 days');
+    const r = await recent(db);
+    expect(r.days).toBe(7);
+    expect(r.cards.map((c) => c.id)).toEqual(['OP18-022', 'OP18-001']);
+    expect(r.cards[1].imageUrl).toBe('https://leaks.test/OP18-001.webp');
+    // A data vai em ISO (UTC), para o navegador dizer "hoje", "ontem" ou há quantos dias.
+    expect(r.cards[0].addedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect(Date.now() - Date.parse(r.cards[0].addedAt)).toBeLessThan(2 * 3600_000);
+  });
+
+  it('regravar a carta (nova rodada do feed) não a deixa "nova" de novo', async () => {
+    const { db, dir } = setup();
+    seedSpoilers(db, dir);
+    for (const id of ['OP18-001', 'OP18-022', 'EB05-001']) setAdded(db, id, '-10 days');
+    seedSpoilers(db, dir);
+    expect((await recent(db)).cards).toEqual([]);
+  });
+
+  it('carta sem data (já estava no banco antes da coluna) e carta que virou oficial ficam de fora', async () => {
+    const { db, dir } = setup();
+    seedSpoilers(db, dir);
+    setAdded(db, 'OP18-022', null);
+    upsertCards(db, [{ id: 'EB05-001', name: 'Nami', category: 'leader', colors: ['blue'], life: 5, power: 5000, types: [], text: '', set: 'EB05' }], {
+      provisional: false,
+      source: 'api:test',
+    });
+    expect((await recent(db)).cards.map((c) => c.id)).toEqual(['OP18-001']);
+    // Carta oficial nova não é spoiler.
+    upsertCards(db, [{ id: 'OP01-001', name: 'Zoro', category: 'leader', colors: ['red'], life: 5, power: 5000, types: [], text: '', set: 'OP01' }], {
+      provisional: false,
+      source: 'api:test',
+    });
+    expect((await recent(db)).cards.map((c) => c.id)).toEqual(['OP18-001']);
+  });
+
+  it('banco antigo: a coluna entra pela migração, sem data para as cartas que já existiam', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'spoilers-db-')), 'old.db');
+    const old = openDb(file);
+    const { dir } = setup();
+    seedSpoilers(old, dir);
+    old.exec('ALTER TABLE cards DROP COLUMN added_at');
+    old.close();
+    const db = openDb(file);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM cards WHERE added_at IS NOT NULL').get()).toEqual({ n: 0 });
+    expect(pendingSpoilers(db).length).toBe(3);
+  });
+});

@@ -699,6 +699,11 @@ está na fila e os espectadores também contam.
 - **Cartão de dicas**: gira a cada 9 s (ou pelo botão) entre dicas de regra, os Líderes mais jogados da semana e o
   histórico do jogador com o Líder do deck (vitórias contra outras pessoas, o melhor e o pior confronto, quando há
   partidas suficientes).
+- **Spoilers novos**: quando chegaram cartas de spoiler nos últimos 7 dias, o cartão alterna entre elas e o resto (um
+  item sim, um não), da mais nova para a mais antiga, com a miniatura, o nome e "Chegou hoje / ontem / há N dias".
+  Tocar na carta abre o texto ampliado, e o cartão espera enquanto ela está aberta. A data é a de quando a carta
+  entrou no banco deste servidor (o site de spoilers não informa o dia da revelação); as cartas que já estavam no
+  banco antes dessa data existir não aparecem, e a que vira oficial sai da lista.
 - **Mão de teste** com o deck da fila: a mesma do construtor (sortear, mulligan, comprar e as chances), sem sair da busca.
 
 A **sala privada** à espera do oponente ganhou o mesmo cartão de dicas e a mão de teste do deck com que a sala foi
@@ -1779,7 +1784,7 @@ de 2 minutos), desistir pelo menu da mesa, abrir os boosters do Selado e as part
 **Partida rápida** (fila, a mão do oponente escondida, o turno passando de um para o outro, recarregar a página no meio
 e voltar para a mesma sala, desistência), na **espera pela fila** (o cartão de dicas, a mão de teste, a busca
 minimizada que segue para as estatísticas, a pergunta "Sair da fila?" ao abrir o construtor e a partida que chega
-com o jogador em outra tela) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe), e
+com o jogador em outra tela, e os spoilers novos alternando com as dicas e abrindo ampliados) e na **Ranqueada** com duas contas de teste (o bounty de quem vence sobe), e
 um **torneio** do começo ao fim (o organizador cria, os jogadores se inscrevem pelo link de convite, a rodada abre, a
 partida é jogada na sala do torneio, o resultado entra sozinho e o torneio termina com a classificação). A mesa também
 é testada com o mouse e o teclado (`e2e/table.spec.ts`): arrastar um DON!! até o Líder e de volta, segurar o clique numa

@@ -1,8 +1,9 @@
-// O que o cartão de dicas mostra enquanto o jogador espera um oponente (fila ou sala privada): dicas de regra
-// e, quando há números, o meta da semana e o histórico do jogador com o Líder do deck. Só a escolha e a ordem
-// ficam aqui (sem React), para os testes; a tela é `components/WaitTips.tsx`.
+// O que o cartão de dicas mostra enquanto o jogador espera um oponente (fila ou sala privada): dicas de regra,
+// quando há números, o meta da semana e o histórico do jogador com o Líder do deck, e os spoilers que chegaram nos
+// últimos dias, um de cada vez. Só a escolha e a ordem ficam aqui (sem React), para os testes; a tela é
+// `components/WaitTips.tsx`.
 
-import type { StatsOverview } from './api';
+import type { ApiCard, StatsOverview } from './api';
 import type { MessageKey } from './i18n';
 
 /** Dicas de regra (chaves do dicionário `i18n/wait`). */
@@ -29,7 +30,9 @@ export type WaitTip =
   /** Vitórias do jogador com o Líder do deck, contra outras pessoas. */
   | { kind: 'deck'; name: string; games: number; wins: number; pct: number }
   /** Melhor (`best`) ou pior confronto do jogador com o Líder do deck. */
-  | { kind: 'matchup'; best: boolean; name: string; opp: string; games: number; pct: number };
+  | { kind: 'matchup'; best: boolean; name: string; opp: string; games: number; pct: number }
+  /** Spoiler novo: a carta e há quantos dias chegou (0 = hoje, pelo calendário do jogador). */
+  | { kind: 'spoiler'; card: ApiCard; daysAgo: number };
 
 /** Líderes mostrados no meta da semana. */
 const META_TOP = 3;
@@ -76,6 +79,24 @@ export function deckTips(stats: Pick<StatsOverview, 'summary' | 'matchups' | 'ca
   return out;
 }
 
+/** Há quantos dias do calendário local foi `iso` (0 = hoje, 1 = ontem); null se a data não se lê. */
+export function daysAgo(iso: string, now: Date = new Date()): number | null {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return null;
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.max(0, Math.round((midnight(now) - midnight(then)) / 86_400_000));
+}
+
+/** Os spoilers novos (`GET /api/spoilers/recent`, já do mais novo para o mais antigo) como itens do cartão. */
+export function spoilerTips(recent: { cards: Array<ApiCard & { addedAt: string }> } | null, now: Date = new Date()): WaitTip[] {
+  const out: WaitTip[] = [];
+  for (const { addedAt, ...card } of recent?.cards ?? []) {
+    const days = daysAgo(addedAt, now);
+    if (days !== null) out.push({ kind: 'spoiler', card, daysAgo: days });
+  }
+  return out;
+}
+
 /** Embaralha com semente (mulberry32 + Fisher-Yates): a ordem das dicas muda a cada espera. */
 export function shuffled<T>(list: readonly T[], seed: number): T[] {
   let s = seed >>> 0;
@@ -94,29 +115,40 @@ export function shuffled<T>(list: readonly T[], seed: number): T[] {
   return out;
 }
 
-/** Onde a rotação está: quantos itens já saíram de cada lista. */
+/** Onde a rotação está: quantos itens já saíram ao todo (`step`), fora os spoilers (`base`) e de cada lista. */
 export interface TipCursor {
   step: number;
+  base: number;
   rule: number;
   data: number;
+  spoiler: number;
 }
 
-export const TIP_START: TipCursor = { step: 0, rule: 0, data: 0 };
+export const TIP_START: TipCursor = { step: 0, base: 0, rule: 0, data: 0, spoiler: 0 };
 
 /** A cada quantos itens entra um de dados (meta, histórico), quando há algum. */
 const DATA_EVERY = 3;
 
 /**
  * O próximo item da rotação: duas dicas de regra e um item de dados, em ciclo. Sem dados (ainda carregando, ou
- * o jogador não tem histórico), só dicas. Cada lista anda no seu contador, então os dados que chegam no meio
- * da espera entram sem repetir nem pular dica.
+ * o jogador não tem histórico), só dicas. Com spoilers novos, eles se alternam com esse ciclo: um item sim, um
+ * não, um spoiler de cada vez. Cada lista anda no seu contador, então o que chega no meio da espera entra sem
+ * repetir nem pular dica.
  */
-export function nextTip(cursor: TipCursor, rules: readonly WaitTip[], data: readonly WaitTip[]): { tip: WaitTip | null; cursor: TipCursor } {
+export function nextTip(
+  cursor: TipCursor,
+  rules: readonly WaitTip[],
+  data: readonly WaitTip[],
+  spoilers: readonly WaitTip[] = [],
+): { tip: WaitTip | null; cursor: TipCursor } {
   const step = cursor.step + 1;
-  const wantsData = step % DATA_EVERY === 0;
-  if (data.length && (wantsData || !rules.length)) {
-    return { tip: data[cursor.data % data.length], cursor: { step, rule: cursor.rule, data: cursor.data + 1 } };
+  if (spoilers.length && (step % 2 === 0 || (!rules.length && !data.length))) {
+    return { tip: spoilers[cursor.spoiler % spoilers.length], cursor: { ...cursor, step, spoiler: cursor.spoiler + 1 } };
   }
-  if (!rules.length) return { tip: null, cursor: { ...cursor, step } };
-  return { tip: rules[cursor.rule % rules.length], cursor: { step, rule: cursor.rule + 1, data: cursor.data } };
+  const base = cursor.base + 1;
+  if (data.length && (base % DATA_EVERY === 0 || !rules.length)) {
+    return { tip: data[cursor.data % data.length], cursor: { ...cursor, step, base, data: cursor.data + 1 } };
+  }
+  if (!rules.length) return { tip: null, cursor: { ...cursor, step, base } };
+  return { tip: rules[cursor.rule % rules.length], cursor: { ...cursor, step, base, rule: cursor.rule + 1 } };
 }

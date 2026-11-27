@@ -54,7 +54,8 @@ export function QueueDock({ queue, screen, onCancel }: { queue: QueueState; scre
   }, [screen]);
   useEffect(() => {
     if (view !== 'wait') return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && minimize();
+    // Com uma carta ampliada aberta (o spoiler do cartão de dicas), o Esc fecha só ela.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.zoom-backdrop') && minimize();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [view, minimize]);

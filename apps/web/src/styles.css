@@ -8125,6 +8125,40 @@ tr.clickable:hover td {
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
+/* Spoiler novo: a carta à esquerda (abre ampliada ao toque) e o nome ao lado. */
+.wait-tip.spoiler {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wait-tip-card {
+  --cw: 54px;
+  --ch: calc(var(--cw) * 1.396);
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: zoom-in;
+}
+.wait-tip-card:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.wait-tip-text {
+  min-width: 0;
+}
+.wait-tip-name {
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.wait-tip-name small {
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .wait-tip-next {
   flex: none;
   display: grid;

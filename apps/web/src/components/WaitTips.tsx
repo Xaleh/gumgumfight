@@ -1,14 +1,18 @@
-// Cartão "enquanto você espera" (fila e sala privada): dicas de regra e, quando há números, o meta da semana e o
-// histórico do jogador com o Líder do deck. A escolha e a ordem são de `waitTips.ts`.
+// Cartão "enquanto você espera" (fila e sala privada): dicas de regra, quando há números, o meta da semana e o
+// histórico do jogador com o Líder do deck, e os spoilers que chegaram nos últimos 7 dias, alternando com o resto
+// (a carta abre ampliada ao toque). A escolha e a ordem são de `waitTips.ts`.
 //
 // Animações (a opção do jogador): em `full` e `soft` o cartão troca sozinho, com uma entrada curta; a barrinha do
 // tempo, que se repete, só existe em `full`; em `off` nada troca sozinho, e o jogador avança pelo botão.
 
+import type { CardData } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type StatsOverview } from '../api';
+import { type ApiCard, api, type StatsOverview } from '../api';
 import { type Translate, useT } from '../i18n';
 import { useSettings } from '../settings';
-import { deckTips, metaTip, nextTip, RULE_TIPS, shuffled, TIP_START, type WaitTip } from '../waitTips';
+import { deckTips, metaTip, nextTip, RULE_TIPS, shuffled, spoilerTips, TIP_START, type WaitTip } from '../waitTips';
+import { StaticCardZoom } from './CardInfo';
+import { StaticCard } from './CardView';
 import { Icon } from './Icons';
 
 /** Quanto tempo cada item fica na tela. */
@@ -27,6 +31,10 @@ function tipText(t: Translate, tip: WaitTip): { kicker: string; text: string } {
         kicker: t('wait.kickerDeck'),
         text: t(tip.best ? 'wait.matchupBest' : 'wait.matchupWorst', { name: tip.name, opp: tip.opp, games: tip.games, pct: tip.pct }),
       };
+    case 'spoiler': {
+      const when = tip.daysAgo === 0 ? t('wait.spoilerToday') : tip.daysAgo === 1 ? t('wait.spoilerYesterday') : t('wait.spoilerDays', { n: tip.daysAgo });
+      return { kicker: t('wait.kickerSpoiler'), text: `${when} ${t('wait.spoilerOpen')}` };
+    }
   }
 }
 
@@ -36,11 +44,16 @@ export function WaitTips({ leader }: { leader?: string | null }) {
   const { animations } = useSettings();
   const [meta, setMeta] = useState<StatsOverview | null>(null);
   const [mine, setMine] = useState<StatsOverview | null>(null);
+  const [recent, setRecent] = useState<{ cards: Array<ApiCard & { addedAt: string }> } | null>(null);
   useEffect(() => {
     let stop = false;
     // Sem rede ou sem estatísticas: o cartão fica só com as dicas.
     api.stats({ days: '7' }).then(
       (s) => !stop && setMeta(s),
+      () => undefined,
+    );
+    api.recentSpoilers().then(
+      (r) => !stop && setRecent(r),
       () => undefined,
     );
     return () => {
@@ -65,31 +78,50 @@ export function WaitTips({ leader }: { leader?: string | null }) {
     const top = metaTip(meta);
     return [...(leader ? deckTips(mine, leader) : []), ...(top ? [top] : [])];
   }, [meta, mine, leader]);
+  const spoilers = useMemo(() => spoilerTips(recent), [recent]);
   // O avanço lê os dados mais novos sem recriar o temporizador a cada resposta do servidor.
-  const latest = useRef(data);
-  latest.current = data;
+  const latest = useRef({ data, spoilers });
+  latest.current = { data, spoilers };
 
   const [shown, setShown] = useState(() => nextTip(TIP_START, rules, []));
-  const advance = useCallback(() => setShown((s) => nextTip(s.cursor, rules, latest.current)), [rules]);
+  const advance = useCallback(() => setShown((s) => nextTip(s.cursor, rules, latest.current.data, latest.current.spoilers)), [rules]);
   const step = shown.cursor.step;
+  /** Carta de spoiler aberta (ampliada): enquanto o jogador lê, o cartão não troca. */
+  const [zoom, setZoom] = useState<CardData | null>(null);
+  const closeZoom = useCallback(() => setZoom(null), []);
+  const paused = animations === 'off' || zoom !== null;
   useEffect(() => {
-    if (animations === 'off') return;
+    if (paused) return;
     const timer = setTimeout(advance, TIP_MS);
     return () => clearTimeout(timer);
-  }, [step, animations, advance]);
+  }, [step, paused, advance]);
 
-  if (!shown.tip) return null;
-  const { kicker, text } = tipText(t, shown.tip);
+  const tip = shown.tip;
+  if (!tip) return null;
+  const { kicker, text } = tipText(t, tip);
   return (
     <section className={`wait-tips anim-${animations}`} aria-label={t('wait.tipsLabel')}>
-      <div className="wait-tip" key={step}>
-        <span className="wait-tip-kicker">{kicker}</span>
-        <p>{text}</p>
+      <div className={tip.kind === 'spoiler' ? 'wait-tip spoiler' : 'wait-tip'} key={step}>
+        {tip.kind === 'spoiler' && (
+          <button type="button" className="wait-tip-card" onClick={() => setZoom(tip.card)} aria-label={t('wait.spoilerView', { name: tip.card.name })}>
+            <StaticCard card={tip.card} />
+          </button>
+        )}
+        <div className="wait-tip-text">
+          <span className="wait-tip-kicker">{kicker}</span>
+          {tip.kind === 'spoiler' && (
+            <strong className="wait-tip-name">
+              {tip.card.name} <small>{tip.card.id}</small>
+            </strong>
+          )}
+          <p>{text}</p>
+        </div>
       </div>
       <button type="button" className="wait-tip-next" onClick={advance} aria-label={t('wait.next')} title={t('wait.next')}>
         <Icon name="chevron" size={16} />
       </button>
-      {animations === 'full' && <i className="wait-tip-timer" key={`timer-${step}`} style={{ animationDuration: `${TIP_MS}ms` }} />}
+      {animations === 'full' && !zoom && <i className="wait-tip-timer" key={`timer-${step}`} style={{ animationDuration: `${TIP_MS}ms` }} />}
+      {zoom && <StaticCardZoom card={zoom} className="dk-zoom" onClose={closeZoom} />}
     </section>
   );
 }
