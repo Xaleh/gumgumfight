@@ -532,7 +532,8 @@ que quatro capitães jogam cada um por si e vence o último de pé. As regras se
 [`docs/regras-yonko.md`](docs/regras-yonko.md). Há duas formas de jogar, e nenhuma entra nas estatísticas:
 
 - **Mesa online (com amigos):** quem cria recebe um **código de 6 letras** e um link de convite (`/?yonko=CÓDIGO`)
-  para até três pessoas. Na sala de espera cada um escolhe o deck e marca **"Estou pronto"**; quem criou a mesa
+  para até três pessoas, e com login chama os amigos do jogo pelo painel **Chamar amigos** (veja
+  [Amigos e convite direto](#amigos-e-convite-direto)). Na sala de espera cada um escolhe o deck e marca **"Estou pronto"**; quem criou a mesa
   põe **bots** nos lugares vagos, tira alguém (ou um bot) da mesa, muda as regras e começa quando houver 3 ou 4
   lugares ocupados e todos estiverem prontos. Cada jogador tem **25 minutos** para a partida inteira, e o relógio
   só corre nas decisões dele. Quem fica sem tempo, ou **2 minutos desconectado** na própria decisão, sai da mesa e
@@ -735,15 +736,25 @@ Com login Google, o item **Amigos** do menu abre a lista de amigos:
   Quem recebe o código digita em **Adicionar pelo código**; o outro lado vê o pedido em **Pedidos recebidos** e
   aceita ou recusa. Quem pediu pode cancelar, e qualquer um dos dois remove a amizade quando quiser. Se os dois
   pedirem, a amizade vale na hora. Até 200 amigos por conta e 30 pedidos por hora (o código não dá para ser varrido).
-- **Quem está online:** cada amigo aparece como **Jogando** (numa partida online ou num treino transmitido),
-  **Online** (com o app aberto no menu ou na lista de amigos, numa sala de espera ou na fila) ou **Offline**. Só
+- **Quem está online:** cada amigo aparece como **Jogando** (numa partida online, num treino transmitido ou numa
+  mesa do Yonko), **Online** (com o app aberto no menu ou na lista de amigos, numa sala de espera ou na fila) ou
+  **Offline**. Só
   amigos aceitos veem o status, e nunca qual partida nem o código da sala. O nome mostrado é o apelido do jogador,
   nunca o da conta Google.
-- **Convidar com um toque:** **Convidar** cria uma sala privada com o deck equipado e as regras da Sala privada, leva
-  você para a sala de espera e avisa o amigo por notificação. Tocar no aviso (`/?convite=CÓDIGO`) abre o app e entra
-  direto na sala com o deck equipado (com a confirmação do deck, se ela estiver ligada nas Configurações). Com o app
-  aberto, o convite aparece como faixa na tela inicial, com **Entrar** e **Recusar**. O convite vale enquanto a sala
-  espera (no máximo 30 min) e dá para repetir a cada 15 s.
+- **Convidar escolhendo o formato:** **Convidar** abre os formatos embaixo do amigo: **1 contra 1** nas regras da
+  Sala privada como estão escolhidas nela, em cada formato (Standard, Extra Grand Battle, All Blue) e no Livre, ou
+  **Yonko · mesa de 4**. Cada opção diz com qual deck você vai; a que o deck equipado não vale fica apagada, com o
+  motivo. O 1 contra 1 cria uma sala privada com o deck equipado, leva você para a sala de espera e avisa o amigo por
+  notificação. Tocar no aviso (`/?convite=CÓDIGO`) abre o app e entra direto na sala com o deck equipado (com a
+  confirmação do deck, se ela estiver ligada nas Configurações). Com o app aberto, o convite aparece como faixa na
+  tela inicial, com **Entrar** e **Recusar**. O convite vale enquanto a sala espera (no máximo 30 min) e dá para
+  repetir a cada 15 s.
+- **Convite para o Yonko:** a opção **Yonko** abre uma mesa online com o deck e as regras da sua última mesa (ou
+  usa a mesa em que você já espera) e avisa o amigo. Na sala de espera, o painel **Chamar amigos** lista os amigos
+  com o status e um botão **Convidar** para cada um, sem sair da mesa: qualquer pessoa sentada chama os amigos dela,
+  não só quem criou. Quem recebe toca no aviso (`/?yonko=CÓDIGO&convite=1`) ou em **Entrar** na faixa e senta direto
+  na mesa com o deck do Yonko dele; lá dá para trocar o deck antes de marcar "Estou pronto". O convite vale enquanto
+  a mesa espera com lugar vago.
 - O item **Amigos** mostra quantos pedidos e convites estão esperando. Código: `apps/server/src/friends/` e
   `apps/web/src/components/Friends.tsx`.
 

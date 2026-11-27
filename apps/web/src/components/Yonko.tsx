@@ -21,7 +21,8 @@ const SEATS = 4;
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-function savedRules(): TableRules {
+/** As regras da mesa guardadas neste navegador (as da última vez na entrada do Yonko). */
+export function savedRules(): TableRules {
   try {
     const r = JSON.parse(localStorage.getItem(RULES_KEY) ?? 'null') as TableRules | null;
     if (r && typeof r === 'object') {
@@ -38,11 +39,27 @@ function savedRules(): TableRules {
 }
 
 /** Só os campos ligados (o motor trata a ausência como desligado). */
-const compactRules = (r: TableRules): TableRules => ({
+export const compactRules = (r: TableRules): TableRules => ({
   ...(r.extraLife ? { extraLife: r.extraLife } : {}),
   ...(r.curveChoice ? { curveChoice: true } : {}),
   ...(r.eliminationDraw ? { eliminationDraw: r.eliminationDraw } : {}),
 });
+
+/** O deck guardado neste navegador para o Yonko (o da última mesa). */
+export function savedDeckId(): string {
+  try {
+    return localStorage.getItem(DECK_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** O deck de quem joga: o escolhido se servir; senão um deck de 60 próprio, um próprio completo ou um pronto. */
+export const yonkoDeckOf = (decks: DeckSummary[] | null | undefined, deckId: string): DeckSummary | undefined =>
+  decks?.find((d) => d.id === deckId && usableForYonko(d)) ??
+  decks?.find((d) => d.mine && yonkoLegal(d)) ??
+  decks?.find((d) => d.mine && usableForYonko(d)) ??
+  decks?.find((d) => d.kind === 'builtin' && usableForYonko(d) && !d.allBlue);
 
 /** Sorteia `n` decks prontos para os bots, com Líderes diferentes entre si (e do de quem joga) enquanto der. */
 function drawBotDecks(decks: DeckSummary[], mine: DeckSummary | undefined, n: number): DeckSummary[] {
@@ -83,13 +100,7 @@ export function Yonko({
   const { user } = useAuth();
   const [decks, setDecks] = useState<DeckSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [deckId, setDeckId] = useState<string>(() => {
-    try {
-      return again?.deckIds[0] ?? localStorage.getItem(DECK_KEY) ?? '';
-    } catch {
-      return '';
-    }
-  });
+  const [deckId, setDeckId] = useState<string>(() => again?.deckIds[0] ?? savedDeckId());
   const [rules, setRules] = useState<TableRules>(savedRules);
   const [bots, setBots] = useState<DeckSummary[]>([]);
   const [picking, setPicking] = useState(false);
@@ -108,14 +119,7 @@ export function Yonko({
       .catch(() => undefined);
   }, []);
 
-  const mine = useMemo(
-    () =>
-      decks?.find((d) => d.id === deckId && usableForYonko(d)) ??
-      decks?.find((d) => d.mine && yonkoLegal(d)) ??
-      decks?.find((d) => d.mine && usableForYonko(d)) ??
-      decks?.find((d) => d.kind === 'builtin' && usableForYonko(d) && !d.allBlue),
-    [decks, deckId],
-  );
+  const mine = useMemo(() => yonkoDeckOf(decks, deckId), [decks, deckId]);
   // Os decks dos bots da mesa local: sorteados ao abrir e quando o Líder de quem joga muda.
   useEffect(() => {
     if (decks) setBots(drawBotDecks(decks, mine, SEATS - 1));

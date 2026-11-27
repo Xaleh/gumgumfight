@@ -1,5 +1,5 @@
-import { type BotLevel, type BotPersonality, cardLegality, FORMATS, hasRanked, isFormat, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
-import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
+import { type BotLevel, type BotPersonality, cardLegality, FORMATS, hasRanked, isFormat, PLAY_FORMATS, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
+import { type ReactNode, type Ref, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type ActiveRoom,
   api,
@@ -16,6 +16,7 @@ import {
   type TournamentMine,
   type WatchTarget,
   whyNotPlayable,
+  type YonkoSeatRef,
 } from '../api';
 import jollyRoger from '../assets/jolly-roger.svg';
 import { useAuth } from '../auth';
@@ -34,7 +35,8 @@ import { DeckConfirm } from './DeckConfirm';
 import { DeckPicker, RANDOM_DECK } from './DeckPicker';
 import { useFavoriteToggle } from './DeckTile';
 import { LeaderPicker, QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
-import { type FriendLink, FriendInvites, friendsBadge, FriendsSheet, useFriends } from './Friends';
+import { type FriendLink, FriendInvites, friendsBadge, FriendsSheet, type InviteOption, useFriends } from './Friends';
+import { compactRules, savedDeckId, savedRules as savedYonkoRules, yonkoDeckOf } from './Yonko';
 import { ReplayLoader } from './ReplayLoader';
 import { SupportersList, SupportModal } from './Support';
 import { SponsorsStrip } from './Tournaments';
@@ -315,6 +317,7 @@ export function Menu({
   onSealed,
   onDraft,
   onYonko,
+  onYonkoOnline,
   dev = false,
   friendLink,
 }: {
@@ -347,8 +350,10 @@ export function Menu({
   onSealed: () => void;
   /** Abre a entrada do Draft (pods de coleção, Pack Rush ou Cubo). */
   onDraft: () => void;
-  /** Abre a sala do Yonko (mesa de todos contra todos). */
-  onYonko: () => void;
+  /** Abre a sala do Yonko (mesa de todos contra todos); `code`: com o código de uma mesa já preenchido. */
+  onYonko: (code?: string) => void;
+  /** Vai para uma mesa online do Yonko (convite de amigo: a mesa que criei ou em que acabei de sentar). */
+  onYonkoOnline: (seat: YonkoSeatRef) => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
   /** Endereço dos amigos (link para adicionar, aviso de pedido ou de convite): ver Friends.tsx. */
@@ -370,6 +375,8 @@ export function Menu({
   const [showFriends, setShowFriends] = useState<{ code?: string; linked?: boolean } | null>(null);
   /** Convite de amigo à espera dos decks carregarem para entrar na sala. */
   const [pendingInvite, setPendingInvite] = useState<string | null>(null);
+  /** O mesmo para o convite de uma mesa do Yonko. */
+  const [pendingYonko, setPendingYonko] = useState<string | null>(null);
   const friends = useFriends(Boolean(user));
   const [deck0, setDeck0] = useState('');
   const [deck1, setDeck1] = useState('');
@@ -710,12 +717,53 @@ export function Menu({
     }
     void run(async () => onOnline(await api.online.joinRoom(room, deck0)));
   };
+  /** O deck que vai para a mesa do Yonko num convite: o da última mesa, ou o primeiro que servir. */
+  const yonkoDeck = useMemo(() => yonkoDeckOf(decks, savedDeckId()), [decks]);
+  /**
+   * Convite para uma mesa do Yonko: senta direto com o deck do Yonko. Não passa pela confirmação do deck: a sala
+   * de espera mostra o deck, deixa trocar, e a partida só começa depois do "Estou pronto".
+   */
+  const joinYonko = (table: string) => {
+    setShowFriends(null);
+    if (!yonkoDeck) return onYonko(table);
+    void run(async () => onYonkoOnline(await api.yonko.join(table, yonkoDeck.id)));
+  };
   /** Por que o botão Convidar está desligado (null: dá para convidar). */
-  const inviteBlocked = playing ? t('menu.playingOnline') : !privateDeck ? t('friends.inviteNeedsDeck') : null;
-  /** Convidar um amigo: sala privada com o deck equipado e as regras da Sala privada, e o aviso para ele. */
-  const inviteFriend = async (friend: { id: string }) => {
-    if (!privateDeck) return;
-    const r = await api.online.createRoom(privateDeck.id, privateMode, false);
+  const inviteBlocked = playing ? t('menu.playingOnline') : null;
+  /**
+   * 1 contra 1: as regras da Sala privada como estão escolhidas nela e, depois, cada formato puro e o Livre.
+   * O deck equipado precisa valer no formato.
+   */
+  const duelModes = [privateMode, ...PLAY_FORMATS.map((f) => playMode(f, false))].filter(
+    (m, i, all) => all.findIndex((x) => x.format === m.format && x.spoilers === m.spoilers) === i,
+  );
+  const inviteOptions: InviteOption[] = [
+    ...duelModes.map((m, i) => ({
+      key: `duel:${i}`,
+      label: t('friends.inviteDuel', { format: modeLabel(m) }),
+      deck: d0?.name,
+      blocked: playsIn(d0, m) ? null : !d0 ? t('menu.pickDeck') : (whyNotPlayable(d0, m.format, spoilerRule(m))?.split('\n')[0] ?? t('menu.deckNotValidIn', { format: modeLabel(m) })),
+    })),
+    { key: 'yonko', label: t('friends.inviteYonko'), deck: yonkoDeck?.name, blocked: yonkoDeck ? null : t('yonko.noDeck') },
+  ];
+  /**
+   * Convidar um amigo no formato escolhido. 1 contra 1: sala privada com o deck equipado nas regras do formato.
+   * Yonko: a mesa em que já espero (ou uma nova, com o deck e as regras da última vez). Depois, o aviso para ele.
+   */
+  const inviteFriend = async (friend: { id: string }, option: string) => {
+    if (option === 'yonko') {
+      if (!yonkoDeck) return;
+      const open = (await api.yonko.active().catch(() => [])).find((a) => a.status === 'waiting');
+      const seat = open ?? (await api.yonko.create(yonkoDeck.id, compactRules(savedYonkoRules())));
+      // A mesa já existe: mesmo se o aviso falhar, a pessoa vai para ela (lá dá para chamar de novo).
+      await api.friends.inviteYonko(friend.id, seat).catch(() => undefined);
+      setShowFriends(null);
+      onYonkoOnline(seat);
+      return;
+    }
+    const mode = duelModes[Number(option.slice('duel:'.length))];
+    if (!mode || !playsIn(d0, mode)) return;
+    const r = await api.online.createRoom(d0.id, mode, false);
     const seat = { roomId: r.roomId, token: r.token };
     // A sala já existe: mesmo se o aviso falhar, a pessoa vai para ela (o código continua lá para mandar).
     await api.friends.invite(friend.id, seat).catch(() => undefined);
@@ -726,12 +774,18 @@ export function Menu({
     if (!friendLink) return;
     if (friendLink.open || friendLink.add) setShowFriends({ code: friendLink.add, linked: Boolean(friendLink.add) });
     if (friendLink.invite) setPendingInvite(friendLink.invite);
+    if (friendLink.yonko) setPendingYonko(friendLink.yonko);
   }, [friendLink?.at]);
   useEffect(() => {
     if (!pendingInvite || !decks.length || !deck0) return;
     setPendingInvite(null);
     joinInvite(pendingInvite);
   }, [pendingInvite, decks.length, deck0]);
+  useEffect(() => {
+    if (!pendingYonko || !decks.length) return;
+    setPendingYonko(null);
+    joinYonko(pendingYonko);
+  }, [pendingYonko, decks.length]);
 
   const queueLive = (kind: QueueKind) =>
     stats ? <Live>{t('menu.queueLive', { n: stats.playing[kind], q: stats.queue[kind][format] })}</Live> : <Live off>{t('menu.counting')}</Live>;
@@ -840,7 +894,7 @@ export function Menu({
         {!playing && friends.data && friends.data.invites.length > 0 && (
           <FriendInvites
             invites={friends.data.invites}
-            onJoin={joinInvite}
+            onJoin={(i) => (i.kind === 'yonko' ? joinYonko(i.code) : joinInvite(i.code))}
             onDecline={(room) => void api.friends.declineInvite(room).then(friends.refresh, () => undefined)}
           />
         )}
@@ -1188,7 +1242,7 @@ export function Menu({
               chips={[t('yonko.homeChipPlayers'), t('yonko.homeChipDeck'), t('yonko.homeChipBots')]}
               live={null}
               action={t('yonko.homeAction')}
-              onAction={onYonko}
+              onAction={() => onYonko()}
             />
           </div>
         </section>
@@ -1230,6 +1284,7 @@ export function Menu({
           refresh={friends.refresh}
           initialCode={showFriends.code}
           linked={showFriends.linked}
+          inviteOptions={inviteOptions}
           onInvite={inviteFriend}
           inviteBlocked={inviteBlocked}
           onClose={() => setShowFriends(null)}

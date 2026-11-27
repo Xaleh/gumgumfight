@@ -147,6 +147,17 @@ export class YonkoTables {
     return out;
   }
 
+  /** Status de uma pessoa nas mesas, para os amigos dela: jogando uma partida, numa sala de espera, ou em nenhuma (null). */
+  presenceOf(ownerHash: string | null, userId: string | null): 'playing' | 'online' | null {
+    let online = false;
+    for (const t of this.tables.values()) {
+      const at = t.presenceOf(ownerHash, userId);
+      if (at === 'playing') return at;
+      online ||= at === 'online';
+    }
+    return online ? 'online' : null;
+  }
+
   /** Fecha as mesas esquecidas: espera ou fim sem ninguém conectado, e partidas paradas há horas. */
   sweep() {
     const now = (this.deps.now ?? Date.now)();

@@ -1,12 +1,15 @@
 // Amigos (roadmap E2): a folha "Amigos" (meu código, adicionar pelo código, pedidos recebidos e
-// enviados, a lista com quem está online e o botão Convidar) e a faixa de convite na tela inicial.
+// enviados, a lista com quem está online e o botão Convidar, que deixa escolher o formato: 1 contra 1
+// em cada formato ou a mesa do Yonko), a faixa de convite na tela inicial e o painel "Chamar amigos"
+// da sala de espera do Yonko.
 //
-// O servidor guarda tudo (`/api/friends`): o status de cada amigo vem da presença que o lobby já
-// conhece, e o convite leva o código da sala privada só para o amigo convidado. Os endereços
-// (`/?amigo=`, `/?amigos=1`, `/?convite=`) ficam em friendLink.ts.
+// O servidor guarda tudo (`/api/friends`): o status de cada amigo vem da presença que o lobby e as
+// mesas do Yonko já conhecem, e o convite leva o código da sala privada (ou da mesa) só para o amigo
+// convidado. Os endereços (`/?amigo=`, `/?amigos=1`, `/?convite=`) ficam em friendLink.ts.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, type FriendInvite, type FriendList, type FriendPresence } from '../api';
+import { useAuth } from '../auth';
 import { type MessageKey, useT } from '../i18n';
 import { poll } from '../poll';
 import { friendLink } from '../friendLink';
@@ -59,7 +62,7 @@ const STATUS_KEY: Record<FriendPresence, MessageKey> = {
 };
 
 /** Faixa "Convite de amigo" na tela inicial, um por convite. */
-export function FriendInvites({ invites, onJoin, onDecline }: { invites: FriendInvite[]; onJoin: (code: string) => void; onDecline: (code: string) => void }) {
+export function FriendInvites({ invites, onJoin, onDecline }: { invites: FriendInvite[]; onJoin: (invite: FriendInvite) => void; onDecline: (code: string) => void }) {
   const t = useT();
   return (
     <>
@@ -70,13 +73,13 @@ export function FriendInvites({ invites, onJoin, onDecline }: { invites: FriendI
           </span>
           <div className="home-banner-text">
             <strong>{t('friends.inviteKicker')}</strong>
-            <span>{t('friends.inviteBanner', { name: i.from.name, format: i.format })}</span>
+            <span>{t('friends.inviteBanner', { name: i.from.name, format: i.kind === 'yonko' ? t('friends.inviteYonko') : i.format })}</span>
           </div>
           <div className="btn-row">
             <button type="button" className="btn" onClick={() => onDecline(i.code)}>
               {t('friends.inviteDecline')}
             </button>
-            <button type="button" className="btn primary" onClick={() => onJoin(i.code)}>
+            <button type="button" className="btn primary" onClick={() => onJoin(i)}>
               {t('friends.inviteJoin')}
             </button>
           </div>
@@ -86,9 +89,19 @@ export function FriendInvites({ invites, onJoin, onDecline }: { invites: FriendI
   );
 }
 
+/** Um formato para o qual dá para convidar: 1 contra 1 nas regras de cartas de `label`, ou a mesa do Yonko. */
+export interface InviteOption {
+  key: string;
+  label: string;
+  /** O deck que vai para a partida. */
+  deck?: string;
+  /** Por que não dá para convidar neste formato (null: dá). */
+  blocked: string | null;
+}
+
 /**
- * Folha "Amigos". `onInvite` cria a sala privada com o deck equipado e avisa o amigo;
- * `inviteBlocked` diz por que não dá (deck que não vale na Sala privada, partida em andamento).
+ * Folha "Amigos". Convidar abre os formatos (`inviteOptions`); `onInvite` cria a sala (ou a mesa) do formato
+ * escolhido e avisa o amigo; `inviteBlocked` diz por que não dá para convidar agora (partida em andamento).
  */
 export function FriendsSheet({
   loggedIn,
@@ -97,6 +110,7 @@ export function FriendsSheet({
   refresh,
   initialCode,
   linked,
+  inviteOptions,
   onInvite,
   inviteBlocked,
   onClose,
@@ -108,7 +122,8 @@ export function FriendsSheet({
   initialCode?: string;
   /** Chegou por um link de amigo. */
   linked?: boolean;
-  onInvite: (friend: { id: string; name: string }) => Promise<void>;
+  inviteOptions: InviteOption[];
+  onInvite: (friend: { id: string; name: string }, option: string) => Promise<void>;
   inviteBlocked: string | null;
   onClose: () => void;
 }) {
@@ -118,6 +133,8 @@ export function FriendsSheet({
   const [notice, setNotice] = useState<string | null>(linked ? t('friends.linkAdd') : null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /** Amigo com os formatos do convite abertos. */
+  const [choosing, setChoosing] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -268,11 +285,32 @@ export function FriendsSheet({
                             className="btn primary"
                             disabled={busy || Boolean(inviteBlocked) || f.status === 'playing'}
                             title={inviteBlocked ?? t('friends.inviteTitle', { name: f.name })}
-                            onClick={() => void act(() => onInvite(f))}
+                            aria-expanded={choosing === f.id}
+                            onClick={() => setChoosing(choosing === f.id ? null : f.id)}
                           >
                             {t('friends.invite')}
                           </button>
                         </span>
+                        {choosing === f.id && !inviteBlocked && f.status !== 'playing' && (
+                          <div className="friend-formats" role="group" aria-label={t('friends.inviteTo', { name: f.name })}>
+                            <span className="muted small">{t('friends.inviteTo', { name: f.name })}</span>
+                            {inviteOptions.map((o) => (
+                              <button
+                                key={o.key}
+                                type="button"
+                                className="friend-format"
+                                disabled={busy || Boolean(o.blocked)}
+                                onClick={() => {
+                                  setChoosing(null);
+                                  void act(() => onInvite(f, o.key));
+                                }}
+                              >
+                                <b>{o.label}</b>
+                                <small>{o.blocked ?? (o.deck ? t('friends.inviteDeck', { deck: o.deck }) : '')}</small>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -300,5 +338,69 @@ export function FriendsSheet({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Entre dois convites para o mesmo amigo (o intervalo do servidor): o botão volta depois disso. */
+const INVITE_AGAIN_MS = 15_000;
+
+/**
+ * Painel "Chamar amigos" de uma mesa já aberta (a sala de espera do Yonko): a lista de amigos com o status
+ * e um botão por amigo, que manda o aviso sem sair da mesa. Só com login; `full`: a mesa não tem lugar vago.
+ */
+export function TableFriends({ invite, full }: { invite: (friendId: string) => Promise<unknown>; full: boolean }) {
+  const t = useT();
+  const { user } = useAuth();
+  const { data } = useFriends(Boolean(user));
+  const [sent, setSent] = useState<Record<string, 'sending' | 'sent'>>({});
+  const [error, setError] = useState<string | null>(null);
+  const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  if (!user || !data) return null;
+
+  const mark = (id: string, state?: 'sending' | 'sent') =>
+    setSent((s) => {
+      const { [id]: _, ...rest } = s;
+      return state ? { ...rest, [id]: state } : rest;
+    });
+  const call = async (id: string) => {
+    mark(id, 'sending');
+    setError(null);
+    try {
+      await invite(id);
+      mark(id, 'sent');
+      timers.current.push(setTimeout(() => mark(id), INVITE_AGAIN_MS));
+    } catch (e) {
+      mark(id);
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <section className="yk-panel table-friends">
+      <h3>{t('friends.tableTitle')}</h3>
+      {data.friends.length === 0 ? (
+        <p className="muted small">{t('friends.tableEmpty')}</p>
+      ) : (
+        <>
+          <p className="muted small">{t('friends.tableHint')}</p>
+          {error && <p className="error">{error}</p>}
+          <ul className="friends-list">
+            {data.friends.map((f) => (
+              <li key={f.id} className={`friend-${f.status}`}>
+                <span className={`friend-dot ${f.status}`} aria-hidden="true" />
+                <span className="friend-name">
+                  {f.name}
+                  <small className="muted">{t(STATUS_KEY[f.status])}</small>
+                </span>
+                <button type="button" className="btn small primary" disabled={full || f.status === 'playing' || Boolean(sent[f.id])} onClick={() => void call(f.id)}>
+                  {sent[f.id] === 'sent' ? t('friends.inviteSent') : t('friends.invite')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }

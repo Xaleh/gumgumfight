@@ -561,7 +561,9 @@ export interface FriendPerson {
 
 export interface FriendInvite {
   from: { id: string; name: string };
-  /** Código da sala privada (o convite entra direto nela). */
+  /** Sala privada de dois jogadores ou mesa do Yonko. */
+  kind: 'room' | 'yonko';
+  /** Código da sala privada ou da mesa (o convite entra direto nela). */
   code: string;
   format: string;
   at: string;
@@ -800,6 +802,9 @@ export const api = {
     remove: (id: string) => send<void>('DELETE', `/api/friends/${encodeURIComponent(id)}`),
     /** Avisa o amigo (push e tela inicial) da sala privada que acabei de criar. */
     invite: (id: string, seat: OnlineSeat) => send<{ ok: true }>('POST', `/api/friends/${encodeURIComponent(id)}/invite`, seat),
+    /** Chama o amigo para a mesa do Yonko em que tenho lugar (a sala de espera). */
+    inviteYonko: (id: string, seat: Pick<YonkoSeatRef, 'id' | 'token'>) =>
+      send<{ ok: true }>('POST', `/api/friends/${encodeURIComponent(id)}/invite`, { tableId: seat.id, token: seat.token }),
     declineInvite: (code: string) => send<void>('DELETE', `/api/friends/invites/${encodeURIComponent(code)}`),
   },
   me: () => get<{ user: User | null }>('/api/auth/me'),

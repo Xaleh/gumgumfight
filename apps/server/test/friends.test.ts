@@ -72,6 +72,12 @@ async function privateRoom(app: App, who: Who) {
   return r.json() as { roomId: string; code: string; token: string };
 }
 
+async function yonkoTable(app: App, who: Who) {
+  const r = await call(app, 'POST', '/api/yonko/tables', who, { deckId: await deckId(app) });
+  expect(r.statusCode).toBe(201);
+  return r.json() as { id: string; code: string; token: string };
+}
+
 describe('Amigos: pedido, aceite e remoção', () => {
   it('exige login', async () => {
     const { app } = setup();
@@ -251,5 +257,76 @@ describe('Amigos: convite para partida', () => {
     await call(app, 'POST', `/api/friends/${b.id}/invite`, a, { roomId: fresh.roomId, token: fresh.token });
     await call(app, 'DELETE', `/api/friends/${b.id}`, a);
     expect((await list(app, b)).invites).toEqual([]);
+  });
+});
+
+describe('Amigos: convite para a mesa do Yonko', () => {
+  it('quem senta na mesa chama o amigo; o convite leva o código e some quando ele senta', async () => {
+    const { app, db, sent } = setup();
+    const { a, b } = await friends(app, db);
+    await subscribe(app, b, 'b');
+    const table = await yonkoTable(app, a);
+
+    const r = await call(app, 'POST', `/api/friends/${b.id}/invite`, a, { tableId: table.id, token: table.token });
+    expect(r.statusCode).toBe(201);
+    await flush();
+    expect(to(sent, 'b')).toEqual([
+      expect.objectContaining({ title: 'Convite para partida', body: expect.stringContaining('mesa do Yonko'), url: `/?yonko=${table.code}&convite=1`, tag: `invite-${a.id}` }),
+    ]);
+    expect((await list(app, b)).invites).toEqual([expect.objectContaining({ kind: 'yonko', code: table.code, format: 'Yonko', from: { id: a.id, name: expect.stringMatching(/^Pirata /) } })]);
+    expect((await list(app, a)).invites).toEqual([]);
+
+    // Quem foi convidado senta com o código; o convite some, e quem já está na mesa também pode chamar os amigos dele.
+    const joined = await call(app, 'POST', '/api/yonko/tables/join', b, { code: table.code, deckId: await deckId(app) });
+    expect(joined.statusCode).toBe(200);
+    expect((await list(app, b)).invites).toEqual([]);
+    const c = login(db);
+    const codeC = (await list(app, c)).code;
+    await call(app, 'POST', '/api/friends/requests', b, { code: codeC });
+    await call(app, 'POST', `/api/friends/${b.id}/accept`, c);
+    expect((await call(app, 'POST', `/api/friends/${c.id}/invite`, b, { tableId: table.id, token: joined.json().token })).statusCode).toBe(201);
+    expect((await list(app, c)).invites).toEqual([expect.objectContaining({ kind: 'yonko', code: table.code, from: expect.objectContaining({ id: b.id }) })]);
+    // Chamar de novo quem já sentou não avisa ninguém.
+    sent.length = 0;
+    expect((await call(app, 'POST', `/api/friends/${b.id}/invite`, a, { tableId: table.id, token: table.token })).statusCode).toBe(200);
+    await flush();
+    expect(to(sent, 'b')).toEqual([]);
+  });
+
+  it('recusa mesa de outra pessoa, token errado, mesa cheia e mesa que já começou', async () => {
+    const { app, db, advance } = setup();
+    const { a, b } = await friends(app, db);
+    const table = await yonkoTable(app, a);
+    const invite = () => call(app, 'POST', `/api/friends/${b.id}/invite`, a, { tableId: table.id, token: table.token });
+    expect((await call(app, 'POST', `/api/friends/${b.id}/invite`, a, { tableId: table.id, token: 'x' })).json().errorCode).toBe('yonkoNotFound');
+    expect((await call(app, 'POST', `/api/friends/${b.id}/invite`, a, { tableId: 'yk-nada', token: table.token })).json().errorCode).toBe('yonkoNotFound');
+    // O token de outra pessoa não serve, mesmo com a mesa certa.
+    expect((await call(app, 'POST', `/api/friends/${a.id}/invite`, b, { tableId: table.id, token: table.token })).json().errorCode).toBe('yonkoNotFound');
+
+    expect((await invite()).statusCode).toBe(201);
+    expect((await list(app, b)).invites).toHaveLength(1);
+    // Mesa cheia (bots nos três lugares): o convite já enviado deixa de valer e um novo é recusado.
+    for (let i = 0; i < 3; i++) expect((await call(app, 'POST', `/api/yonko/tables/${table.id}/bot`, a, { t: table.token })).statusCode).toBe(200);
+    expect((await list(app, b)).invites).toEqual([]);
+    advance(INVITE_GAP_MS);
+    expect((await invite()).json().errorCode).toBe('yonkoFull');
+    expect((await call(app, 'POST', `/api/yonko/tables/${table.id}/start`, a, { t: table.token })).statusCode).toBe(200);
+    expect((await invite()).json().errorCode).toBe('yonkoStarted');
+  });
+
+  it('o status dos amigos conta a mesa do Yonko: jogando durante a partida', async () => {
+    const { app, db, advance } = setup();
+    const { a, b } = await friends(app, db);
+    const status = async () => (await list(app, a)).friends[0].status;
+    const table = await yonkoTable(app, b);
+    // Fora do menu há mais tempo que a presença dura: só a mesa diz onde a pessoa está.
+    advance(10 * 60_000);
+    expect(await status()).toBe('offline');
+    for (let i = 0; i < 3; i++) await call(app, 'POST', `/api/yonko/tables/${table.id}/bot`, b, { t: table.token });
+    expect((await call(app, 'POST', `/api/yonko/tables/${table.id}/start`, b, { t: table.token })).statusCode).toBe(200);
+    expect(await status()).toBe('playing');
+    expect(JSON.stringify(await list(app, a))).not.toContain(table.code);
+    expect((await call(app, 'POST', `/api/yonko/tables/${table.id}/leave`, b, { t: table.token })).statusCode).toBe(200);
+    expect(await status()).toBe('offline');
   });
 });

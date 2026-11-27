@@ -171,7 +171,7 @@ gumgumfight/
 │   ├── src/profiles/            perfil público do jogador: store.ts (SQL, regras do replay), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
-│   ├── src/friends/             store.ts (código de amigo e amizades), routes.ts (lista, pedidos, status online e convite)
+│   ├── src/friends/             store.ts (código de amigo e amizades), routes.ts (lista, pedidos, status online e convite para sala privada ou mesa do Yonko)
 │   ├── src/monitor/             store.ts (erros agrupados e horas dos canais SSE, SQL), sse.ts (SseMetrics), routes.ts (onError, relato do navegador, painel)
 │   └── test/                    9 arquivos de teste + fixtures da optcgapi/optcgleaks
 ├── apps/web/                    React + Vite
@@ -1340,12 +1340,25 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
   é uma linha de `friendships` por par (pedido pendente → aceito). Pedir de volta a quem já pediu aceita na hora.
 - **Status**: `Lobby.presenceOf(user:<id>)` responde `playing` (lugar numa sala em andamento, contra alguém ou o bot),
   `online` (sinal do menu, que vem de `GET /api/online/stats` ou `GET /api/friends`, nos últimos 30 s; sala de espera;
-  fila) ou `offline`. Só amigos aceitos recebem o status, e nunca a sala nem o código.
-- **Convite**: o navegador cria a sala privada com `POST /api/online/rooms` (deck equipado e regras da Sala privada) e
+  fila) ou `offline`. As mesas do Yonko entram junto (`YonkoTables.presenceOf`): `playing` na partida em andamento
+  enquanto a pessoa não saiu dela, `online` na sala de espera com o canal aberto. Só amigos aceitos recebem o status,
+  e nunca a sala nem o código.
+- **Convite**: na folha, **Convidar** abre os formatos (`InviteOption`, montados no `Menu.tsx`): 1 contra 1 nas regras
+  da Sala privada e em cada `PLAY_FORMATS`, e a mesa do Yonko. No 1 contra 1, o navegador cria a sala privada com
+  `POST /api/online/rooms` (deck equipado e regras do formato escolhido) e
   chama `POST /api/friends/:id/invite`. O servidor exige o token do lugar 0 **e** que a conta seja a de quem criou,
   guarda o convite em memória (até 20 por pessoa, 30 min, só enquanto a sala espera e os dois são amigos) e manda o
   push da categoria `friends` com `/?convite=CÓDIGO`. Tocar no aviso (ou em **Entrar** na faixa da tela inicial)
   chama `POST /api/online/rooms/join` com o deck equipado, passando pela confirmação do deck se ela estiver ligada.
+- **Convite para o Yonko**: o mesmo `POST /api/friends/:id/invite`, com `{ tableId, token }` de uma mesa em espera em
+  que a conta tem lugar (qualquer lugar, não só o de quem criou: o código da mesa já está à vista de todos). Pela
+  folha, o navegador usa a mesa em que a pessoa já espera (`GET /api/yonko/active`) ou cria uma com o deck e as
+  regras guardados (`gumgum.yonko.deck` e `gumgum.yonko.rules`); pela sala de espera, o painel `TableFriends` chama
+  a rota para a mesa aberta. O convite (`kind: 'yonko'`) vale enquanto a mesa espera com lugar vago e some para quem
+  já sentou nela; chamar quem já está sentado responde 200 sem aviso. O push leva `/?yonko=CÓDIGO&convite=1`
+  (`friendLink.ts` lê como convite; sem o `convite`, `/?yonko=` continua sendo o link da mesa, que abre a entrada do
+  Yonko). Tocar no aviso ou em **Entrar** chama `POST /api/yonko/tables/join` com o deck do Yonko, sem a confirmação
+  do deck: a sala de espera mostra o deck e a partida só começa depois do "Estou pronto".
 - Pedido de amizade e aceite também geram push (`friends`, `/?amigos=1` abre a folha). Endereços lidos em
   `apps/web/src/friendLink.ts`; a folha e a faixa em `components/Friends.tsx`.
 
@@ -2204,10 +2217,10 @@ Quem chama, na coluna da direita:
 | POST | `/api/admin/stats/global/sync` | Força uma rodada do sync do meta global | Admin |
 | GET | `/api/online/config` · `/api/online/stats` · `/api/online/leaders?format=` | Configuração do online, contadores do menu e Líderes na fila casual | Pública |
 | GET | `/api/online/active` | Partidas em andamento de quem pede (com o token do assento) | Navegador |
-| GET | `/api/friends` | Meu código de amigo, amigos (nome público, recompensa e status `playing`/`online`/`offline`), pedidos recebidos e enviados e convites para partida ainda válidos. Também me conta como online | Sessão |
+| GET | `/api/friends` | Meu código de amigo, amigos (nome público, recompensa e status `playing`/`online`/`offline`), pedidos recebidos e enviados e convites ainda válidos (`kind`: `room`, sala privada, ou `yonko`, mesa do Yonko). Também me conta como online | Sessão |
 | POST | `/api/friends/requests` | Pede amizade pelo código (`{ code }`); se a outra conta já tinha pedido, vira amizade. 30 pedidos por hora por conta, até 200 amigos | Sessão |
 | POST · DELETE | `/api/friends/:id/accept` · `/api/friends/:id` | Aceita o pedido recebido / recusa, cancela ou desfaz a amizade | Sessão |
-| POST | `/api/friends/:id/invite` | Convida o amigo para a sala privada que acabei de criar (`{ roomId, token }`: lugar de quem criou, sala à espera); push com `/?convite=CÓDIGO`. Um convite a cada 15 s por amigo | Sessão + Assento |
+| POST | `/api/friends/:id/invite` | Convida o amigo para a sala privada que acabei de criar (`{ roomId, token }`: lugar de quem criou, sala à espera; push com `/?convite=CÓDIGO`) ou para a mesa do Yonko em que tenho lugar (`{ tableId, token }`: mesa à espera com lugar vago; push com `/?yonko=CÓDIGO&convite=1`). Um convite a cada 15 s por amigo | Sessão + Assento |
 | DELETE | `/api/friends/invites/:code` | Recusa o convite (some da tela inicial; a sala de quem convidou continua) | Sessão |
 | POST | `/api/online/rooms` · `/api/online/rooms/join` · `/api/online/queue` | Cria uma sala privada; entra numa; entra na fila (`{ deckId, format, queue }`; ranqueada exige login) | Navegador |
 | GET · DELETE | `/api/online/queue/:ticket` | Consulta a fila / sai dela | Quem tem o ticket |

@@ -171,9 +171,10 @@ function MainApp() {
           })
           .catch(() => undefined);
       } else if (tournament) setScreen({ name: 'tournaments', id: tournament, lobby: url.searchParams.get('lobby') === '1' });
-      // Amigos: link para adicionar, aviso de pedido e convite para a sala de um amigo (no meio de uma partida online, fica nela).
+      // Amigos: link para adicionar, aviso de pedido e convite para a sala (ou a mesa do Yonko) de um amigo
+      // (no meio de uma partida online ou de uma mesa do Yonko, fica nela).
       const friendLink = friendLinkFrom(url);
-      if (friendLink) setScreen((s) => (s.name === 'online' ? s : { name: 'menu', friendLink }));
+      if (friendLink) setScreen((s) => (s.name === 'online' || s.name === 'yonko-online' ? s : { name: 'menu', friendLink }));
     };
     const here = new URL(location.href);
     if (here.searchParams.has(ROOM_PARAM) || here.searchParams.has(TOURNAMENT_PARAM) || friendLinkFrom(new URL(here.href))) {
@@ -432,7 +433,8 @@ function MainApp() {
       onTeamBot={isTeam(user) ? () => setScreen({ name: 'team' }) : undefined}
       onSealed={() => setScreen({ name: 'sealed', hub: 'sealed' })}
       onDraft={() => setScreen({ name: 'sealed', hub: 'draft' })}
-      onYonko={() => setScreen({ name: 'yonko' })}
+      onYonko={(code) => setScreen({ name: 'yonko', ...(code ? { code } : {}) })}
+      onYonkoOnline={(seat) => setScreen({ name: 'yonko-online', seat })}
       dev={dev}
       friendLink={screen.name === 'menu' ? screen.friendLink : undefined}
     />

@@ -22368,6 +22368,56 @@ div.dk-tile-main {
   gap: 8px;
   margin-left: auto;
 }
+/* Formatos do convite: abrem embaixo do amigo, na folha (1 contra 1 em cada formato e a mesa do Yonko). */
+.friend-formats {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+.friend-formats > span {
+  grid-column: 1 / -1;
+}
+.friend-format {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.friend-format:hover:not(:disabled),
+.friend-format:focus-visible {
+  border-color: var(--accent);
+}
+.friend-format:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.friend-format b {
+  font-weight: 900;
+}
+.friend-format small {
+  color: var(--muted);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* Painel "Chamar amigos" da sala de espera do Yonko. */
+.table-friends .friends-list {
+  margin-top: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+}
+.table-friends .friends-list .btn {
+  margin-left: auto;
+}
 
 /* ------------------------------------------------------------------ Sandbox de regras */
 .sandbox {
