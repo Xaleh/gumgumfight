@@ -85,7 +85,7 @@ export default {
   'settings.shortcutsHint': 'On a computer you can also play from the keyboard: Space ends the turn, the numbers mark DON!!, Q W E R T pick your Characters and L your Leader. The full list is under "View shortcuts".',
   'settings.shortcutsShow': 'View shortcuts',
   'settings.animations': 'Animations',
-  'settings.animationsHint': 'Full: cards flying, the stops at the centre of the table (card played, attack, ability, [Trigger]) and the turn-change banner. Soft: cards just move from one place to the other, without the stops at the centre. Off: the table changes instantly.',
+  'settings.animationsHint': 'Full: cards flying, the stops at the centre of the table (card played, attack, ability, [Trigger]) and the turn-change banner. Soft: cards just move from one place to the other, without the stops at the centre. Off: the table changes instantly. Page turns (tutorial lessons and menu sections) only show with Full.',
   'settings.animFull': 'Full',
   'settings.animSoft': 'Soft',
   'settings.animOff': 'Off',

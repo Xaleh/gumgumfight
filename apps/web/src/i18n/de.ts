@@ -85,7 +85,7 @@ export default {
   'settings.shortcutsHint': 'Am Computer kannst du auch mit der Tastatur spielen: Die Leertaste beendet den Zug, die Zahlen markieren DON!!, Q W E R T wählen deine Charaktere und L deinen Leader. Die ganze Liste steht unter „Kürzel ansehen“.',
   'settings.shortcutsShow': 'Kürzel ansehen',
   'settings.animations': 'Animationen',
-  'settings.animationsHint': 'Voll: fliegende Karten, die Stopps in der Tischmitte (gespielte Karte, Angriff, Fähigkeit, [Trigger]) und das Banner beim Zugwechsel. Sanft: Die Karten wandern nur von einem Ort zum anderen, ohne die Stopps in der Mitte. Aus: Der Tisch ändert sich sofort.',
+  'settings.animationsHint': 'Voll: fliegende Karten, die Stopps in der Tischmitte (gespielte Karte, Angriff, Fähigkeit, [Trigger]) und das Banner beim Zugwechsel. Sanft: Die Karten wandern nur von einem Ort zum anderen, ohne die Stopps in der Mitte. Aus: Der Tisch ändert sich sofort. Das Umblättern (Tutorial-Lektionen und Menübereiche) gibt es nur bei „Voll“.',
   'settings.animFull': 'Voll',
   'settings.animSoft': 'Sanft',
   'settings.animOff': 'Aus',

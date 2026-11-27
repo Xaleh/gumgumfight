@@ -11010,16 +11010,20 @@ html[lang='ja'] body {
   justify-content: center;
   align-items: flex-start;
 }
-.gibi {
+.gibi,
+.screen-turn {
   --gibi-sheen: 0.55;
   --gibi-back: var(--panel2);
   --gibi-edge: var(--brown);
-  position: relative;
-  width: min(560px, 100%);
 }
-:root[data-theme='dark'] .gibi {
+:root[data-theme='dark'] .gibi,
+:root[data-theme='dark'] .screen-turn {
   --gibi-sheen: 0.16;
   --gibi-edge: #5a3a24;
+}
+.gibi {
+  position: relative;
+  width: min(560px, 100%);
 }
 .gibi.spread {
   width: 100%;
@@ -11205,6 +11209,44 @@ html[lang='ja'] body {
 }
 .gibi-turn-back > .gibi-turn-shade {
   opacity: var(--lift);
+}
+/* A tela virando como página (screenTurn.ts): a camada cobre a tela inteira e as cópias são do app todo. */
+.screen-turn {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+}
+.screen-turn .gibi-turn-back,
+.screen-turn .gibi-turn.spread .gibi-turn-back {
+  border-radius: 0;
+}
+.screen-turn .gibi-turn.spread .gibi-turn-back {
+  background: var(--bg);
+}
+.screen-turn-frame {
+  position: relative;
+  overflow: hidden;
+}
+/* Do tamanho da tela e com o fundo do `body`: o que é fixo na tela se posiciona por ela. */
+.screen-turn-view {
+  position: absolute;
+  top: 0;
+  transform: translateZ(0);
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 500px at 0% 0%, var(--bg-glow1) 0%, transparent 60%),
+    radial-gradient(1000px 600px at 100% 0%, var(--bg-glow2) 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 100%),
+    var(--bg);
+}
+.screen-turn-scroll {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.screen-turn-app {
+  height: 100%;
 }
 /* Folha de rosto da lição (livro aberto, passo sem figura). */
 .lesson-plate {

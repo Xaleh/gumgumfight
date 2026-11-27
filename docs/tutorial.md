@@ -30,7 +30,7 @@ Os decks são os iniciais ST01 (Luffy, para quem aprende) e ST03 (Crocodile, par
 | `apps/web/src/components/Learn.tsx` | Hub: progresso, capítulos, lições, insígnias e glossário. |
 | `apps/web/src/components/Lesson.tsx` | Tela da lição: a mesa (`LessonTable` do `GameScreen`) ou o gibi das lições sem mesa (carta, anatomia, curva). |
 | `apps/web/src/components/PageBook.tsx` | O gibi das lições sem mesa: uma página no celular, livro aberto em tela larga, e a virada de página. |
-| `apps/web/src/pageTurn.ts` | A dobra da virada de página: a conta (`foldAt`) e o desenho com cópias paradas das páginas (`PageTurn`). |
+| `apps/web/src/pageTurn.ts` | A dobra da virada de página: a conta (`foldAt`) e o desenho com cópias paradas das páginas (`PageTurn`). Também vira a tela ao entrar e sair das seções do menu (`screenTurn.ts`). |
 | `apps/web/src/components/Coach.tsx` | O treinador (texto, quiz, botões) e os destaques (`Spotlight`, anéis em volta das áreas). |
 | `apps/web/src/i18n/tutorial/*.ts` | Os textos, nos 6 idiomas. |
 | `apps/web/test/tutorial.test.ts` | Resolve cada lição de ponta a ponta sem navegador e confere que todos os textos existem. |

@@ -85,7 +85,7 @@ export default {
   'settings.shortcutsHint': 'パソコンではキーボードでも操作できます。スペースでターン終了、数字でドン!!を選択、Q W E R Tでキャラ、Lでリーダーを選びます。一覧は「ショートカットを見る」から確認できます。',
   'settings.shortcutsShow': 'ショートカットを見る',
   'settings.animations': 'アニメーション',
-  'settings.animationsHint': 'フル：カードの移動、場の中央での演出（プレイしたカード、アタック、効果、[Trigger]）、ターン交代の表示。ソフト：カードが移動するだけで、中央での演出はありません。オフ：場がすぐに切り替わります。',
+  'settings.animationsHint': 'フル：カードの移動、場の中央での演出（プレイしたカード、アタック、効果、[Trigger]）、ターン交代の表示。ソフト：カードが移動するだけで、中央での演出はありません。オフ：場がすぐに切り替わります。ページをめくる演出（チュートリアルのレッスンとメニューの各セクション）はフルのときだけ表示されます。',
   'settings.animFull': 'フル',
   'settings.animSoft': 'ソフト',
   'settings.animOff': 'オフ',

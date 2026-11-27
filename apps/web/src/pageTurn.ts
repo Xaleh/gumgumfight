@@ -3,8 +3,8 @@
 // A conta é a de uma folha de papel dobrada no plano. Um ponto E da borda de fora da folha é levado até F
 // (o dedo); a dobra é a mediatriz entre os dois. Do lado da lombada a folha continua no lugar; o resto
 // aparece refletido na dobra, de verso para cima. `foldAt` faz só a conta (testada em
-// test/pageTurn.test.ts) e `PageTurn` desenha com cópias paradas das páginas (quem monta as cópias é o
-// componente PageBook).
+// test/pageTurn.test.ts) e `PageTurn` desenha com cópias paradas das páginas. Quem monta as cópias é quem
+// usa: o gibi das lições (components/PageBook.tsx) e a troca de tela do menu (screenTurn.ts).
 //
 // Coordenadas da folha: a lombada é x = 0, a borda de fora é x = W, e o topo é y = 0. Em livro aberto a
 // folha que vira é a da direita e o verso cai sobre a página da esquerda (x de −W a 0).
@@ -126,10 +126,10 @@ const polygon = (pts: Pt[]) => (pts.length < 3 ? 'polygon(0 0, 0 0, 0 0)' : `pol
 export interface TurnSheets {
   /** A frente da folha que vira. */
   leaf: HTMLElement;
-  /** O verso dela (livro aberto: a página que fica à esquerda). `null`: a própria folha vista por trás. */
+  /** O verso dela (livro aberto: a página que fica à esquerda). `null`: a própria folha vista por trás, ou papel liso. */
   back: HTMLElement | null;
-  /** O que a folha descobre do lado direito. */
-  under: HTMLElement;
+  /** O que a folha descobre do lado direito. `null`: o que já está na tela, por baixo da camada. */
+  under: HTMLElement | null;
   /** Livro aberto: a página da esquerda, parada, até o verso da folha cobri-la. */
   left: HTMLElement | null;
 }
@@ -175,7 +175,8 @@ export class PageTurn {
   private raf = 0;
   private settle: (() => void) | null = null;
 
-  constructor(host: HTMLElement, box: TurnBox, sheets: TurnSheets, dir: 1 | -1, grabY?: number) {
+  /** `plainBack`: sem verso próprio, a folha tem as costas de papel liso (em vez de se ver por trás). */
+  constructor(host: HTMLElement, box: TurnBox, sheets: TurnSheets, dir: 1 | -1, grabY?: number, plainBack = false) {
     this.dir = dir;
     this.box = box;
     const { pageW: W, leafH: H } = box;
@@ -184,9 +185,9 @@ export class PageTurn {
 
     // O verso: em livro aberto, a página seguinte (espelhada, para a reflexão desfazer); em página
     // única, a própria folha bem apagada, como papel visto contra a luz.
-    const inner = el(box.spread ? 'gibi-turn-flip' : 'gibi-turn-ghost', sheets.back ?? (sheets.leaf.cloneNode(true) as HTMLElement));
+    const face = sheets.back ?? (plainBack ? null : (sheets.leaf.cloneNode(true) as HTMLElement));
     this.backShade = el('gibi-turn-shade');
-    this.back = el('gibi-turn-back', inner, this.backShade);
+    this.back = el('gibi-turn-back', ...(face ? [el(sheets.back ? 'gibi-turn-flip' : 'gibi-turn-ghost', face)] : []), this.backShade);
     this.back.style.width = `${W}px`;
     this.back.style.height = `${H}px`;
     // A tampa cobre só o lado da lombada: é ela que corta o verso na dobra e deixa a sombra da folha aparecer.
@@ -197,7 +198,7 @@ export class PageTurn {
     cast.style.width = `${W}px`;
     cast.style.height = `${H}px`;
     this.front = el('gibi-turn-front', sheets.leaf);
-    this.half = el('gibi-turn-half', el('gibi-turn-under', sheets.under), cast, this.front, this.lid);
+    this.half = el('gibi-turn-half', ...(sheets.under ? [el('gibi-turn-under', sheets.under)] : []), cast, this.front, this.lid);
     this.half.style.left = `${box.spread ? W : 0}px`;
     this.half.style.width = `${W}px`;
     const stage = el('gibi-turn-stage', ...(sheets.left ? [el('gibi-turn-left', sheets.left)] : []), this.half);
@@ -252,14 +253,14 @@ export class PageTurn {
 
   /**
    * Termina a virada sozinha: `commit` leva a folha até o outro lado; sem ele, devolve ao lugar.
-   * `auto`: a virada inteira sem o dedo (mais lenta, com a folha subindo no meio do caminho).
+   * `auto`: a virada inteira sem o dedo (mais lenta, com a folha subindo no meio do caminho); `autoMs`: quanto dura.
    */
-  glide(commit: boolean, auto = false): Promise<void> {
+  glide(commit: boolean, auto = false, autoMs?: number): Promise<void> {
     const { pageW: W, leafH: H, spread } = this.box;
     const from = { ...this.F };
     const tx = this.dir > 0 === commit ? -W : W;
     const ty = this.E.y;
-    const ms = auto ? (spread ? 720 : 640) : 160 + (440 * Math.abs(tx - from.x)) / (2 * W);
+    const ms = auto ? (autoMs ?? (spread ? 720 : 640)) : 160 + (440 * Math.abs(tx - from.x)) / (2 * W);
     const arc = auto ? Math.min(H * 0.13, W * 0.3) : 0;
     cancelAnimationFrame(this.raf);
     this.settle?.();
