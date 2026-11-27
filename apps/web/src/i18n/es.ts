@@ -391,6 +391,10 @@ export default {
   'menu.bothDecksValid': 'Ambos mazos deben ser válidos en {format}.',
   'menu.battle': '¡A pelear!',
   'menu.opponent': 'Rival: {name}',
+  /** Card "Contra o bot": o botão-resumo e a folha com quem começa, nível e estilo. */
+  'menu.botOptions': 'Opciones del bot',
+  'menu.botSummary': 'Bot: {value}',
+  'menu.firstSummary': 'Empieza: {who}',
   'menu.whoStarts': 'Quién empieza',
   'menu.firstRandom': 'A suertes',
   'menu.you': 'Tú',

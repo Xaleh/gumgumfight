@@ -391,6 +391,10 @@ export default {
   'menu.bothDecksValid': '両方のデッキが{format}で使用可能である必要があります。',
   'menu.battle': 'バトル！',
   'menu.opponent': '対戦相手：{name}',
+  /** Card "Contra o bot": o botão-resumo e a folha com quem começa, nível e estilo. */
+  'menu.botOptions': 'Botの設定',
+  'menu.botSummary': 'Bot：{value}',
+  'menu.firstSummary': '先攻：{who}',
   'menu.whoStarts': '先攻',
   'menu.firstRandom': 'ランダム',
   'menu.you': 'あなた',
