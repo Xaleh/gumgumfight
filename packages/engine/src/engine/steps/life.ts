@@ -334,25 +334,32 @@ export function execLifeStep(state: GameState, frame: EffectFrame, step: LifeSte
       const life = lifeOf(side).life;
       if (!frame.choice) {
         const card = life[life.length - 1];
+        const top = cardDef(state, card).name;
         askOption(
           state,
           frame,
           frame.controller,
-          pr('lifeTopIsWhere', `${srcName}: a carta do topo é ${cardDef(state, card).name}. Onde deixar?`, { source: srcName, card: cardDef(state, card).name }),
+          // Com mais de dois na mesa, a pergunta diz de quem é a Vida olhada.
+          side !== 'own' && isMultiplayer(state)
+            ? pr('lifeTopOfIsWhere', `${srcName}: a carta do topo da Vida de ${lifeOf(side).name} é ${top}. Onde deixar?`, { source: srcName, card: top, opponent: lifeOf(side).name })
+            : pr('lifeTopIsWhere', `${srcName}: a carta do topo é ${top}. Onde deixar?`, { source: srcName, card: top }),
           ['Manter no topo', 'Colocar no fundo'],
           ['engine.optKeepOnTop', 'engine.optPlaceAtBottom'],
         );
         return false;
       }
       if (frame.choice[0] === '1') life.unshift(life.pop()!);
+      const where = frame.choice[0] === '1' ? 'Bottom' : 'Top';
       log(
         state,
         frame.controller,
-        lg(
-          `peeksLife${side === 'own' ? 'Own' : 'Opponent'}${frame.choice[0] === '1' ? 'Bottom' : 'Top'}`,
-          `${ps.name} olha a carta do topo da Vida ${side === 'own' ? 'própria' : 'do oponente'} e a deixa no ${frame.choice[0] === '1' ? 'fundo' : 'topo'}.`,
-          { player: ps.name },
-        ),
+        side !== 'own' && isMultiplayer(state)
+          ? lg(`peeksLifeOf${where}`, `${ps.name} olha a carta do topo da Vida de ${lifeOf(side).name} e a deixa no ${where === 'Bottom' ? 'fundo' : 'topo'}.`, { player: ps.name, opponent: lifeOf(side).name })
+          : lg(
+              `peeksLife${side === 'own' ? 'Own' : 'Opponent'}${where}`,
+              `${ps.name} olha a carta do topo da Vida ${side === 'own' ? 'própria' : 'do oponente'} e a deixa no ${where === 'Bottom' ? 'fundo' : 'topo'}.`,
+              { player: ps.name },
+            ),
       );
       return true;
     }

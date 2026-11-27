@@ -280,6 +280,9 @@ describe('Yonko (auditoria): "a carta revelada" depois de um passo repetido para
     expect(s.players[3].life).toHaveLength(life[3] - 1);
     expect(s.players[1].life).toHaveLength(life[1]);
     expect(s.players[2].life).toHaveLength(life[2]);
+    // O histórico diz para quem cada parte valeu: todos revelam, e só o lugar 3 perde a Vida.
+    const hits = s.log.filter((e) => e.key === 'log.effectHits').map((e) => e.text);
+    expect(hits).toEqual(['Arlong: o efeito vale para J1, J2, J3.', 'Arlong: o efeito vale para J3.']);
   });
 
   it('Cognac Mama-Mash: a carta revelada de um oponente tem o custo escolhido, e o efeito acontece', () => {
@@ -294,5 +297,11 @@ describe('Yonko (auditoria): "a carta revelada" depois de um passo repetido para
     s = applyAction(s, { type: 'option', player: 0, index: 5 });
     // A carta do lugar 1 tem o custo escolhido: "K.O. up to 1 of your opponent's Characters …".
     expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, options: [victim] });
+    // Cada revelação diz de quem é o deck ("do oponente" não diz, com três na mesa).
+    expect(s.log.filter((e) => e.key === 'log.revealsDeckTopOf').map((e) => e.text)).toEqual([
+      'J0 revela Brutamontes do topo do deck de J1.',
+      'J0 revela Recruta do topo do deck de J2.',
+      'J0 revela Recruta do topo do deck de J3.',
+    ]);
   });
 });

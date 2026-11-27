@@ -2453,6 +2453,7 @@ export default {
   'engine.revealedTopOrBottom': '{source}: garder {card} sur le dessus ou la placer sous le deck ?',
   'engine.deckTopOrBottom': '{source}: les placer sur le dessus ou sous le deck ?',
   'engine.opponentDeckTopIs': '{source}: la carte du dessus du deck adverse est {card}.',
+  'engine.deckTopOfIs': '{source}: la carte du dessus du deck de {opponent} est {card}.',
   // ---- your Characters and cards ----
   'engine.chooseOwnCardsToRest': '{source}: choisissez {n|# de vos cartes|# de vos cartes} à incliner.',
   'engine.chooseOwnCardsToReturn': '{source}: choisissez {n|# de vos cartes|# de vos cartes} à renvoyer dans votre main.',
@@ -2479,6 +2480,7 @@ export default {
   'engine.chooseHandCardsToLifeTop': '{source}: choisissez jusqu’à {n|# carte|# cartes} de votre main à ajouter sur le dessus de la Vie.',
   'engine.peekWhichLife': '{source}: regarder la carte du dessus de quelle Vie ?',
   'engine.lifeTopIsWhere': '{source}: la carte du dessus est {card}. Où voulez-vous la laisser ?',
+  'engine.lifeTopOfIsWhere': '{source}: la carte du dessus de la Vie de {opponent} est {card}. Où voulez-vous la laisser ?',
   // ---- optional costs and replacements ----
   'engine.opponentMayLifeTrash': '{source}: défausser {n|# carte|# cartes} du dessus de votre Vie pour éviter l’effet ?',
   'engine.opponentMayDiscard': '{source}: défausser {n|# carte|# cartes} de votre main pour éviter l’effet ?',
@@ -2698,6 +2700,8 @@ export default {
   'log.peeksLifeOwnBottom': '{player} regarde la carte du dessus de sa Vie et la place en dessous.',
   'log.peeksLifeOpponentTop': '{player} regarde la carte du dessus de la Vie adverse et la laisse sur le dessus.',
   'log.peeksLifeOpponentBottom': '{player} regarde la carte du dessus de la Vie adverse et la place en dessous.',
+  'log.peeksLifeOfBottom': '{player} regarde la carte du dessus de la Vie de {opponent} et la place en dessous.',
+  'log.peeksLifeOfTop': '{player} regarde la carte du dessus de la Vie de {opponent} et la laisse sur le dessus.',
   'log.faceUpLifeToBottom': '{card} (Vie face visible) va sous le deck.',
   // ---- hand, deck and trash ----
   'log.draws': '{player} pioche {n|# carte|# cartes}.',
@@ -2713,6 +2717,7 @@ export default {
   'log.revealsFromDeckToHand': '{player} révèle {card} de son deck et l’ajoute à sa main.',
   'log.revealsDeckTop': '{player} révèle {card} du dessus de son deck.',
   'log.revealsOppDeckTop': '{player} révèle {card} du dessus du deck adverse.',
+  'log.revealsDeckTopOf': '{player} révèle {card} du dessus du deck de {opponent}.',
   'log.addsToHand': '{player} ajoute {card} à sa main.',
   'log.trashToHand': '{player} ajoute {card} de sa défausse à sa main.',
   'log.placesAtBottom': '{player} place {n|# carte|# cartes} sous son deck.',
@@ -2785,6 +2790,7 @@ export default {
   'log.lapsedConditionTagged': '{card} {tag} : la condition n’est plus remplie, l’effet ne s’active pas.',
   'log.onKoConditionFails': '{card} {tag} : la condition n’est pas remplie, l’effet ne s’active pas.',
   'log.conditionFails': '{source}: la condition n’est pas remplie ({reason}), l’effet n’a pas lieu.',
+  'log.effectHits': '{source}: l’effet s’applique à {players}.',
   'log.cond.maxCharacters': '{player} a {n|# Personnage|# Personnages} ; il en faut {limit} ou moins',
   'log.cond.maxCharactersSelf': '{player} a {n|# Personnage|# Personnages}, cette carte comprise ; il en faut {limit} ou moins',
   'log.cond.minCharacters': '{player} a {n|# Personnage|# Personnages} ; il en faut {limit} ou plus',

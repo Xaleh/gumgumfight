@@ -127,6 +127,7 @@ const yonko = {
   'yonko.counterMarkHint': '手札のカウンターを選び、ボタンでまとめて使います。[カウンター]イベントは単独で使います。',
   'yonko.donPicked': 'ドン!!を{n}枚選択中。',
   'yonko.attachAll': '+{n} ドン!!（すべて）',
+  'yonko.effectOf': '{name}の効果',
   'deck.buildYonko': '四皇用に組む（60枚・各1枚）',
   'deck.buildYonkoTitle': 'バトルロイヤル卓用デッキ：リーダーの色のカード60枚、カード番号ごとに1枚、禁止リストなし。',
   'deck.savedReadyYonko': 'デッキを保存しました。四皇で使えます。',

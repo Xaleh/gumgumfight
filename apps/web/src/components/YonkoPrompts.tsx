@@ -3,25 +3,32 @@
 // do deck, o descarte, a Vida). Todas recolhem em "Ver a mesa" (a faixa de ação fica com as mesmas respostas) e,
 // numa batalha, levam embaixo quem ataca quem (`PromptBackdrop`).
 
-import { cardDef, type GameState, type Pending, type PlayerId } from '@gumgum/engine';
-import type { ReactNode } from 'react';
+import { type CardDef, cardDef, type GameState, type Pending, type PlayerId } from '@gumgum/engine';
+import type { CSSProperties, ReactNode } from 'react';
+import type { YonkoReveal } from '../game/useYonkoNotices';
 import type { Translate } from '../i18n';
-import { CardView, type Highlight } from './CardView';
+import { CardView, type Highlight, StaticCard } from './CardView';
 import { PromptBackdrop, useSkipGuard } from './table/Prompt';
 import { orderText } from './table/shared';
 
 type Option = Extract<Pending, { kind: 'option' }>;
 type Select = Extract<Pending, { kind: 'selectTargets' }>;
 
-/** A carta que pergunta, em miniatura, com o nome (o toque abre a carta para ler). */
-function Source({ s, uid, onCard }: { s: GameState; uid: string; onCard: (uid: string) => void }) {
+/**
+ * A carta que pergunta, em miniatura, com o nome (o toque abre a carta para ler). Quando a carta é de outro
+ * jogador (o efeito dele que pede uma escolha a quem joga), o nome dele vai junto: numa mesa de quatro, é o que
+ * diz de onde veio a pergunta.
+ */
+function Source({ s, me, t, uid, onCard }: { s: GameState; me: PlayerId; t: Translate; uid: string; onCard: (uid: string) => void }) {
   if (!s.cards[uid]) return null;
+  const owner = s.cards[uid].owner;
   return (
     <div className="yk-modal-source">
       <span className="source-thumb">
         <CardView state={s} uid={uid} onClick={() => onCard(uid)} />
       </span>
       <span>{cardDef(s, uid).name}</span>
+      {owner !== me && <small>{t('yonko.effectOf', { name: s.players[owner].name })}</small>}
     </div>
   );
 }
@@ -168,7 +175,7 @@ export function OptionModal({
 }) {
   return (
     <Frame s={s} me={me} t={t} label={prompt} onPeek={onPeek} onCancel={onCancel}>
-      <Source s={s} uid={pending.source} onCard={onCard} />
+      <Source s={s} me={me} t={t} uid={pending.source} onCard={onCard} />
       {pending.shown?.length ? (
         <div className="yk-modal-cards feature">
           {pending.shown.map((uid) => (
@@ -242,7 +249,7 @@ export function PickModal({
           : t('game.tapToChoose');
   return (
     <Frame s={s} me={me} t={t} label={prompt} className={cards.length > 4 ? 'wide' : ''} onPeek={onPeek} onCancel={onCancel}>
-      <Source s={s} uid={pending.source} onCard={onRead} />
+      <Source s={s} me={me} t={t} uid={pending.source} onCard={onRead} />
       <h3>{prompt}</h3>
       <p className="muted small">
         {pending.max > 0 && cards.length > 1 && `${t('game.optionsCount', { n: pending.options.length })} `}
@@ -285,5 +292,41 @@ export function PickModal({
         )}
       </div>
     </Frame>
+  );
+}
+
+/**
+ * As cartas que outro jogador revelou (a busca no deck, uma carta da mão, o topo do deck…), como na mesa de dois:
+ * a carta inteira (o toque abre para ler) e a linha do registro, com a cor do lugar de quem revelou. Fica até quem
+ * joga fechar: sem isto só o registro dizia qual carta foi, e ela some na mão do outro.
+ */
+export function RevealModal({ lines, t, color, onCard, onClose }: { lines: YonkoReveal[]; t: Translate; color: (player: PlayerId) => string; onCard: (def: CardDef) => void; onClose: () => void }) {
+  const n = lines.reduce((sum, l) => sum + l.cards.length, 0);
+  const title = t('game.revealedTitle', { n });
+  return (
+    <div className="yk-reveal-back yk-modal-back" onClick={onClose}>
+      <div className={['yk-modal', 'reveals', n > 4 ? 'wide' : ''].join(' ')} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+        <div className="yk-modal-kicker">{title}</div>
+        {lines.map((line, i) => (
+          <div key={i} className="yk-reveal-line" style={line.player !== null ? ({ '--pc': color(line.player) } as CSSProperties) : undefined}>
+            <div className="yk-modal-cards">
+              {line.cards.map((def, j) => (
+                <StaticCard key={j} card={def} onClick={() => onCard(def)} />
+              ))}
+            </div>
+            <p>
+              {line.text}
+              {line.count > 1 && <b className="yk-reveal-times">×{line.count}</b>}
+            </p>
+          </div>
+        ))}
+        <p className="muted small">{t('game.tapCardToRead')}</p>
+        <div className="yk-modal-answers">
+          <button type="button" className="yk-btn primary" onClick={onClose} autoFocus>
+            {t('game.revealedOk')}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -13,6 +13,7 @@
 import {
   type Action,
   cancelAllowed,
+  type CardDef,
   cardDef,
   cardImage,
   cardStatuses,
@@ -39,16 +40,17 @@ import { enteredWithoutRush } from '../game/freshCharacter';
 import { usePreloadCardImages } from '../game/preloadImages';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { useYonkoGame, type YonkoSetup } from '../game/useYonkoGame';
+import { useYonkoNotices } from '../game/useYonkoNotices';
 import { useBoardSize } from '../hooks/useBoardSize';
 import { type Translate, useT, useTryT } from '../i18n';
 import { AnimationsSeg, cardText, useSettings, VolumeControl } from '../settings';
-import { CardTextInfo } from './CardInfo';
+import { CardTextInfo, StaticCardZoom } from './CardInfo';
 import { CardView, type Highlight, PickOrderContext } from './CardView';
 import { Icon } from './Icons';
 import { useBoardMotion } from './Motion';
 import { askText, type Confirm, hasCost, PromptBackdrop, useSkipGuard } from './table/Prompt';
 import type { Drag, Mode } from './table/shared';
-import { CurveModal, MulliganModal, OptionModal, PickModal } from './YonkoPrompts';
+import { CurveModal, MulliganModal, OptionModal, PickModal, RevealModal } from './YonkoPrompts';
 import { useTableGestures } from './table/useTableGestures';
 
 type TryT = ReturnType<typeof useTryT>;
@@ -164,6 +166,8 @@ interface BannerView {
   peek?: boolean;
   /** DON!! marcados para anexar: a conta deles vai na faixa, com a carta de DON!! ao lado. */
   don?: number;
+  /** A pergunta vem do efeito de outro jogador: o lugar dele (a faixa diz de quem é o efeito). */
+  from?: PlayerId;
 }
 
 /**
@@ -607,7 +611,12 @@ function AskEffect({
             </div>
           )}
           <div className="ask-body">
-            {def && <div className="ask-name">{def.name}</div>}
+            {def && (
+              <div className="ask-name">
+                {def.name}
+                {s.cards[pending.source].owner !== me && <small className="yk-ask-from">{t('yonko.effectOf', { name: s.players[s.cards[pending.source].owner].name })}</small>}
+              </div>
+            )}
             <h3>{ask.question}</h3>
             {ask.cost && (
               <p className="ask-cost">
@@ -807,6 +816,11 @@ export function YonkoTable({
   useBoardSize(board);
   const motion = useBoardMotion(s, { enabled: animate, tempo: 0.85, lastAction: game.lastAction, lang: locale, calm: !showy, root: '.yk' });
   useMatchAudio(s, { enabled: true, animate: showy, tempo: 0.85, human: me, lastAction: game.lastAction });
+  // Os avisos que saem do registro, como na mesa de dois: a linha curta (por que algo não aconteceu, para quem
+  // valeu o efeito) e as cartas que outro jogador revelou.
+  const { notice, setNotice, reveals, setReveals } = useYonkoNotices(s, me, tryT, showy);
+  /** Uma carta revelada aberta para ler (ela pode já ter saído da vista de quem joga). */
+  const [readCard, setReadCard] = useState<CardDef | null>(null);
 
   /** Carta própria selecionada (na mão ou em campo), com a vez livre. */
   const [sel, setSel] = useState<string | null>(null);
@@ -887,16 +901,20 @@ export function YonkoTable({
     keepSel.current = 0;
   }, [game.error]);
 
-  // A leitura de uma carta ou do registro (celular) segura os bots.
+  // A leitura de uma carta, do registro (celular) ou das cartas reveladas segura os bots.
+  const revealing = reveals.length > 0;
   useEffect(() => {
-    game.setPaused?.(sheet !== null);
-  }, [sheet]); // eslint-disable-line react-hooks/exhaustive-deps
+    game.setPaused?.(sheet !== null || revealing);
+  }, [sheet, revealing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Esc fecha a janela aberta; sem janela, solta a carta escolhida.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // A carta revelada aberta para ler fecha sozinha (`StaticCardZoom`); depois, as cartas reveladas.
+      if (readCard) return;
       if (sheet !== null) setSheet(null);
+      else if (revealing) setReveals([]);
       else {
         setSel(null);
         setDonPicked([]);
@@ -904,7 +922,7 @@ export function YonkoTable({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sheet]);
+  }, [sheet, revealing, readCard]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Celular: a aba acompanha a batalha (a mesa atacada, ou a de quem ataca quando o alvo é quem joga).
   const battle = s.battle && s.cards[s.battle.attacker] && s.cards[s.battle.target] ? s.battle : null;
@@ -1119,6 +1137,14 @@ export function YonkoTable({
   const name = (uid: string) => cardDef(s, uid).name;
   const who = (id: PlayerId) => (id === me ? t('yonko.you') : s.players[id].name);
 
+  /** O dono da carta que abriu a pergunta, quando ela está à vista de quem joga. */
+  const sourceOwner = (p: Pending | null): PlayerId | null => {
+    const uid = p && 'source' in p ? p.source : null;
+    return uid && s.cards[uid] && cardDef(s, uid).id !== HIDDEN_CARD ? s.cards[uid].owner : null;
+  };
+  /** A pergunta para quem joga vem do efeito de outro jogador: o lugar dele. */
+  const askedBy = ((owner) => (owner !== null && owner !== me ? owner : undefined))(sourceOwner(myPending));
+
   /** O que a faixa do meio mostra agora: a pergunta aberta, a carta selecionada ou de quem é a vez. */
   const banner = ((): BannerView => {
     const cancel: Btn[] = cancelAllowed(s, me) ? [{ label: t('yonko.undo'), onClick: () => send({ type: 'cancel', player: me }) }] : [];
@@ -1141,6 +1167,7 @@ export function YonkoTable({
           return {
             icon: p.curve ? 'crown' : 'check',
             mine: true,
+            from: askedBy,
             text: p.curve ? t('yonko.curve') : promptText(tryT, p),
             sub: p.curve ? t('yonko.curveHint') : undefined,
             peek: true,
@@ -1153,6 +1180,7 @@ export function YonkoTable({
           return {
             icon: 'check',
             mine: true,
+            from: askedBy,
             text: promptText(tryT, p),
             peek: true,
             buttons: [
@@ -1183,6 +1211,7 @@ export function YonkoTable({
           return {
             icon: p.intent === 'harm' ? 'swords' : 'check',
             mine: true,
+            from: askedBy,
             text: promptText(tryT, p),
             chip: p.options.length ? t('yonko.options', { n: p.options.length }) : t('yonko.noOptions'),
             sub: pickWindow ? undefined : p.max > 1 ? t('yonko.pickRange', { min: p.min, max: p.max }) : p.max === 1 && !quickChoice ? t('yonko.pickOne') : undefined,
@@ -1249,7 +1278,7 @@ export function YonkoTable({
           };
         }
         case 'manual':
-          return { icon: 'check', mine: true, text: t('yonko.manual', { card: name(p.source) }), sub: p.text, buttons: [{ label: t('yonko.manualDone'), kind: 'primary', onClick: () => send({ type: 'manualDone', player: me }) }] };
+          return { icon: 'check', mine: true, from: askedBy, text: t('yonko.manual', { card: name(p.source) }), sub: p.text, buttons: [{ label: t('yonko.manualDone'), kind: 'primary', onClick: () => send({ type: 'manualDone', player: me }) }] };
         default:
           return { icon: 'check', mine: true, text: '', buttons: cancel };
       }
@@ -1257,7 +1286,11 @@ export function YonkoTable({
     if (pending) {
       const other = who(pending.player);
       const key = pending.kind === 'counter' ? 'yonko.waitCounter' : pending.kind === 'block' ? 'yonko.waitBlock' : pending.kind === 'mulligan' || (pending.kind === 'option' && pending.curve) ? 'yonko.waitSetup' : 'yonko.waitChoice';
-      return { icon: 'bot', mine: false, waiting: true, text: t(key, { name: other }), buttons: [] };
+      // A carta que pede a escolha (e de quem é, quando o efeito é de outro jogador): dá para entender a espera.
+      const owner = sourceOwner(pending);
+      const card = owner !== null && 'source' in pending ? name(pending.source) : null;
+      const sub = card === null ? undefined : owner === pending.player || owner === me ? card : `${card} · ${t('yonko.effectOf', { name: s.players[owner!].name })}`;
+      return { icon: 'bot', mine: false, waiting: true, text: t(key, { name: other }), sub, buttons: [] };
     }
     if (!myTurnIdle) {
       const active = s.players[s.activePlayer];
@@ -1565,6 +1598,11 @@ export function YonkoTable({
                   </div>
                 )}
                 <div className="yk-banner-actions">
+                  {banner.from !== undefined && (
+                    <span className="yk-chip from" style={vars({ '--pc': seatColor(s, banner.from) })}>
+                      {t('yonko.effectOf', { name: s.players[banner.from].name })}
+                    </span>
+                  )}
                   {banner.chip && <span className="yk-chip">{banner.chip}</span>}
                   {(banner.tray || banner.peek) && (
                     <button type="button" className="yk-btn ghost" aria-pressed={trayHidden} onClick={() => setTrayHidden((v) => !v)} title={t('game.peekTitle')} aria-label={t('game.peekTitle')}>
@@ -1594,6 +1632,11 @@ export function YonkoTable({
               <button type="button" className={['yk-end', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
                 {t('yonko.endTurn')}
               </button>
+              {notice && (
+                <button type="button" key={notice.text} className="yk-toast" role="status" style={notice.player !== null ? vars({ '--pc': seatColor(s, notice.player) }) : undefined} onClick={() => setNotice(null)}>
+                  {notice.text}
+                </button>
+              )}
               {flash && s.phase === 'main' && (
                 <div key={flash.key} className={['turn-banner', 'yk-flash', flash.mine ? 'mine' : 'theirs', showy ? 'sweep' : ''].join(' ')} style={vars({ '--pc': flash.color })}>
                   <div className="tb-stripe">
@@ -1744,6 +1787,9 @@ export function YonkoTable({
         )}
 
         {lifeCard && windows && <LifeReveal s={s} me={me} uid={lifeCard} trigger={legal.some((a) => a.type === 'answer' && a.yes)} t={t} onAnswer={(yes) => send({ type: 'answer', player: me, yes })} onPeek={() => setTrayHidden(true)} />}
+
+        {revealing && !sheet && !motion.busy && <RevealModal lines={reveals} t={t} color={(id) => seatColor(s, id)} onCard={setReadCard} onClose={() => setReveals([])} />}
+        {readCard && <StaticCardZoom card={readCard} className="log-zoom" onClose={() => setReadCard(null)} />}
 
         {sheet && (
           <div className="yk-sheet-back" onClick={() => setSheet(null)}>

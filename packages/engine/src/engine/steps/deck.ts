@@ -5,7 +5,7 @@ import { shuffleInPlace } from '../../rng';
 import type { EffectStep, GameState, PlayerState } from '../../types';
 import type { EffectFrame } from '../constants';
 import { DECK_TOP_BOTTOM, lg, log, logSecret, pr, promptOf } from '../messages';
-import { opponentOf } from '../table';
+import { isMultiplayer, opponentOf } from '../table';
 import { cardDef, matchesFilter } from '../queries';
 import { markRevealed } from '../cancel';
 import { askCards, askOption, playFree } from '../effects';
@@ -194,7 +194,15 @@ export function execDeckStep(state: GameState, frame: EffectFrame, step: DeckSte
       const card = state.players[revealer].deck[0];
       frame.last = card ? [card] : [];
       if (step.vs !== undefined) frame.lastOf = { cards: { ...frame.lastOf?.cards, [revealer]: frame.last }, tail: frame.last };
-      if (card) log(state, frame.controller, lg('revealsOppDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck do oponente.`, { player: ps.name, card: cardDef(state, card).name }), { uids: [card] });
+      if (card) {
+        const name = cardDef(state, card).name;
+        const of = state.players[revealer].name;
+        // Com mais de dois na mesa, "o oponente" não diz de quem é o deck.
+        const line = isMultiplayer(state)
+          ? lg('revealsDeckTopOf', `${ps.name} revela ${name} do topo do deck de ${of}.`, { player: ps.name, card: name, opponent: of })
+          : lg('revealsOppDeckTop', `${ps.name} revela ${name} do topo do deck do oponente.`, { player: ps.name, card: name });
+        log(state, frame.controller, line, { uids: [card] });
+      }
       return true;
     }
     case 'revealedToTopOrBottom': {
@@ -231,7 +239,11 @@ export function execDeckStep(state: GameState, frame: EffectFrame, step: DeckSte
       const card = opp.deck[0];
       if (!card) return true;
       if (!frame.choice) {
-        askOption(state, frame, frame.controller, pr('opponentDeckTopIs', `${srcName}: a carta do topo do deck do oponente é ${cardDef(state, card).name}.`, { source: srcName, card: cardDef(state, card).name }), ['OK'], ['common.ok'], undefined, [card]);
+        const top = cardDef(state, card).name;
+        const prompt = isMultiplayer(state)
+          ? pr('deckTopOfIs', `${srcName}: a carta do topo do deck de ${opp.name} é ${top}.`, { source: srcName, card: top, opponent: opp.name })
+          : pr('opponentDeckTopIs', `${srcName}: a carta do topo do deck do oponente é ${top}.`, { source: srcName, card: top });
+        askOption(state, frame, frame.controller, prompt, ['OK'], ['common.ok'], undefined, [card]);
         return false;
       }
       logSecret(

@@ -127,6 +127,7 @@ const yonko = {
   'yonko.counterMarkHint': 'Mark the Counters in your hand and use them all with the button. A [Counter] Event is used on its own.',
   'yonko.donPicked': '{n|# DON!! marked|# DON!! marked}.',
   'yonko.attachAll': '+{n} DON!! (all)',
+  'yonko.effectOf': "{name}'s effect",
   'deck.buildYonko': 'Build for Yonko (60, 1 of each)',
   'deck.buildYonkoTitle': 'Free-for-all table deck: 60 cards in the Leader’s colors, one copy of each card number, no banned list.',
   'deck.savedReadyYonko': 'Deck saved and ready for Yonko.',

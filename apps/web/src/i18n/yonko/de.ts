@@ -127,6 +127,7 @@ const yonko = {
   'yonko.counterMarkHint': 'Markiere die Counter in deiner Hand und nutze alle mit dem Button. Ein [Counter]-Event wird einzeln gespielt.',
   'yonko.donPicked': '{n|# DON!! markiert|# DON!! markiert}.',
   'yonko.attachAll': '+{n} DON!! (alle)',
+  'yonko.effectOf': 'Effekt von {name}',
   'deck.buildYonko': 'Für Yonko bauen (60, je 1)',
   'deck.buildYonkoTitle': 'Deck für den Jeder-gegen-jeden-Tisch: 60 Karten in den Farben des Leaders, je eine Kopie pro Kartennummer, keine Bannliste.',
   'deck.savedReadyYonko': 'Deck gespeichert und bereit für Yonko.',

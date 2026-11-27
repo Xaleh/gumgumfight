@@ -101,6 +101,12 @@ Decisões tomadas para o motor funcionar. Todas fáceis de mudar.
     a carta daquele oponente (Arlong: só quem revelou um Evento perde a Vida). Se o efeito seguinte é um alvo em
     campo (Cognac Mama-Mash), basta a carta de um oponente servir, como nos patamares (regra 10).
 
+17. **O registro diz para quem o efeito valeu.** Quando um passo roda contra cada oponente (regra 6), o motor
+    escreve "Carta: o efeito vale para Fulano, Beltrano." só com os oponentes para quem a condição do passo vale. As
+    linhas e perguntas que diziam "do oponente" (o topo do deck, a Vida olhada) levam o nome do jogador. Na mesa,
+    essa linha vira um aviso curto, as cartas reveladas por outro jogador abrem numa janela, e a pergunta que vem do
+    efeito de outro jogador diz de quem é o efeito.
+
 ## 5. O que mudou em relação à primeira versão da fase 1
 
 A primeira versão do motor de mesa (antes de o manual chegar) seguia três regras propostas no plano. O manual

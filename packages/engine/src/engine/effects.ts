@@ -27,8 +27,10 @@ export function stepEffect(state: GameState, frame: EffectFrame) {
     // na ordem dos turnos (cada cópia leva o oponente em `vs`).
     if (step.vs === undefined && eachOpponent(step) && fixedOpponent(state, frame.controller) === undefined) {
       const original = step;
-      frame.steps.splice(frame.i, 1, ...opponentsOf(state, frame.controller).map((o) => ({ ...original, vs: o })));
+      const copies = opponentsOf(state, frame.controller).map((o) => ({ ...original, vs: o }));
+      frame.steps.splice(frame.i, 1, ...copies);
       step = frame.steps[frame.i];
+      noteWhoIsHit(state, frame, copies);
     }
     // O oponente da vez saiu da mesa antes de o passo chegar nele.
     if (step.vs !== undefined && state.players[step.vs].out) {
@@ -63,6 +65,24 @@ export function stepEffect(state: GameState, frame: EffectFrame) {
     frame.choice = undefined;
     frame.memo = undefined;
   }
+}
+
+/**
+ * Mesa com mais de dois: o histórico diz para quem vale o passo que roda contra cada oponente (a carta fala em
+ * "your opponent", e quem está na mesa precisa saber que foi atingido, ou por que não foi). Só entram os oponentes
+ * para quem a condição do passo vale ("If your opponent has 7 or more cards…": só quem tem 7 ou mais); sem nenhum,
+ * a linha da condição que falhou já explica. Dois passos seguidos do mesmo efeito para os mesmos jogadores ("return
+ * all cards… and draw 5") dão uma linha só.
+ */
+function noteWhoIsHit(state: GameState, frame: EffectFrame, copies: EffectStep[]) {
+  if (copies[0]?.afterIf && frame.ifFailed) return;
+  const hit = copies.filter((c) => !c.if || withOpponent(frame.controller, c.vs!, () => stepConditionMet(state, frame, c))).map((c) => state.players[c.vs!].name);
+  if (!hit.length) return;
+  const source = cardDef(state, frame.source).name;
+  const players = hit.join(', ');
+  if (frame.hitNote === players) return;
+  frame.hitNote = players;
+  log(state, frame.controller, lg('effectHits', `${source}: o efeito vale para ${players}.`, { source, players }), { cards: [frame.source] });
 }
 
 /** Passos que agem sobre "o oponente" (a mão, a Vida, os DON!!, o deck dele) sem escolher um alvo em campo. */
