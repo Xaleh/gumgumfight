@@ -15,6 +15,18 @@ describe('endereços dos amigos', () => {
     expect(invite?.open).toBeUndefined();
   });
 
+  it('convite para a mesa do Yonko: senta na mesa do código; o link da mesa, sem convite, fica para o App', () => {
+    const url = new URL('https://x.app/?yonko=ab12cd&convite=1');
+    const invite = friendLinkFrom(url);
+    expect(invite).toMatchObject({ yonko: 'AB12CD' });
+    expect(invite?.invite).toBeUndefined();
+    expect(url.search).toBe('');
+    const link = new URL('https://x.app/?yonko=AB12CD');
+    expect(friendLinkFrom(link)).toBeNull();
+    expect(link.search).toBe('?yonko=AB12CD');
+    expect(friendLinkFrom(new URL('https://x.app/?yonko=../x&convite=1'))?.yonko).toBeUndefined();
+  });
+
   it('ignora códigos inválidos e endereços sem os parâmetros', () => {
     expect(friendLinkFrom(new URL('https://x.app/?sala=ABC123'))).toBeNull();
     const bad = friendLinkFrom(new URL('https://x.app/?amigo=OOOO0000&convite=../x'));

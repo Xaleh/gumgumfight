@@ -192,6 +192,25 @@ export class YonkoTable {
     return list.find(mine)?.token ?? this.data.seats.find(mine)?.token ?? null;
   }
 
+  /** A sala ainda espera e tem lugar vago (um convite de amigo só vale enquanto isso). */
+  get open(): boolean {
+    return this.status === 'waiting' && this.data.seats.some((s) => s === null);
+  }
+
+  /**
+   * Status de quem senta nesta mesa, para os amigos (`friends/`): `playing` na partida em andamento (enquanto
+   * não saiu dela) e `online` na sala de espera, ou depois do fim, com o canal aberto. null: não está aqui.
+   */
+  presenceOf(ownerHash: string | null, userId: string | null): 'playing' | 'online' | null {
+    const mine = (s: YonkoSeat | null) => Boolean(s && !s.bot && ((ownerHash && s.ownerHash === ownerHash) || (userId && s.userId === userId)));
+    if (this.status === 'playing') {
+      const p = this.data.players?.findIndex(mine) ?? -1;
+      return p >= 0 && !this.state?.players[p].out ? 'playing' : null;
+    }
+    const seat = (this.data.players ?? this.data.seats).find(mine);
+    return seat && this.seatConnected(seat) ? 'online' : null;
+  }
+
   private touch() {
     this.data.touchedAt = this.deps.now();
   }

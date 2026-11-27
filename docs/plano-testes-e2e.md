@@ -137,6 +137,10 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   desligadas valem na hora (a mesa leva `anim-off`). Entrou com o redesenho da mesa (playmats, animações de voo).
 - `yonko.spec.ts`, arrasto (só no `desktop`): joga até ter uma carta que dá para jogar, arrasta-a da mão até a mesa
   de quem joga (a mesa mostra que aceita a carta) e a carta sai da mão.
+- `friends.spec.ts` (só no `desktop`): três contas amigas. Uma abre **Amigos**, toca em **Convidar**, vê a escolha do formato
+  por cima da folha (1 contra 1 e o Yonko; Esc fecha só a escolha) e escolhe o Yonko; chega à sala de espera da mesa. A segunda vê a faixa do convite na tela
+  inicial e senta direto na mesa. Da sala de espera, a primeira chama a terceira pelo painel **Chamar amigos**, e a
+  faixa aparece para ela; o endereço do aviso (`/?yonko=CÓDIGO&convite=1`) a senta na mesa.
 - No teste da mesa local, nos dois projetos a partida corre com as animações completas. Depois de encerrar o turno, o
   teste espera a faixa de troca de turno atravessar a mesa na vez do bot e sair, e só então o jogador desliga as
   animações. (Até 2026-11-27 o `iphone` as desligava ainda na preparação, por causa do diagnóstico descrito abaixo.)

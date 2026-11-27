@@ -502,8 +502,6 @@ export function buildApp(
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
-  // Amigos e convite direto para partida (só com login; o status vem da presença do lobby).
-  registerFriendRoutes(app, { db, user: auth.viewer, lobby, notifier, now: opts.now });
   // Mesas do Yonko (todos contra todos): sala com código, bots nos lugares vagos e partida de 3 ou 4 (yonko/).
   const yonkoTables = registerYonkoRoutes(app, {
     db,
@@ -517,6 +515,8 @@ export function buildApp(
     sse,
   });
   app.decorate('yonkoTables', yonkoTables);
+  // Amigos e convite direto para partida ou mesa do Yonko (só com login; o status vem do lobby e das mesas).
+  registerFriendRoutes(app, { db, user: auth.viewer, lobby, yonko: yonkoTables, notifier, now: opts.now });
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
   registerTournamentRoutes(app, {
     db,

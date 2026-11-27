@@ -3,6 +3,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { DB } from '../db';
 import { fail } from '../errors';
+import { areFriends } from '../friends/store';
 import { tierFor } from '../stats/catalog';
 import { findPlayer } from '../stats/store';
 import { type GoogleKeys, LoginError, verifyGoogleIdToken } from './google';
@@ -188,10 +189,14 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
     return { user: publicUser(getUser(db, u.id)!) };
   });
 
-  /** A foto enviada; só o próprio usuário e os admins (tela de perfis) a veem. */
+  /**
+   * A foto enviada: o próprio usuário, os amigos aceitos dele (a folha de amigos) e os admins (tela de perfis) a
+   * veem. A foto do Google nunca passa por aqui nem vai para os amigos.
+   */
   app.get<{ Params: { id: string } }>('/api/users/:id/picture', async (req, reply) => {
     const u = viewer(req);
-    const pic = u && (u.id === req.params.id || isAdmin(u.role)) ? getCustomPicture(db, req.params.id) : null;
+    const allowed = u && (u.id === req.params.id || isAdmin(u.role) || areFriends(db, u.id, req.params.id));
+    const pic = allowed ? getCustomPicture(db, req.params.id) : null;
     if (!pic) return reply.code(404).send(fail('notFound', 'Não encontrado'));
     // O endereço muda a cada troca (?v=), então a imagem pode ficar no cache do navegador.
     return reply
