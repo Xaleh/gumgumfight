@@ -60,6 +60,7 @@ export default {
   'tutorial.stepOf': 'Paso {n} de {total}',
   'tutorial.coach': 'Entrenador',
   'tutorial.collapse': 'Plegar o abrir el entrenador',
+  'tutorial.pagePull': 'Tira de la esquina para pasar la página',
   'tutorial.next': 'Siguiente',
   'tutorial.finish': 'Terminar lección',
   'tutorial.retry': 'Intentar de nuevo',

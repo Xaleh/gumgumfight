@@ -38,6 +38,7 @@ import type { GameSetup } from './game/useGame';
 import type { YonkoSetup } from './game/useYonkoGame';
 import type { SandboxSpec } from '@gumgum/engine';
 import { usePushSync, useWakeLock } from './pwa';
+import { canTurnScreen, turnScreen } from './screenTurn';
 import { useSettings } from './settings';
 
 type Screen =
@@ -311,10 +312,22 @@ const Pages = memo(function Pages({ screen, setScreen }: { screen: Screen; setSc
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, []);
   const dev = isDev(role);
+  const shown = useRef(screen);
+  shown.current = screen;
+  /**
+   * Entrar numa seção a partir do menu (`dir` 1) e voltar dela (−1): a tela vira como página (screenTurn.ts).
+   * Só com as animações completas; com as suaves e as desligadas a tela troca na hora, como as outras.
+   */
+  const flip = (dir: 1 | -1, next: Screen) => {
+    if (settings.animations !== 'full' || !canTurnScreen()) return setScreen(next);
+    // Com a fila aberta, abrir certas telas só pergunta antes (a tela não troca): aí não há o que virar.
+    const from = shown.current;
+    turnScreen(dir, () => setScreen(next), () => shown.current !== from);
+  };
   if (screen.name === 'builder') {
     return (
       <DeckBuilder
-        onExit={() => setScreen(screen.back ?? { name: 'menu' })}
+        onExit={() => (screen.back ? setScreen(screen.back) : flip(-1, { name: 'menu' }))}
         link={screen.link}
         linkInvalid={screen.linkInvalid}
         openId={screen.open}
@@ -326,7 +339,7 @@ const Pages = memo(function Pages({ screen, setScreen }: { screen: Screen; setSc
   if (screen.name === 'learn') {
     return (
       <Learn
-        onExit={() => setScreen({ name: 'menu' })}
+        onExit={() => flip(-1, { name: 'menu' })}
         onLesson={(id) => setScreen({ name: 'lesson', id })}
         onSandbox={() => setScreen({ name: 'sandbox', from: 'learn' })}
       />
@@ -358,7 +371,7 @@ const Pages = memo(function Pages({ screen, setScreen }: { screen: Screen; setSc
   if (screen.name === 'stats') {
     return (
       <Stats
-        onExit={() => setScreen({ name: 'menu' })}
+        onExit={() => flip(-1, { name: 'menu' })}
         onOpenDeck={(link) => setScreen({ name: 'builder', link })}
         onProfile={(id) => setScreen({ name: 'profile', id, back: { name: 'stats' } })}
       />
@@ -398,7 +411,7 @@ const Pages = memo(function Pages({ screen, setScreen }: { screen: Screen; setSc
         key={`${screen.id ?? ''}:${screen.lobby ? 'lobby' : ''}`}
         initialId={screen.id}
         initialLobby={screen.lobby}
-        onExit={() => setScreen({ name: 'menu' })}
+        onExit={() => flip(-1, { name: 'menu' })}
         onPlay={(seat, tournament, lobby) => setScreen({ name: 'online', seat, tournament, ...(lobby ? { lobby } : {}) })}
         onWatch={(target, tournament, lobby) => setScreen({ name: 'watch', target, tournament, ...(lobby ? { lobby } : {}) })}
         onReplay={(setup, tournament) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'tournaments', id: tournament } })}
@@ -503,16 +516,16 @@ const Pages = memo(function Pages({ screen, setScreen }: { screen: Screen; setSc
   return (
     <Menu
       onStart={(setup) => setScreen({ name: 'game', setup, key: Date.now() })}
-      onBuildDecks={(id) => setScreen({ name: 'builder', ...(id ? { open: id } : {}) })}
-      onLearn={() => setScreen({ name: 'learn' })}
+      onBuildDecks={(id) => flip(1, { name: 'builder', ...(id ? { open: id } : {}) })}
+      onLearn={() => flip(1, { name: 'learn' })}
       onSandbox={() => setScreen({ name: 'sandbox' })}
       onDaily={() => setScreen({ name: 'daily' })}
       onCoverage={dev ? () => setScreen({ name: 'coverage' }) : undefined}
-      onStats={() => setScreen({ name: 'stats' })}
+      onStats={() => flip(1, { name: 'stats' })}
       onOnline={(seat) => setScreen({ name: 'online', seat })}
       onWatch={() => setScreen({ name: 'watch-list' })}
       onWatchRoom={(target) => setScreen({ name: 'watch', target, home: true })}
-      onTournaments={(id) => setScreen({ name: 'tournaments', id })}
+      onTournaments={(id) => flip(1, { name: 'tournaments', id })}
       onTournamentMatch={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
       onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
       onTeamBot={isTeam(user) ? () => setScreen({ name: 'team' }) : undefined}

@@ -176,6 +176,7 @@ gumgumfight/
 │   └── test/                    9 arquivos de teste + fixtures da optcgapi/optcgleaks
 ├── apps/web/                    React + Vite
 │   ├── src/App.tsx              seleção de tela (useState<Screen>, sem roteador)
+│   ├── src/pageTurn.ts, screenTurn.ts   a dobra da virada de página (a conta e o desenho) e a tela virando como página
 │   ├── src/api.ts               todos os fetches, header x-deck-owner, URLs de SSE
 │   ├── src/auth.tsx, settings.tsx   contexts (login; configurações, inclusive o idioma `locale`)
 │   ├── src/i18n/                idiomas da interface: index.ts (t/useT, plural), pt-BR.ts (chaves), en.ts, es.ts, ja.ts, fr.ts, de.ts, format.ts
@@ -651,6 +652,16 @@ partida, torneio ou nome de jogador) não muda, com TTL de segurança (30 s e 5 
 numa notificação: a partida online, se ainda estiver em `/api/online/active`, ou a página do torneio), `?perfil=<id>`
 (perfil público de um jogador; `profileLink.ts` só aceita um id `p-` + 12 hex) e `?sandbox=<mesa em base64url>` (abre
 o Sandbox de regras com a mesa do link; `game/sandboxLink.ts`).
+
+**A tela vira como página** (`screenTurn.ts`): entrar em Aprender, Montar decks, Torneios e Estatísticas a partir do
+menu, e voltar delas para o menu, troca a tela com a dobra de papel de `pageTurn.ts` (a mesma do gibi das lições, ver
+`docs/tutorial.md`), em cerca de meio segundo e sem o dedo. No celular a tela inteira é a folha; a partir de 1000 px a
+tela é um livro aberto e só a metade direita vira, por cima do meio. Vale só com as **Animações** completas (e sem o
+sistema pedindo menos movimento): com as suaves e as desligadas, e em todas as outras trocas de tela (entrar numa
+partida, numa lição, num torneio), a tela troca na hora. É o `flip` do `App.tsx` que decide, e só é chamado de cliques.
+A dobra usa cópias paradas do `#root` (o que estava na tela e, onde a folha cobre, o que vai ficar), numa camada fixa por
+cima do app (`.screen-turn`); onde a folha só descobre a tela nova não há cópia, e aparece a tela de verdade, que
+continua carregando por baixo. Um `<canvas>` não viria na cópia: as cinco telas de hoje não têm nenhum.
 
 **Sandbox de regras** (`components/Sandbox.tsx`, tela `sandbox`): editor da mesa; "Jogar" abre a tela `game` com
 `GameSetup.mode = 'sandbox'` e `setup.sandbox` (a mesa), e a volta da mesa leva de novo ao editor. No modo `sandbox`

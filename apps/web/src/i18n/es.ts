@@ -86,7 +86,7 @@ export default {
   'settings.shortcutsHint': 'En el ordenador también puedes jugar con el teclado: Espacio termina el turno, los números marcan DON!!, Q W E R T eligen tus Personajes y L tu Líder. La lista completa está en "Ver atajos".',
   'settings.shortcutsShow': 'Ver atajos',
   'settings.animations': 'Animaciones',
-  'settings.animationsHint': 'Completas: cartas volando, las paradas en el centro de la mesa (carta jugada, ataque, habilidad, [Trigger]) y el aviso de cambio de turno. Suaves: las cartas solo van de un lugar a otro, sin las paradas en el centro. Desactivadas: la mesa cambia al instante.',
+  'settings.animationsHint': 'Completas: cartas volando, las paradas en el centro de la mesa (carta jugada, ataque, habilidad, [Trigger]) y el aviso de cambio de turno. Suaves: las cartas solo van de un lugar a otro, sin las paradas en el centro. Desactivadas: la mesa cambia al instante. El paso de página (lecciones del tutorial y secciones del menú) solo aparece con las completas.',
   'settings.animFull': 'Completas',
   'settings.animSoft': 'Suaves',
   'settings.animOff': 'Desactivadas',

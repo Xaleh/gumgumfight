@@ -1313,7 +1313,9 @@ Para quem nunca jogou One Piece Card Game: **Aprender** no menu (ou o convite "P
 **Rota do Aprendiz**, com 14 lições curtas em 4 capítulos (Fundamentos, O turno, Combate e Domínio). As lições rodam
 na mesa de verdade, com cenários prontos montados pelo motor: um treinador explica cada passo, destaca as áreas da mesa
 e pede uma jogada, travando as outras até a hora certa. Há também a anatomia da carta (toque e descubra), quizzes, um
-glossário de termos e uma partida final contra o bot fácil com dicas. Não precisa de login; o progresso fica no
+glossário de termos e uma partida final contra o bot fácil com dicas. As lições sem mesa são um gibi que se folheia: a
+página vira com a dobra do papel, pelos botões ou puxando a ponta da folha (no computador o gibi abre como um livro e só
+a folha da direita vira), sempre seguindo a opção **Animações**. Não precisa de login; o progresso fica no
 navegador e é guardado também no servidor (por conta ou por navegador). Quem termina as 14 lições ganha o título
 **Aprendiz da Grand Line** (mostrado só no hub do tutorial). Fora das lições: **Dicas do treinador** nas partidas contra
 o bot (opção nas Configurações, desligada por padrão), palavras-chave clicáveis no texto das cartas e, para a
@@ -1407,7 +1409,9 @@ a linha errada contra o servidor), mas só com cartas que existem no repositóri
   as cartas, uma a uma. Na mesa larga, com a mão no canto, o leque abre por cima da mesa enquanto o mouse está nele.
   "Ver mão" continua abrindo a mão inteira em tamanho grande.
 - **Animações** (Configurações ou menu da partida): **Completas**, **Suaves** (as cartas só vão de um lugar ao outro,
-  sem as paradas no centro da mesa nem a faixa animada de troca de turno) ou **Desligadas**.
+  sem as paradas no centro da mesa nem a faixa animada de troca de turno) ou **Desligadas**. Fora da mesa, só as
+  completas mostram as páginas virando: as lições sem mesa do tutorial e a entrada e a saída de Aprender, Montar decks,
+  Torneios e Estatísticas a partir do menu.
 - **Atalhos de teclado** (Configurações ou menu da partida, desligados por padrão; **Ver atalhos** mostra a lista):
   **Espaço** encerra o turno, **Enter** confirma (o botão principal que está na tela) e **Esc** cancela. **Q W E R T**
   escolhem os seus Personagens, da esquerda para a direita, e **L** o Líder (com **Shift**, a carta do oponente; na
@@ -1808,7 +1812,9 @@ com o jogador em outra tela, e os spoilers novos alternando com as dicas e abrin
 um **torneio** do começo ao fim (o organizador cria, os jogadores se inscrevem pelo link de convite, a rodada abre, a
 partida é jogada na sala do torneio, o resultado entra sozinho e o torneio termina com a classificação). A mesa também
 é testada com o mouse e o teclado (`e2e/table.spec.ts`): arrastar um DON!! até o Líder e de volta, segurar o clique numa
-carta, reordenar a mão, arrastar uma carta para o campo, atacar arrastando o Líder e os atalhos de teclado. As
+carta, reordenar a mão, arrastar uma carta para o campo, atacar arrastando o Líder e os atalhos de teclado. O gibi das
+lições sem mesa do tutorial também (`e2e/tutorial.spec.ts`): virar a página pelo botão e puxando a ponta. E a tela
+virando como página ao entrar e sair das seções do menu (`e2e/screen-turn.spec.ts`). As
 contas de teste são criadas direto no banco temporário, com as funções do servidor (`e2e/support/account-cli.ts`): não
 há rota de login de teste. Os testes marcados com `@iphone` rodam também no iPhone 13 com o WebKit, o motor do Safari
 (onde os boosters abertos já saíram do lugar), entre eles a inscrição num torneio pelo celular.

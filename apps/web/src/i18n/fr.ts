@@ -86,7 +86,7 @@ export default {
   'settings.shortcutsHint': 'Sur ordinateur, vous pouvez aussi jouer au clavier : Espace termine le tour, les chiffres marquent des DON!!, Q W E R T choisissent vos Personnages et L votre Leader. La liste complète est dans « Voir les raccourcis ».',
   'settings.shortcutsShow': 'Voir les raccourcis',
   'settings.animations': 'Animations',
-  'settings.animationsHint': 'Complètes : cartes qui volent, arrêts au centre de la table (carte jouée, attaque, capacité, [Trigger]) et bannière de changement de tour. Douces : les cartes vont simplement d’un endroit à l’autre, sans les arrêts au centre. Désactivées : la table change instantanément.',
+  'settings.animationsHint': 'Complètes : cartes qui volent, arrêts au centre de la table (carte jouée, attaque, capacité, [Trigger]) et bannière de changement de tour. Douces : les cartes vont simplement d’un endroit à l’autre, sans les arrêts au centre. Désactivées : la table change instantanément. Les pages qui tournent (leçons du tutoriel et sections du menu) n’apparaissent qu’avec les animations complètes.',
   'settings.animFull': 'Complètes',
   'settings.animSoft': 'Douces',
   'settings.animOff': 'Désactivées',

@@ -86,7 +86,7 @@ const ptBR = {
   'settings.shortcutsHint': 'No computador, dá para jogar também pelo teclado: Espaço encerra o turno, os números marcam DON!!, Q W E R T escolhem os Personagens e L o Líder. A lista completa está em "Ver atalhos".',
   'settings.shortcutsShow': 'Ver atalhos',
   'settings.animations': 'Animações',
-  'settings.animationsHint': 'Completas: cartas voando, as paradas no centro da mesa (carta jogada, ataque, habilidade, [Trigger]) e a faixa de troca de turno. Suaves: as cartas só vão de um lugar ao outro, sem as paradas no centro. Desligadas: a mesa muda na hora.',
+  'settings.animationsHint': 'Completas: cartas voando, as paradas no centro da mesa (carta jogada, ataque, habilidade, [Trigger]) e a faixa de troca de turno. Suaves: as cartas só vão de um lugar ao outro, sem as paradas no centro. Desligadas: a mesa muda na hora. As páginas virando (lições do tutorial e seções do menu) aparecem só nas completas.',
   'settings.animFull': 'Completas',
   'settings.animSoft': 'Suaves',
   'settings.animOff': 'Desligadas',

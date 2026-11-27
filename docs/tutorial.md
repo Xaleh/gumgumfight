@@ -28,12 +28,35 @@ Os decks são os iniciais ST01 (Luffy, para quem aprende) e ST03 (Crocodile, par
 | `apps/web/src/components/TutorialFunnel.tsx` | Aba **Tutorial** da Administração: o funil das lições. |
 | `apps/server/src/tutorial/` | Progresso no servidor, título, eventos anônimos e o funil (`store.ts`, `routes.ts`). |
 | `apps/web/src/components/Learn.tsx` | Hub: progresso, capítulos, lições, insígnias e glossário. |
-| `apps/web/src/components/Lesson.tsx` | Tela da lição: a mesa (`LessonTable` do `GameScreen`) ou o painel das lições sem mesa (carta, anatomia, curva). |
+| `apps/web/src/components/Lesson.tsx` | Tela da lição: a mesa (`LessonTable` do `GameScreen`) ou o gibi das lições sem mesa (carta, anatomia, curva). |
+| `apps/web/src/components/PageBook.tsx` | O gibi das lições sem mesa: uma página no celular, livro aberto em tela larga, e a virada de página. |
+| `apps/web/src/pageTurn.ts` | A dobra da virada de página: a conta (`foldAt`) e o desenho com cópias paradas das páginas (`PageTurn`). Também vira a tela ao entrar e sair das seções do menu (`screenTurn.ts`). |
 | `apps/web/src/components/Coach.tsx` | O treinador (texto, quiz, botões) e os destaques (`Spotlight`, anéis em volta das áreas). |
 | `apps/web/src/i18n/tutorial/*.ts` | Os textos, nos 6 idiomas. |
 | `apps/web/test/tutorial.test.ts` | Resolve cada lição de ponta a ponta sem navegador e confere que todos os textos existem. |
 | `apps/web/test/{coachTips,terms}.test.ts` | As dicas do treinador e os termos clicáveis. |
+| `apps/web/test/pageTurn.test.ts` | A conta da dobra da virada de página. |
+| `e2e/tutorial.spec.ts` | O gibi no navegador: virar pelo botão, puxar a ponta, o celular e os modos sem animação. |
 | `apps/server/test/tutorial.test.ts` | Progresso, título, eventos, funil e limite de envios. |
+
+## O gibi das lições sem mesa
+
+As lições sem mesa (`card`, `keywords` e `deck`) são páginas que se folheiam (`PageBook`). Até 999 px de largura há uma
+página só, com a figura do passo em cima e o treinador embaixo. A partir de 1000 px o gibi abre como um livro: a figura na
+página da esquerda (ou a folha de rosto da lição, quando o passo não tem figura) e o treinador na da direita.
+
+A página vira pelos botões do treinador ("Próximo", "Voltar", "Concluir lição") ou puxando a ponta da folha: uma faixa na
+borda de fora da página, com a orelha dobrada no canto de baixo. A ponta só aparece para onde o botão também levaria (com
+o quiz sem resposta, não há ponta para a frente). Solta antes de uns 28% do caminho, a folha volta; um toque nela vira a
+página inteira. No livro aberto só a folha da direita vira, por cima da lombada, e o verso dela já é a página seguinte.
+
+A virada segue a opção **Animações**: completas, a dobra; suaves (ou o sistema pedindo menos movimento), a página só
+esmaece; desligadas, troca na hora. A ponta de puxar só existe nas completas.
+
+Por baixo, a dobra é desenhada com cópias paradas das páginas (o que estava na tela e o que vai ficar), por cima do livro
+de verdade. Para puxar a ponta é preciso mostrar a página seguinte antes de o passo mudar: ela é montada escondida
+(`.gibi-pages.peek`, com o treinador em modo `preview`, que não pega o foco nem fala no leitor de tela) e copiada. O passo
+só muda de verdade quando a folha chega ao outro lado, então uma puxada desistida não conta no funil das lições.
 
 A mesa da lição é a mesma das partidas (`Table`, em `components/table/Table.tsx`) com a opção `tutorial`: o treinador fica no painel
 lateral (desktop) ou flutuando em cima/embaixo (celular), as perguntas do motor ficam escondidas nos passos de leitura e
