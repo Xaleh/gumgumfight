@@ -1998,6 +1998,7 @@ export default {
   'game.opponentSeesQuestion': 'Dein Gegner sieht dieselbe Frage, ob die Kosten bezahlt werden können oder nicht.',
   'game.drawOne': '1 Karte ziehen',
   'game.payAndUse': 'Bezahlen und nutzen',
+  'game.useEffect': 'Effekt nutzen',
   'game.stop': 'Stopp',
   'game.dontUse': 'Nicht nutzen',
   // ---- Kartenzoom ----

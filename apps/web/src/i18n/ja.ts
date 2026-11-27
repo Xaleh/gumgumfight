@@ -1996,6 +1996,7 @@ export default {
   'game.opponentSeesQuestion': 'コストを支払えるかどうかに関係なく、相手には同じ質問が表示されます。',
   'game.drawOne': 'カードを1枚引く',
   'game.payAndUse': '支払って使用',
+  'game.useEffect': '効果を使用',
   'game.stop': 'やめる',
   'game.dontUse': '使用しない',
   // ---- カードの拡大表示 ----

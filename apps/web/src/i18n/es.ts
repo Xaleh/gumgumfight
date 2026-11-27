@@ -1998,6 +1998,7 @@ export default {
   'game.opponentSeesQuestion': 'Tu rival ve la misma pregunta, se pueda pagar el coste o no.',
   'game.drawOne': 'Robar 1 carta',
   'game.payAndUse': 'Pagar y usar',
+  'game.useEffect': 'Usar el efecto',
   'game.stop': 'Parar',
   'game.dontUse': 'No usar',
   // ---- zoom de la carta ----

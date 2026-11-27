@@ -4,10 +4,10 @@
 import { type Action, cardDef, type GameState, type PlayerId, translateToPt, zoneOf } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useT, useTryT } from '../../i18n';
-import { listText } from '../../game/engineText';
+import { listText, msgText } from '../../game/engineText';
 import { cardText, useSettings } from '../../settings';
 import { CardView, type Highlight } from '../CardView';
-import { type KeyedOptions, orderText, promptText } from './shared';
+import { type Keyed, type KeyedOptions, orderText, promptText, type TryT, useMediaQuery } from './shared';
 import { OFF_TABLE } from './decisions';
 
 // ------------------------------------------------------------------ prompts
@@ -70,6 +70,8 @@ export function Prompt(props: {
   const t = useT();
   const tryT = useTryT();
   const pending = state.pending;
+  // No desktop a pergunta de sim ou não tem um desenho próprio, com a carta ao lado (o caso `confirm`, mais abaixo).
+  const wide = useMediaQuery('(min-width: 1000px)');
   // "Ver a mesa": a janela da pergunta recolhe para um balão no topo, para olhar o campo e a mão antes de
   // responder (ex.: usar ou não um efeito quando o oponente ataca). Volta sozinha quando a situação muda.
   const [peek, setPeek] = useState(false);
@@ -358,9 +360,67 @@ export function Prompt(props: {
         </div>
       );
     }
-    case 'confirm':
+    case 'confirm': {
       // Sem como pagar o custo a pergunta abre mesmo assim (para o oponente não deduzir a mão),
       // só com "Não usar".
+      const yes = !pending.cannot && (
+        <button className="btn primary big" data-hotkey="confirm" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+          {/* "Pagar e usar" só quando há o que pagar: sem custo, a resposta é "Usar o efeito". */}
+          {pending.drawUpTo ? t('game.drawOne') : hasCost(pending) ? t('game.payAndUse') : t('game.useEffect')}
+        </button>
+      );
+      const no = (
+        <button
+          className={`btn big${pending.cannot ? ' primary' : ''}`}
+          data-hotkey={pending.cannot ? 'confirm' : undefined}
+          onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}
+        >
+          {pending.drawUpTo ? t('game.stop') : t('game.dontUse')}
+        </button>
+      );
+      if (wide) {
+        const def = state.cards[pending.source] ? cardDef(state, pending.source) : null;
+        const ask = askText(tryT, pending, def?.name);
+        return (
+          <div className="modal-backdrop ask-backdrop">
+            <div className={`modal-card ask c-${def?.colors[0] ?? 'red'}`}>
+              <div className="ask-main">
+                {def && (
+                  <div className="ask-art">
+                    <CardView state={state} uid={pending.source} onClick={() => props.onCard(pending.source)} />
+                  </div>
+                )}
+                <div className="ask-body">
+                  {def && <div className="ask-name">{def.name}</div>}
+                  <h3>{ask.question}</h3>
+                  {ask.cost && (
+                    <p className="ask-cost">
+                      <b>{t('card.cost')}</b>
+                      {ask.cost}
+                    </p>
+                  )}
+                  {pending.cannot && (
+                    <p className="ask-cannot">
+                      {ask.cannot && <b>{ask.cannot}</b>}
+                      {t('game.opponentSeesQuestion')}
+                    </p>
+                  )}
+                  {def && cardText(def, locale).text && <p className="ask-text">{cardText(def, locale).text}</p>}
+                  <div className="ask-answers">
+                    {yes}
+                    {no}
+                  </div>
+                </div>
+              </div>
+              <div className="ask-foot">
+                {peekButton}
+                {hint}
+                {cancel}
+              </div>
+            </div>
+          </div>
+        );
+      }
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
@@ -368,18 +428,8 @@ export function Prompt(props: {
             <h3>{prompt}</h3>
             {pending.cannot && <p className="muted small">{t('game.opponentSeesQuestion')}</p>}
             <div className="btn-row center">
-              {!pending.cannot && (
-                <button className="btn primary big" data-hotkey="confirm" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                  {pending.drawUpTo ? t('game.drawOne') : t('game.payAndUse')}
-                </button>
-              )}
-              <button
-                className={`btn big${pending.cannot ? ' primary' : ''}`}
-                data-hotkey={pending.cannot ? 'confirm' : undefined}
-                onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}
-              >
-                {pending.drawUpTo ? t('game.stop') : t('game.dontUse')}
-              </button>
+              {yes}
+              {no}
             </div>
             <div className="btn-row center">
               {peekButton}
@@ -389,8 +439,43 @@ export function Prompt(props: {
           </div>
         </div>
       );
+    }
   }
 }
+
+type Confirm = Extract<NonNullable<GameState['pending']>, { kind: 'confirm' }>;
+
+/** A pergunta cobra um custo? (O motor manda o custo nos parâmetros do texto: "Custo: …", "Pagar … para evitar?".) */
+function hasCost(pending: Confirm): boolean {
+  const p = pending as Confirm & Keyed;
+  return Boolean(p.promptParts?.cost) || p.promptParams?.cost !== undefined;
+}
+
+/**
+ * O texto da pergunta de sim ou não em pedaços, para a janela do desktop: a pergunta sem o nome da carta na
+ * frente (o nome e a carta já estão ao lado), o custo à parte no "usar o efeito?" e o aviso de que não dá
+ * para pagar. Sem a chave do motor no dicionário, a pergunta fica como veio.
+ */
+function askText(tryT: TryT, pending: Confirm, name: string | undefined): { question: string; cost?: string; cannot?: string } {
+  const p = pending as Confirm & Keyed;
+  let question = msgText(tryT, p.promptKey, p.promptParams, p.promptParts);
+  if (question === undefined) return { question: pending.prompt };
+  let cost: string | undefined;
+  if (p.promptKey === 'engine.useEffectWithCost') {
+    const plain = msgText(tryT, 'engine.useEffect', p.promptParams);
+    const text = (p.promptParts?.cost && listText(tryT, p.promptParts.cost)) || String(p.promptParams?.cost ?? '');
+    if (plain !== undefined && text) {
+      question = plain;
+      cost = capital(text);
+    }
+  }
+  if (name && question.startsWith(`${name}: `)) question = capital(question.slice(name.length + 2));
+  // "(Não dá para pagar o custo.)": na janela vai sem os parênteses, numa linha própria.
+  const cannot = pending.cannot ? tryT('engine.cannotPayCost')?.replace(/^[(（]\s*|\s*[)）]$/g, '') : undefined;
+  return { question, cost, cannot };
+}
+
+const capital = (text: string) => text.charAt(0).toLocaleUpperCase() + text.slice(1);
 
 function SourceLine({ state, uid }: { state: GameState; uid: string }) {
   if (!state.cards[uid]) return null;

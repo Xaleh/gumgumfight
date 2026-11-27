@@ -1999,6 +1999,7 @@ const ptBR = {
   'game.opponentSeesQuestion': 'O oponente vê a mesma pergunta, dando para pagar ou não.',
   'game.drawOne': 'Comprar 1 carta',
   'game.payAndUse': 'Pagar e usar',
+  'game.useEffect': 'Usar o efeito',
   'game.stop': 'Parar',
   'game.dontUse': 'Não usar',
   // ---- carta ampliada ----
