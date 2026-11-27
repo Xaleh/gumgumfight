@@ -135,26 +135,35 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   (largada e mão inicial) e as perguntas dos bots são respondidas pelo botão em destaque da faixa de ação até
   "Encerrar turno" acender; o turno passa para um bot; e as opções da mesa abrem com a escolha das animações, que
   desligadas valem na hora (a mesa leva `anim-off`). Entrou com o redesenho da mesa (playmats, animações de voo).
-- No `desktop` a partida corre com as animações completas e o jogador as desliga no fim. No `iphone` ele as desliga
-  ainda na preparação, antes do primeiro turno, por causa da queda do WebKit descrita abaixo.
+- Nos dois projetos a partida corre com as animações completas. Depois de encerrar o turno, o teste espera a faixa de
+  troca de turno atravessar a mesa na vez do bot e sair, e só então o jogador desliga as animações. (Até 2026-11-27 o
+  `iphone` as desligava ainda na preparação, por causa do diagnóstico descrito abaixo.)
 
-**A queda da mesa no WebKit do CI tem causa (26/11/2026):** é a **faixa animada de troca de turno** das animações
-completas (`.turn-banner.sweep` em `styles.css`: `tb-sweep` anima `filter: blur()` numa faixa com `backdrop-filter`).
-Foi isolada no PR do redesenho do Yonko, com variantes do teste rodando só no WebKit do CI:
+**O diagnóstico do PR do Yonko (26/11/2026) mediu o CSS de antes da correção.** O PR do redesenho do Yonko
+(Xaleh/gumgumfight#244) rodou variantes do teste no WebKit do CI e concluiu que a faixa de troca de turno ainda
+derrubava a mesa com as animações completas, no Yonko e na mesa de dois. A conclusão valia para o branch, não para a
+`main`:
 
-| Variante (WebKit do CI; as que caem, caíram nas duas tentativas) | Resultado |
-|---|---|
-| Yonko, animações completas | cai (a página trava ~1 s depois de uma troca de turno e cai ~21 s depois) |
-| Yonko, animações suaves | passa |
-| Yonko, animações desligadas | passa |
-| Yonko, completas com `.turn-banner { display: none }` | passa |
-| Yonko, completas sem animação nem transição de CSS | passa |
-| Yonko, completas com `.motion-layer { display: none }` (sem as cartas voando) | cai |
-| Yonko, completas sem os enfeites da mesa nova (brilho, pulso, pontinhos) | cai |
-| **Mesa de dois**, completas, 40 s de Auto | cai (aos ~31 s, nas duas tentativas) |
+- O branch do PR não tinha a correção do `tb-sweep` (ela entrou na `main` às 21:16 UTC; o branch tinha juntado a
+  `main` às 21:14). Na época o job de ponta a ponta rodava duas vezes por commit: no *push* (só o branch, com
+  `filter: none` nos quadros do meio) e no *pull_request* (o branch junto com a `main`, já com `blur(0)`).
+- As quedas vieram das execuções de *push*. A execução de *pull_request* do mesmo commit de diagnóstico (`277e021`)
+  passou em todas as variantes de primeira, com o Yonko nas completas e a mesa de dois em 40 s de Auto.
+- Ou seja, a tabela daquele diagnóstico repete, pelo CI, o que a seção "Queda da mesa no WebKit de Linux" já dizia: sem
+  a faixa não cai, sem animação de CSS não cai, e não é das cartas voando nem da mesa do Yonko.
 
-Ou seja: não é da mesa do Yonko nem das cartas voando, e a mesa de dois cai do mesmo jeito. É o que está por trás
-do "Conhecido na fase 1" (a queda "logo depois do mulligan" é a primeira faixa de turno). Continua sem resposta se
-isso acontece num iPhone de verdade ou só no WebKit de Linux do Playwright, que desenha sem placa de vídeo. Falta
-descobrir qual das duas propriedades derruba (o `backdrop-filter` ou o `filter` animado), trocar por algo que o
-WebKit aguente e, então, levar para o `iphone` os testes de partida que hoje ficam só no `desktop`.
+**Conferido no WebKit do CI em 2026-11-27**, numa execução só, com a mesa de dois, as animações completas e o bot
+jogando pelos dois lados por 25 s, e o `tb-sweep` trocado por CSS injetado (um teste temporário, que não ficou no
+repositório):
+
+| `tb-sweep` em uso                                                              | Resultado                              |
+| ------------------------------------------------------------------------------ | -------------------------------------- |
+| O de hoje (`blur(0)` nos quadros de 20% e 78%)                                 | não cai                                |
+| O antigo (`filter: none` nos quadros de 20% e 78%)                             | cai (a página trava na primeira faixa) |
+| O antigo, sem o `backdrop-filter` da faixa                                     | cai (a página trava na primeira faixa) |
+| Sem `filter` na animação (só `transform` e `opacity`), com o `backdrop-filter` | não cai                                |
+
+Quem derruba é o `filter` animado com os dois quadros em `none`; o `backdrop-filter` da faixa não tem culpa. A faixa
+ficou como estava: a correção (`blur(0)` no lugar de `none`) não muda o que se vê. Com isso foram para o `iphone` a
+partida inteira no Auto, as duas filas online e a partida do torneio, e a mesma execução passou com tudo de primeira,
+sem nova tentativa. Num iPhone de verdade continua não conferido (ver "iPhone de verdade", acima).
