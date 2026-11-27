@@ -368,7 +368,7 @@ describe('foto da conta', () => {
     expect((await a.inject({ url: pic, headers: admin.cookie })).statusCode).toBe(200);
   });
 
-  it('logo do playmat: só quem transmite envia, só ele (e o admin) vê, e some com o perfil', async () => {
+  it('logo do playmat: só quem transmite (Streamer, Organizador, Admin) envia, só ele (e o admin) vê, e some com o perfil', async () => {
     const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
     const admin = await login(a);
     const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
@@ -423,5 +423,9 @@ describe('foto da conta', () => {
 
     // O admin também transmite: pode ter a própria logo.
     expect((await put(png, admin.cookie)).json().user.playmatLogo).toMatch(/\/playmat-logo\?v=\d+$/);
+    // O Organizador tem as permissões do Streamer: a logo que o Zoro tirou não volta, mas ele pode enviar outra.
+    await role('organizer');
+    expect((await me()).playmatLogo).toBeNull();
+    expect((await put(png)).json().user.playmatLogo).toMatch(new RegExp(`^/api/users/${zoroId}/playmat-logo\\?v=\\d+$`));
   });
 });

@@ -19,7 +19,7 @@ import {
   zoneOf,
 } from '@gumgum/engine';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, isAdmin, isTeam, type LiveRoom, type RoomDecks } from '../../api';
+import { api, isAdmin, isTeam, type LiveRoom, type RoomDecks, seesHands } from '../../api';
 import { BotReport } from '../BotFeedback';
 import { CoachPanel } from '../CoachPanel';
 import { useAuth } from '../../auth';
@@ -343,7 +343,7 @@ export function Table({
   );
   const { user } = useAuth();
   /**
-   * Mesa lateral: a logo de quem transmite (perfis Streamer e Admin) no centro do playmat, no lugar da padrão.
+   * Mesa lateral: a logo de quem transmite (perfis Streamer, Organizador e Admin) no centro do playmat, no lugar da padrão.
    * Vale só para a tela desta conta; o replay embutido num app parceiro fica sempre com a padrão.
    */
   const playmatLogo = lateral && !embed ? (user?.playmatLogo ?? null) : null;
@@ -352,8 +352,8 @@ export function Table({
   const { marks, toggleMark, updateMark, coachEntries, buildBotReport, coachReport } = useBotCoach({
     game, t, locale, isOnline, online, botDeckId, botDeckName, reportMatch, effectiveBotLevel, coachOn,
   });
-  /** Streamer e Admin mandam a partida aberta para a tela de transmissão (menu da partida). */
-  const canBroadcast = Boolean(online?.room && !broadcast && !tutorial && user && (user.role === 'streamer' || isAdmin(user.role)));
+  /** Streamer, Organizador e Admin mandam a partida aberta para a tela de transmissão (menu da partida). */
+  const canBroadcast = Boolean(online?.room && !broadcast && !tutorial && user && seesHands(user.role));
   const sendToBroadcast = () =>
     api.broadcast.choose(online!.room!.id).then(
       () => {

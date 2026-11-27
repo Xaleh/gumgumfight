@@ -4175,6 +4175,162 @@ button.hint-pill::after,
   display: none;
 }
 
+/*
+ * Pergunta de sim ou não no desktop (usar um efeito, pagar um custo): a carta que pergunta fica ao lado, com o
+ * nome, a pergunta, o custo e o texto dela; as duas respostas do mesmo tamanho, e "Ver a mesa" e "Cancelar"
+ * num rodapé discreto. A mesa atrás escurece sem desfocar, para dar para ler o campo e a mão. Sem animação
+ * própria: a entrada é a de toda janela.
+ */
+.modal-backdrop.ask-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.modal-card.ask {
+  width: min(620px, 100%);
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid var(--line);
+  /* um toque da cor da carta no canto dela */
+  background:
+    radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--card-color, transparent) 20%, transparent), transparent 62%),
+    var(--surface);
+  box-shadow:
+    0 0 0 1px rgba(var(--shadow2-rgb), 0.12),
+    0 24px 70px rgba(var(--shadow2-rgb), 0.5);
+}
+.ask-main {
+  display: flex;
+  gap: 20px;
+  padding: 20px 22px 20px 20px;
+}
+.ask-art {
+  --cw: 164px;
+  flex: none;
+  align-self: flex-start;
+  border-radius: 9px;
+  box-shadow: 0 10px 24px rgba(var(--shadow2-rgb), 0.4);
+}
+.ask-art .card {
+  cursor: zoom-in;
+}
+.ask-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ask-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ask-name::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--card-color, var(--muted));
+}
+.modal-card.ask h3 {
+  margin: 4px 0 0;
+  font-size: 23px;
+  line-height: 1.2;
+}
+.ask-cost {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.ask-cost b {
+  flex: none;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brown);
+  background: var(--brand-yellow);
+}
+.ask-cannot {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.ask-cannot b {
+  display: block;
+  font-size: 14px;
+  color: var(--danger-text);
+}
+.ask-text {
+  margin: 12px 0 0;
+  border-left: 3px solid var(--card-color, var(--line));
+  border-radius: 4px 12px 12px 4px;
+  padding: 9px 12px;
+  background: rgba(var(--shadow-rgb), 0.07);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-line;
+  /* o texto inteiro; só rola numa carta de texto muito longo */
+  max-height: 150px;
+  overflow-y: auto;
+}
+.ask-answers {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+.ask-answers .btn {
+  flex: 1 1 0;
+  min-height: 48px;
+}
+.ask-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding: 7px 12px;
+  background: rgba(var(--shadow-rgb), 0.07);
+}
+.ask-foot .btn {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ask-foot .btn:hover:not(:disabled) {
+  background: var(--panel2);
+  color: var(--text);
+}
+.ask-foot .btn.cancel {
+  margin-left: auto;
+  color: var(--danger-text);
+}
+.ask-foot .btn.cancel:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.ask-foot .cancel-hint {
+  margin: 0 0 0 auto;
+  text-align: right;
+}
+
 .mulligan-hand {
   display: flex;
   justify-content: center;

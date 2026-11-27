@@ -203,7 +203,7 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
 
   // ---------------------------------------------------------------- logo do playmat (quem transmite)
 
-  /** Conta que transmite (Streamer, Admin ou Dev), ou responde 401/403. */
+  /** Conta que transmite (Streamer, Organizador, Admin ou Dev), ou responde 401/403. */
   const broadcaster = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = viewer(req);
     if (!u) {
@@ -211,7 +211,7 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
       return null;
     }
     if (!seesHands(u.role)) {
-      void reply.code(403).send(fail('playmatLogoForbidden', 'A logo no playmat é só para os perfis Streamer e Admin.'));
+      void reply.code(403).send(fail('playmatLogoForbidden', 'A logo no playmat é só para os perfis Streamer, Organizador e Admin.'));
       return null;
     }
     return u;

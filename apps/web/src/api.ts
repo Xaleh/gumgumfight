@@ -578,8 +578,8 @@ export interface FriendList {
 }
 
 /**
- * player: joga e assiste sem ver as mãos; streamer: assiste vendo as mãos;
- * organizer: cria e gerencia torneios; admin: tudo isso e muda os perfis;
+ * player: joga e assiste sem ver as mãos; streamer: assiste vendo as mãos, transmite e troca a logo do playmat;
+ * organizer: tudo do streamer, e cria e gerencia torneios; admin: tudo isso e muda os perfis;
  * dev: tudo do admin e as funções de desenvolvimento (ferramentas manuais, cobertura, testes).
  */
 export type Role = 'player' | 'streamer' | 'organizer' | 'admin' | 'dev';
@@ -594,6 +594,11 @@ export const ROLE_LABEL: Record<Role, MessageKey> = {
 };
 /** Poderes de administrador (o Dev é um Admin com as ferramentas de desenvolvimento). */
 export const isAdmin = (role: Role | undefined) => role === 'admin' || role === 'dev';
+/**
+ * Quem transmite: assiste vendo as mãos, usa o modo transmissão e troca a logo do playmat. O Organizador
+ * tem tudo o que o Streamer tem (igual a `seesHands` em apps/server/src/auth/store.ts).
+ */
+export const seesHands = (role: Role | undefined) => role === 'streamer' || role === 'organizer' || isAdmin(role);
 /**
  * Funções de desenvolvimento, escondidas do público: ferramentas manuais na partida,
  * cobertura das cartas, opções de teste e treino no servidor contra o bot.
@@ -610,7 +615,7 @@ export interface User {
   /** O usuário enviou a própria foto (pode voltar para a do Google). */
   customPicture: boolean;
   /**
-   * Logo de quem transmite (perfis Streamer, Admin e Dev) no centro do playmat da mesa lateral, no lugar
+   * Logo de quem transmite (perfis Streamer, Organizador, Admin e Dev) no centro do playmat da mesa lateral, no lugar
    * da logo padrão: só esta conta a vê. null = a logo padrão.
    */
   playmatLogo: string | null;
@@ -1187,7 +1192,7 @@ export const api = {
     replay: (roomId: string) => get<Record<string, unknown>>(`/api/online/rooms/${roomId}/replay`),
     eventsUrl: (roomId: string, t: string) => `/api/online/rooms/${roomId}/events?t=${encodeURIComponent(t)}`,
   },
-  /** Modo transmissão (perfil Streamer ou Admin): o link da fonte do OBS e a partida da live. */
+  /** Modo transmissão (perfil Streamer, Organizador ou Admin): o link da fonte do OBS e a partida da live. */
   broadcast: {
     mine: () => get<BroadcastInfo>('/api/broadcast'),
     newKey: () => send<BroadcastInfo>('POST', '/api/broadcast/key'),
@@ -1422,7 +1427,7 @@ export interface TournamentInput {
   checkIn: boolean;
   /** Com check-in: o torneio começa sozinho na hora marcada (para quando o organizador não está presente). */
   autoStart: boolean;
-  /** Quem transmite (Streamer e Admin) pode mostrar as mãos dos jogadores ao vivo, sem o atraso mínimo de 1 min. */
+  /** Quem transmite (Streamer, Organizador e Admin) pode mostrar as mãos dos jogadores ao vivo, sem o atraso mínimo de 1 min. */
   liveHands: boolean;
   /** Warnings que um jogador pode receber antes de o organizador ter de decidir a eliminação (null = sem regra). */
   maxWarnings: number | null;

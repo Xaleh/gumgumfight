@@ -34,7 +34,7 @@ export type Panel = null | 'log' | 'matches' | 'deck' | 'coach';
 
 export type TryT = ReturnType<typeof useTryT>;
 /** Campos que o motor passa a mandar junto das perguntas e das habilidades: a chave do texto no dicionário e os parâmetros. */
-interface Keyed {
+export interface Keyed {
   promptKey?: string;
   promptParams?: Record<string, string | number>;
   promptParts?: MsgParts;

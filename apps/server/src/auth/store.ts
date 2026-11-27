@@ -17,8 +17,9 @@ export const SESSION_DAYS = 60;
 
 /**
  * Perfil da conta. player: joga e assiste às partidas sem ver as mãos; streamer:
- * pode assistir vendo as mãos dos dois jogadores; organizer: cria e gerencia
- * torneios; admin: tudo isso, gerencia qualquer torneio e muda os perfis; dev: tudo
+ * pode assistir vendo as mãos dos dois jogadores, usa o modo transmissão e troca a
+ * logo do playmat; organizer: tudo do streamer, e cria e gerencia torneios; admin:
+ * tudo isso, gerencia qualquer torneio e muda os perfis; dev: tudo
  * do admin e as funções de desenvolvimento (ferramentas manuais, cobertura, testes).
  */
 export const ROLES = ['player', 'streamer', 'organizer', 'admin', 'dev'] as const;
@@ -31,8 +32,11 @@ export const isAdmin = (role: Role | undefined) => role === 'admin' || role === 
  * opções de teste. Escondidas do público em geral.
  */
 export const isDev = (role: Role | undefined) => role === 'dev';
-/** Pode assistir às partidas vendo as mãos. */
-export const seesHands = (role: Role | undefined) => role === 'streamer' || isAdmin(role);
+/**
+ * Quem transmite: assiste às partidas vendo as mãos, usa o modo transmissão e troca a logo do playmat.
+ * O Organizador tem tudo o que o Streamer tem (e cria torneios).
+ */
+export const seesHands = (role: Role | undefined) => role === 'streamer' || role === 'organizer' || isAdmin(role);
 /** Pode criar torneios (e gerenciar os que criou; o admin gerencia todos). */
 export const createsTournaments = (role: Role | undefined) => role === 'organizer' || isAdmin(role);
 
@@ -46,7 +50,8 @@ export interface User {
   customPicture: boolean;
   /**
    * Logo de quem transmite, no centro do playmat da mesa lateral (URL do servidor): aparece no lugar da logo
-   * padrão, só na tela desta conta. null sem logo enviada ou sem o perfil que transmite (Streamer, Admin, Dev).
+   * padrão, só na tela desta conta. null sem logo enviada ou sem o perfil que transmite (Streamer, Organizador,
+   * Admin, Dev).
    */
   playmatLogo: string | null;
   role: Role;
