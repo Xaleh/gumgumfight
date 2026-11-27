@@ -15,6 +15,7 @@ Tudo o que precisa para abrir o perfil e publicar as primeiras três semanas: im
 | [`mihawk/`](mihawk) | Série "Mihawk aprende a jogar": roteiros, legendas, vídeos de apoio e sobreposições para gravar com o cosplay | MP4 1080×1920 e PNG transparente |
 | [`novos-modos/`](novos-modos) | Selado, Pack Rush, Draft, Draft Cubo e All Blue: 16 amostras do app, 6 Reels, 5 stories, carrossel e legendas | MP4 1080×1920 e JPG 1080×1350 |
 | [`espectador/`](espectador) | Modo espectador: carrossel de 8 imagens, 2 Reels e legendas (mãos liberadas, playmat, mesa lateral ou em pé, OBS) | JPG 1080×1350 e MP4 1080×1920 |
+| [`amigos/`](amigos) | Amigos e convite para partidas: carrossel de 7 imagens, 2 Reels, 4 stories e legendas | JPG 1080×1350, MP4 e JPG 1080×1920 |
 | [`src/`](src) | O que gera tudo isso (veja [Como refazer](#como-refazer)) | HTML, CSS e scripts |
 
 As telas e a partida são do app de verdade, gravadas no celular (tema escuro). As artes usam as cores, a fonte e o

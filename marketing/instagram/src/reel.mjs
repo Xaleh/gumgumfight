@@ -141,10 +141,10 @@ const TEAL = '#35c9b6';
 /** Amostra sem texto: um trecho da gravação cortado direto pelo ffmpeg (sem passar pelo navegador). */
 const sample = (file, start, dur) => ({ cut: { file: `modos-${file}.mp4`, start, dur } });
 /** Título em cima e o celular grande com um trecho da gravação. `link` põe o botão do link (stories). */
-function showcase({ dur, eyebrow, title, lead, file, start, link = false, color = TEAL }) {
+function showcase({ dur, eyebrow, title, lead, file, start, link = false, color = TEAL, prefix = 'modos' }) {
   return {
     dur,
-    clip: { file: `modos-${file}.mp4`, start, width: 720 },
+    clip: { file: `${prefix}-${file}.mp4`, start, width: 720 },
     cls: 'deep burst spin',
     html: `<div class="layer col center" style="padding:${link ? 262 : 238}px 60px 0;gap:14px">
       ${a('up', 0.04, `<div class="eyebrow" style="color:${color}">${eyebrow}</div>`)}
@@ -342,6 +342,21 @@ const reels = {
     desk({ dur: 4.2, eyebrow: 'Cartas', title: 'Toque <em>para ler</em>', lead: 'Qualquer carta à vista abre com o efeito.', file: 'mesa', start: 53.7 }),
     outro(3),
   ],
+  // Amigos: gravações em src/clips/amigos-*.mp4 (pedido do Jinbe, aceite e convite da Nami, Usopp recebendo).
+  'amigos/reels/reel-jogue-com-os-amigos': [
+    intro('Novidade no GumGum Fight', 'Jogue com<br>os <em>amigos</em>', 2.2),
+    showcase({ dur: 5.4, eyebrow: 'Passo 1', title: 'Digite o <em>código</em>', lead: 'Cada conta tem um código de amigo de 8 letras.', prefix: 'amigos', file: 'pedido', start: 2.6 }),
+    showcase({ dur: 4.2, eyebrow: 'Passo 2', title: 'Aceite <em>o pedido</em>', lead: 'Um toque e vocês são amigos.', prefix: 'amigos', file: 'convite', start: 2.4 }),
+    showcase({ dur: 4.6, eyebrow: 'Na lista', title: 'Quem está <em>online</em>', lead: 'Jogando, online ou offline, com foto e recompensa.', prefix: 'amigos', file: 'convite', start: 10.6 }),
+    showcase({ dur: 4.2, eyebrow: 'Passo 3', title: 'Convide <em>e escolha</em>', lead: 'Standard, Extra Grand Battle, All Blue ou Livre.', prefix: 'amigos', file: 'convite', start: 12.9 }),
+    showcase({ dur: 5, eyebrow: 'Do outro lado', title: 'Um toque <em>e jogo</em>', lead: 'O convite chega na hora. É tocar em Entrar.', prefix: 'amigos', file: 'recebe', start: 1.2 }),
+    outro(3),
+  ],
+  'amigos/reels/reel-convite-chegou': [
+    showcase({ dur: 6, eyebrow: 'Convite de amigo', title: 'Bora uma <em>partida?</em>', lead: 'Seu amigo chama, você toca em Entrar e a partida começa.', prefix: 'amigos', file: 'recebe', start: 0.8 }),
+    outro(3),
+  ],
+  'amigos/stories/story-convite': [story({ dur: 7, eyebrow: 'Amigos', title: 'Chama <em>a galera</em>', lead: 'Adicione pelo código e convide para uma partida.', prefix: 'amigos', file: 'convite', start: 11.4 })],
 };
 
 

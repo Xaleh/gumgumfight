@@ -492,6 +492,99 @@ Object.assign(slides, {
   },
 });
 
+// ------------------------------------------------------------------- amigos
+const AMG = 7;
+const twoPhones = (a, b, la, lb, top = 600) => `<div class="layer" style="top:${top}px;bottom:auto;display:flex;justify-content:center;gap:40px">
+  <div class="col center" style="gap:26px">${phone(a, { w: 360, rot: -4 })}${la ? `<span class="chip solid">${la}</span>` : ''}</div>
+  <div class="col center" style="gap:26px">${phone(b, { w: 360, rot: 4 })}${lb ? `<span class="chip solid">${lb}</span>` : ''}</div>
+</div>`;
+const statusDot = (c, t) => `<span class="chip" style="display:inline-flex;align-items:center;gap:12px"><i style="width:22px;height:22px;border-radius:50%;background:${c};display:inline-block"></i>${t}</span>`;
+Object.assign(slides, {
+  'amigos/posts/amigos-1': {
+    cls: 'burst vignette',
+    html: `<div class="layer pad col" style="--bx:72%;--by:62%;gap:18px">
+      <div class="eyebrow">Novidade no GumGum Fight</div>
+      <div class="h h1" style="font-size:150px">Jogue com<br>os <em>amigos</em></div>
+    </div>
+    <div class="layer" style="top:620px;left:80px;right:auto;bottom:auto;width:400px">
+      <div class="chips" style="flex-direction:column;align-items:flex-start;gap:18px"><span class="chip solid">Código de amigo</span><span class="chip solid">Quem está online</span><span class="chip solid">Convite direto</span></div>
+    </div>
+    <div class="layer" style="left:auto;right:90px;top:470px;bottom:auto">${phone('amigos-lista.jpg', { w: 450, rot: 4 })}</div>
+    ${foot('<span class="swipe">arrasta ➜</span>')}`,
+  },
+  'amigos/posts/amigos-2': {
+    cls: 'deep burst',
+    html: `<div class="layer pad col" style="gap:18px">${head('Passo 1', 'Mande o seu <em>código</em>', 'Cada conta tem um código de amigo de 8 letras e um link. O amigo digita o código em "Adicionar pelo código".')}</div>
+    ${twoPhones('amigos-codigo.jpg', 'amigos-pedido-enviado.jpg', 'Seu código', 'O amigo adiciona')}${count(2, AMG)}`,
+  },
+  'amigos/posts/amigos-3': {
+    cls: 'burst',
+    html: `<div class="layer pad col" style="--by:70%;gap:18px">${head('Passo 2', 'Aceite <em>o pedido</em>', 'O pedido aparece em "Pedidos recebidos". Um toque em Aceitar e vocês são amigos.')}</div>
+    ${twoPhones('amigos-pedido.jpg', 'amigos-aceito.jpg', 'Pedido recebido', 'Agora são amigos')}${count(3, AMG)}`,
+  },
+  'amigos/posts/amigos-4': {
+    cls: 'deep burst',
+    html: `<div class="layer pad col" style="gap:18px">${head('Na lista', 'Veja quem está <em>online</em>', 'Cada amigo aparece com o status, a foto e a recompensa. Nunca com a partida nem o código da sala.')}
+      <div class="chips" style="margin-top:22px;gap:14px">${statusDot('#f2b733', 'Jogando')}${statusDot('#3bc985', 'Online')}${statusDot('#7d8aa0', 'Offline')}</div>
+    </div>
+    <div class="layer" style="top:720px;bottom:auto;display:flex;justify-content:center">${phone('amigos-lista.jpg', { w: 360, rot: -3, top: '-40px' })}</div>${count(4, AMG)}`,
+  },
+  'amigos/posts/amigos-5': {
+    cls: 'burst',
+    html: `<div class="layer pad col" style="--by:72%;gap:18px">${head('Passo 3', 'Escolha <em>o formato</em>', 'Toque em Convidar e escolha: Standard, Extra Grand Battle, All Blue ou Livre. A sala sai com o seu deck equipado.')}</div>
+    <div class="layer" style="top:660px;bottom:auto;display:flex;justify-content:center">${phone('amigos-formato.jpg', { w: 360, rot: 3 })}</div>${count(5, AMG)}`,
+  },
+  'amigos/posts/amigos-6': {
+    cls: 'deep burst',
+    html: `<div class="layer pad col" style="gap:18px">${head('Do outro lado', 'O amigo entra <em>com um toque</em>', 'O convite chega como notificação e como faixa na tela inicial. É tocar em Entrar e a partida começa.')}</div>
+    ${twoPhones('amigos-faixa.jpg', 'amigos-partida.jpg', 'O convite chega', 'E é jogar')}${count(6, AMG)}`,
+  },
+  'amigos/posts/amigos-7': {
+    cls: 'burst vignette',
+    html: `<div class="layer pad col center" style="--by:40%;justify-content:center;gap:40px;padding-bottom:230px">
+      <div class="h h2 y">Chama<br>a galera!</div>
+      <div class="lead" style="max-width:860px">Entre com o Google e abra <b>Amigos</b> no menu.</div>
+      <div class="btn" style="margin-top:14px">${URL_TEXT}</div>
+      <div class="chip" style="margin-top:6px">Link na bio</div>
+    </div>
+    ${count(AMG, AMG)}
+    <div class="foot" style="justify-content:center;flex-direction:column;gap:22px"><img src="logo.svg" alt=""><div class="note">${DISCLAIMER}</div></div>`,
+  },
+  // Stories (o topo e o rodapé ficam livres para a interface do Instagram)
+  'amigos/stories/amigos-meu-codigo': {
+    cls: 'story burst vignette',
+    html: `<div class="layer col center" style="--by:44%;padding:280px 80px 360px;gap:26px">
+      <div class="ico big round">${icon('user')}</div>
+      <div class="eyebrow" style="margin-top:30px">GumGum Fight</div>
+      <div class="h h2">Me adiciona<br>como <em>amigo!</em></div>
+      <div class="lead sm" style="margin-top:6px">Meu código de amigo:</div>
+      <div class="paper" style="width:820px;height:190px"></div>
+      <div class="lead sm" style="max-width:820px;margin-top:16px">No app: Menu › Amigos › Adicionar pelo código</div>
+    </div>`,
+  },
+  'amigos/stories/amigos-3-passos': {
+    cls: 'story deep burst',
+    html: `<div class="layer col" style="--by:20%;padding:262px 80px 0;gap:18px">
+      <div class="eyebrow" style="font-size:38px">Jogar com os amigos</div>
+      <div class="h h2">Em <em>3 passos</em></div>
+      <div class="col" style="gap:30px;margin-top:50px">
+        ${step(1, 'Abra Amigos no menu', 'Com o login do Google.')}
+        ${step(2, 'Troque os códigos', 'Digite o código do amigo ou mande o seu link.')}
+        ${step(3, 'Toque em Convidar', 'Escolha o formato. O amigo recebe o aviso e entra direto.')}
+      </div>
+    </div>`,
+  },
+  'amigos/stories/amigos-revanche': {
+    cls: 'story burst vignette',
+    html: `<div class="layer col center" style="--by:40%;padding:300px 80px 360px;gap:26px">
+      <div class="ico big round">${icon('swords')}</div>
+      <div class="eyebrow" style="margin-top:34px">Desafio</div>
+      <div class="h h2">Marca aquele<br>amigo que te deve<br>uma <em>revanche</em></div>
+      <div style="width:760px;height:300px;margin-top:40px"></div>
+    </div>`,
+  },
+});
+
 // ------------------------------------------- série "Mihawk aprende a jogar"
 // Sobreposições com fundo transparente, para pôr por cima do vídeo do cosplay no editor.
 const MIHAWK_EPISODES = [
