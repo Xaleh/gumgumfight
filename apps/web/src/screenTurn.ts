@@ -56,8 +56,10 @@ export function canTurnScreen() {
 /**
  * Faz `update` (que troca a tela) com a virada: `dir` 1 = para a frente (a tela de agora é a folha que sai),
  * −1 = para trás (a tela nova é a folha que volta). Chamar só de um clique: a troca é feita na hora.
+ * `changed`: depois de `update`, diz se a tela trocou mesmo (com a fila aberta, abrir certas telas só pergunta
+ * antes); sem troca, não há virada.
  */
-export function turnScreen(dir: 1 | -1, update: () => void) {
+export function turnScreen(dir: 1 | -1, update: () => void, changed: () => boolean = () => true) {
   finish();
   const W = document.documentElement.clientWidth;
   const H = document.documentElement.clientHeight;
@@ -70,10 +72,12 @@ export function turnScreen(dir: 1 | -1, update: () => void) {
   if (dir > 0) {
     const before = { leaf: right(), left: left() };
     flushSync(update);
+    if (!changed()) return;
     sheets = { ...before, back: left(), under: null };
   } else {
     const before = { under: right(), back: left() };
     flushSync(update);
+    if (!changed()) return;
     sheets = { ...before, leaf: right(), left: null };
   }
   const layer = div('screen-turn');

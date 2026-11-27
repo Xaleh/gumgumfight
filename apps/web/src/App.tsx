@@ -312,11 +312,18 @@ const Pages = memo(function Pages({ screen, setScreen }: { screen: Screen; setSc
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, []);
   const dev = isDev(role);
+  const shown = useRef(screen);
+  shown.current = screen;
   /**
    * Entrar numa seção a partir do menu (`dir` 1) e voltar dela (−1): a tela vira como página (screenTurn.ts).
    * Só com as animações completas; com as suaves e as desligadas a tela troca na hora, como as outras.
    */
-  const flip = (dir: 1 | -1, next: Screen) => (settings.animations === 'full' && canTurnScreen() ? turnScreen(dir, () => setScreen(next)) : setScreen(next));
+  const flip = (dir: 1 | -1, next: Screen) => {
+    if (settings.animations !== 'full' || !canTurnScreen()) return setScreen(next);
+    // Com a fila aberta, abrir certas telas só pergunta antes (a tela não troca): aí não há o que virar.
+    const from = shown.current;
+    turnScreen(dir, () => setScreen(next), () => shown.current !== from);
+  };
   if (screen.name === 'builder') {
     return (
       <DeckBuilder

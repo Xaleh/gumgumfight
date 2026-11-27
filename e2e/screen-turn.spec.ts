@@ -6,6 +6,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './support/fixtures';
 import { openHome } from './support/app';
 import { label } from './support/i18n';
+import { joinQueue } from './support/online';
 
 /** A camada da virada: existe só enquanto a folha está no ar. */
 const turning = (page: Page) => page.locator('.screen-turn');
@@ -61,6 +62,36 @@ test.describe('a tela vira como página', () => {
     await page.getByRole('dialog').getByRole('button', { name: label('menu.battle'), exact: true }).click();
     await expect(page.locator('.game')).toBeVisible();
     expect(await turns()).toBe(6);
+  });
+
+  test('com a busca por oponente aberta: a tela que só pergunta não vira, e a busca acompanha a virada', async ({ page }) => {
+    await openHome(page);
+    await joinQueue(page, 'casual');
+    await page.getByRole('dialog', { name: label('menu.onlineSearching') }).getByRole('button', { name: label('wait.minimize'), exact: true }).click();
+    const pill = page.getByRole('button', { name: new RegExp(`^${label('wait.pill')}`) });
+    const leave = page.getByRole('alertdialog', { name: label('wait.leaveTitle') });
+    const turns = await countTurns(page);
+    // O construtor pede para sair da fila antes: a tela não trocou, então nada vira.
+    await page.getByRole('button', { name: label('menu.navDecks'), exact: true }).first().click();
+    await leave.getByRole('button', { name: label('wait.leaveStay'), exact: true }).click();
+    await expect(home(page)).toBeVisible();
+    expect(await turns()).toBe(0);
+    // As estatísticas mantêm a fila: a tela vira e a busca minimizada continua lá.
+    await page.getByRole('button', { name: label('menu.myStats'), exact: true }).click();
+    await expect(page.getByRole('button', { name: label('stats.backMenu'), exact: true })).toBeVisible();
+    await expect(turning(page)).toHaveCount(0);
+    expect(await turns()).toBe(1);
+    await expect(pill).toBeVisible();
+    // Sai da fila (o teste seguinte não é pareado com quem ficou): o "Sair da fila e abrir" troca a tela na hora.
+    await page.getByRole('button', { name: label('stats.backMenu'), exact: true }).click();
+    await expect(home(page)).toBeVisible();
+    await page.getByRole('button', { name: label('menu.navDecks'), exact: true }).first().click();
+    await leave.getByRole('button', { name: label('wait.leaveGo'), exact: true }).click();
+    await expect(page.getByRole('button', { name: label('deck.backMenu'), exact: true })).toBeVisible();
+    expect(await turns()).toBe(2);
+    await expect
+      .poll(async () => ((await (await page.request.get('/api/online/stats')).json()) as { queue: { casual: Record<string, number> } }).queue.casual.standard)
+      .toBe(0);
   });
 
   for (const animations of ['soft', 'off'] as const) {
