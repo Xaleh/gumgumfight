@@ -17,6 +17,7 @@ const wait = {
   'wait.leaveStay': 'Rester dans la file',
   'wait.leaveGo': 'Quitter la file et ouvrir',
   'wait.stopped': 'La recherche d’un adversaire s’est arrêtée : {reason}',
+  'wait.watchingShort': '👁 {n}',
   // ---- cartão de dicas ----
   'wait.tipsLabel': 'En attendant',
   'wait.kickerRule': 'Astuce de règles',

@@ -795,8 +795,13 @@ O estado da fila mora na raiz do app, não na tela inicial: `MainApp` (`App.tsx`
 1,5 s) não redesenhar a tela aberta; só quem lê o contexto (a tela inicial) redesenha.
 
 - **`QueueDock`** desenha a busca por cima de qualquer tela, em três formas: a janela "Procurando oponente" (com o
-  cartão de dicas, "Mão de teste", "Minimizar" e "Cancelar"), a pílula minimizada (embaixo; no alto e só com o tempo
-  nas telas de mesa, `queuePillOnTop`) e a folha da mão de teste. Trocar de tela minimiza.
+  cartão de dicas, "Mão de teste", "Minimizar" e "Cancelar"), a pílula minimizada (presa embaixo; com ela aberta, o
+  `#root` ganha um espaço no fim para o último conteúdo da página rolar por cima dela) e a folha da mão de teste.
+  Trocar de tela minimiza. Nas telas de mesa (`queueChipInTable`: assistir e replay) não há pílula solta, que
+  encostaria nos controles da partida: a busca minimizada é a etiqueta `QueueChip`, dentro do canto da própria mesa
+  (na barra do espectador, onde a etiqueta "Assistindo · N" encolhe para "👁 N", ou sob o botão do menu no replay).
+  Como a mesa também é usada fora do app principal (transmissão, replay embutido), a etiqueta lê o contexto sem
+  exigir o provedor. A forma da busca (`view`) mora no `MainApp` e vai no mesmo contexto.
 - **Quais telas mantêm a fila** (`queueScreens.ts`, `queuePolicy`): `keep` nas telas de navegar (`menu`, `stats`,
   `profile`, `learn`, `tournaments`, `watch-list`, `watch` e `game` em modo replay); `leave` em `online` e
   `yonko-online` (o jogador já tem um lugar numa sala, e o servidor tirou o bilhete: `lobby.leaveQueue`); `ask` em todas

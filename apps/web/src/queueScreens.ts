@@ -21,5 +21,8 @@ export function queuePolicy(screen: string, replay = false): QueuePolicy {
   return LEAVE.has(screen) ? 'leave' : 'ask';
 }
 
-/** Telas de mesa (assistir e replay): a busca minimizada sobe para o alto, longe da mão e dos controles. */
-export const queuePillOnTop = (screen: string) => screen === 'watch' || screen === 'game';
+/**
+ * Telas de mesa (assistir e replay): as bordas são todas da partida, e uma pílula solta encostaria nos controles.
+ * Nelas a busca minimizada é uma etiqueta no canto da própria mesa, junto das outras (`QueueChip`).
+ */
+export const queueChipInTable = (screen: string) => screen === 'watch' || screen === 'game';

@@ -17,6 +17,7 @@ const wait = {
   'wait.leaveStay': '待ち続ける',
   'wait.leaveGo': '待ちをやめて開く',
   'wait.stopped': '対戦相手の検索が止まりました：{reason}',
+  'wait.watchingShort': '👁 {n}',
   // ---- cartão de dicas ----
   'wait.tipsLabel': '待っている間に',
   'wait.kickerRule': 'ルールのヒント',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { queuePillOnTop, queuePolicy } from '../src/queueScreens';
+import { queueChipInTable, queuePolicy } from '../src/queueScreens';
 
 describe('fila e telas: quando a busca por oponente continua', () => {
   it('telas de navegar e ler mantêm a fila', () => {
@@ -25,10 +25,10 @@ describe('fila e telas: quando a busca por oponente continua', () => {
     expect(queuePolicy('yonko-online')).toBe('leave');
   });
 
-  it('nas telas de mesa a busca minimizada fica no alto', () => {
-    expect(queuePillOnTop('watch')).toBe(true);
-    expect(queuePillOnTop('game')).toBe(true);
-    expect(queuePillOnTop('menu')).toBe(false);
-    expect(queuePillOnTop('stats')).toBe(false);
+  it('nas telas de mesa a busca minimizada é a etiqueta da própria mesa', () => {
+    expect(queueChipInTable('watch')).toBe(true);
+    expect(queueChipInTable('game')).toBe(true);
+    expect(queueChipInTable('menu')).toBe(false);
+    expect(queueChipInTable('stats')).toBe(false);
   });
 });

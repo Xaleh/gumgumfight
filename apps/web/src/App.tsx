@@ -14,7 +14,7 @@ import { Lesson } from './components/Lesson';
 import { Draft } from './components/Draft';
 import { Menu } from './components/Menu';
 import { useQueue } from './components/OnlineMenu';
-import { QueueDock, QueueLeaveConfirm, QueueProvider, QueueStopped } from './components/QueueDock';
+import { QueueDock, QueueLeaveConfirm, QueueProvider, QueueStopped, type QueueView } from './components/QueueDock';
 import { Sandbox } from './components/Sandbox';
 import { Sealed } from './components/Sealed';
 import { OAuthConsent } from './components/OAuthConsent';
@@ -142,6 +142,7 @@ function announceMatch() {
 function MainApp() {
   const [screen, setScreenNow] = useState<Screen>(savedScreen);
   const [queueError, setQueueError] = useState<unknown>(null);
+  const [queueView, setQueueView] = useState<QueueView>('wait');
   /** Tela pedida com a fila aberta e que tira o jogador dela: espera o "Sair da fila e abrir". */
   const [pending, setPending] = useState<Screen | null>(null);
   const { queue, enqueue, cancel } = useQueue((seat) => {
@@ -173,8 +174,12 @@ function MainApp() {
     <QueueProvider
       value={{
         queue,
+        view: queueView,
+        setView: setQueueView,
         enqueue: async (...args) => {
           setQueueError(null);
+          // Toda busca nova abre na janela.
+          setQueueView('wait');
           await enqueue(...args);
         },
         cancel,

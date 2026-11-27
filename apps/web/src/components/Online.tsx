@@ -7,6 +7,7 @@ import { type MessageKey, type Translate, useLocale, useT, useTryT } from '../i1
 import { fmtBerries, fmtNumber } from '../i18n/format';
 import { roomDeck } from '../roomDeck';
 import { useSettings } from '../settings';
+import { QueueChip, useQueueMinimized } from './QueueDock';
 import { useWaitDeck, WaitHandSheet } from './WaitHandTest';
 import { WaitTips } from './WaitTips';
 
@@ -468,10 +469,17 @@ export function SpectatorBar({
 }) {
   const t = useT();
   const n = online.room?.spectators ?? 1;
+  // Quem assiste enquanto espera na fila: a busca minimizada entra aqui, com as outras etiquetas, e a de quem
+  // assiste encolhe para o olho e o número (no celular a fileira já vai até a faixa do oponente).
+  const queued = useQueueMinimized();
   return (
     <div className="spectator-bar">
-      <span className="spectator-tag" title={t('online.watchingTitle', { n })}>
-        {t('online.watching', { n })}
+      {/* Na mesma linha: nas mesas em que a barra é uma coluna, a etiqueta da fila não empurra o resto para baixo. */}
+      <span className="spectator-tags">
+        <span className="spectator-tag" title={t('online.watchingTitle', { n })} aria-label={queued ? t('online.watchingTitle', { n }) : undefined}>
+          {queued ? t('wait.watchingShort', { n }) : t('online.watching', { n })}
+        </span>
+        <QueueChip />
       </span>
       {canHands && (
         <button className={['auto-toggle', online.hands ? 'on' : ''].join(' ')} onClick={onToggleHands} title={t('online.handsTitle')}>

@@ -17,6 +17,7 @@ const wait = {
   'wait.leaveStay': 'In der Warteschlange bleiben',
   'wait.leaveGo': 'Warteschlange verlassen und öffnen',
   'wait.stopped': 'Die Suche nach einem Gegner wurde beendet: {reason}',
+  'wait.watchingShort': '👁 {n}',
   // ---- cartão de dicas ----
   'wait.tipsLabel': 'Während du wartest',
   'wait.kickerRule': 'Regeltipp',

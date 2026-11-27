@@ -1,23 +1,29 @@
 // A busca por oponente (fila casual e ranqueada) na tela, em qualquer página do app: a janela "Procurando
 // oponente" (com o cartão de dicas e a mão de teste do deck da fila), a busca minimizada, que acompanha o jogador
-// pelas telas de navegar, e a pergunta "Sair da fila?" ao abrir uma tela que tira ele da fila.
+// pelas telas de navegar (uma pílula embaixo; nas telas de mesa, uma etiqueta no canto da mesa), e a pergunta
+// "Sair da fila?" ao abrir uma tela que tira ele da fila.
 //
 // O estado da fila mora na raiz do app (`MainApp`, com `useQueue`) e chega aos componentes pelo contexto daqui:
 // assim a busca não acaba quando o jogador sai da tela inicial. Quais telas mantêm a fila: `queueScreens.ts`.
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
 import type { FormatId, QueueKind, QueueLeader } from '../api';
 import { useT } from '../i18n';
-import { queuePillOnTop } from '../queueScreens';
+import { queueChipInTable } from '../queueScreens';
 import { useSettings } from '../settings';
 import { LeaderArt } from './LeaderArt';
 import { fmtWait, type QueueState } from './OnlineMenu';
 import { useWaitDeck, WaitHandSheet } from './WaitHandTest';
 import { WaitTips } from './WaitTips';
 
+/** Como a busca aparece: a janela, minimizada, ou a folha da mão de teste. */
+export type QueueView = 'wait' | 'pill' | 'hand';
+
 export interface AppQueue {
   /** A busca em andamento (null: fora da fila). */
   queue: QueueState | null;
+  view: QueueView;
+  setView: (view: QueueView) => void;
   enqueue: (deckId: string, format: FormatId, kind: QueueKind, leader?: QueueLeader | null) => Promise<void>;
   cancel: () => void;
   /** Recusa do servidor que encerrou a busca (a tela inicial mostra e limpa; nas outras telas, o aviso daqui). */
@@ -34,24 +40,50 @@ export function useAppQueue(): AppQueue {
   return ctx;
 }
 
+/** A busca está minimizada (fora do app principal, onde não há fila, é sempre falso). */
+export function useQueueMinimized(): boolean {
+  const ctx = useContext(QueueContext);
+  return Boolean(ctx?.queue && ctx.view === 'pill');
+}
+
+/**
+ * A busca minimizada nas telas de mesa (assistir e replay): uma etiqueta com o tempo, no canto da mesa, ao lado das
+ * outras ("Assistindo", chat). Tocar reabre a janela. Fora do app principal (transmissão, replay embutido) não há
+ * fila, e ela não aparece.
+ */
+export function QueueChip() {
+  const t = useT();
+  const { animations } = useSettings();
+  const ctx = useContext(QueueContext);
+  if (!ctx?.queue || ctx.view !== 'pill') return null;
+  const time = fmtWait(ctx.queue.waited);
+  return (
+    <button type="button" className={`queue-chip anim-${animations}`} onClick={() => ctx.setView('wait')} aria-label={t('wait.pillOpen', { time })} title={t('wait.pill')}>
+      <i className="queue-pill-dot" aria-hidden="true" />
+      <b>{time}</b>
+    </button>
+  );
+}
+
 /**
  * A busca na tela. Abre como janela; "Minimizar" (ou Esc, ou tocar fora) deixa só a pílula com o tempo, e o
- * jogador segue navegando. `screen`: a tela aberta (trocar de tela minimiza; nas telas de mesa a pílula vai para o alto).
+ * jogador segue navegando. `screen`: a tela aberta (trocar de tela minimiza; nas telas de mesa quem mostra a busca
+ * minimizada é a etiqueta da mesa, `QueueChip`).
  */
 export function QueueDock({ queue, screen, onCancel }: { queue: QueueState; screen: string; onCancel: () => void }) {
   const t = useT();
   const { animations } = useSettings();
-  const [view, setView] = useState<'wait' | 'pill' | 'hand'>('wait');
+  const { view, setView } = useAppQueue();
   const deck = useWaitDeck(queue.deckId);
-  const minimize = useCallback(() => setView('pill'), []);
-  const openWait = useCallback(() => setView('wait'), []);
+  const minimize = useCallback(() => setView('pill'), [setView]);
+  const openWait = useCallback(() => setView('wait'), [setView]);
 
   const last = useRef(screen);
   useEffect(() => {
     if (last.current === screen) return;
     last.current = screen;
     setView('pill');
-  }, [screen]);
+  }, [screen, setView]);
   useEffect(() => {
     if (view !== 'wait') return;
     // Com uma carta ampliada aberta (o spoiler do cartão de dicas), o Esc fecha só ela.
@@ -60,12 +92,21 @@ export function QueueDock({ queue, screen, onCancel }: { queue: QueueState; scre
     return () => window.removeEventListener('keydown', onKey);
   }, [view, minimize]);
 
+  // Com a pílula embaixo, a página ganha espaço no fim para o último conteúdo rolar por cima dela (styles.css).
+  const pillBelow = view === 'pill' && !queueChipInTable(screen);
+  useEffect(() => {
+    if (!pillBelow) return;
+    document.documentElement.classList.add('queue-pill-open');
+    return () => document.documentElement.classList.remove('queue-pill-open');
+  }, [pillBelow]);
+
   const time = fmtWait(queue.waited);
   if (view === 'pill') {
+    if (!pillBelow) return null;
     return (
       <button
         type="button"
-        className={['queue-pill', `anim-${animations}`, queuePillOnTop(screen) ? 'top' : ''].join(' ')}
+        className={`queue-pill anim-${animations}`}
         onClick={openWait}
         aria-label={t('wait.pillOpen', { time })}
       >

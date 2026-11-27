@@ -17,6 +17,7 @@ const wait = {
   'wait.leaveStay': 'Seguir en la cola',
   'wait.leaveGo': 'Salir de la cola y abrir',
   'wait.stopped': 'La búsqueda de oponente se detuvo: {reason}',
+  'wait.watchingShort': '👁 {n}',
   // ---- cartão de dicas ----
   'wait.tipsLabel': 'Mientras esperas',
   'wait.kickerRule': 'Consejo de reglas',

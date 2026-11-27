@@ -690,7 +690,8 @@ está na fila e os espectadores também contam.
 
 - **Minimizar** (ou Esc, ou tocar fora) deixa só uma pílula com o tempo de busca, e o jogador segue pelo app. A busca
   continua nas telas de navegar: tela inicial, estatísticas, perfis, a lista de lições, torneios e as partidas para
-  assistir (ao vivo e replays). Tocar na pílula reabre a janela.
+  assistir (ao vivo e replays). Tocar na pílula reabre a janela. Na mesa (assistindo ou num replay) a pílula vira uma
+  etiqueta com o tempo no canto da mesa, junto das outras, para não cobrir nada da partida.
 - **Partida encontrada** em qualquer uma dessas telas leva direto para a mesa, com um toque e, no celular, uma vibração.
 - **Telas onde se joga ou se edita algo** (construtor de decks, lição, desafio do dia, Sandbox, Selado, Draft, Yonko,
   Administração) perguntam antes: "Sair da fila e abrir" ou "Continuar na fila". Na fila, os outros modos da tela

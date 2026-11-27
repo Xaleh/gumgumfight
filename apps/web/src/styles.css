@@ -7987,23 +7987,38 @@ tr.clickable:hover td {
  */
 .queue-actions {
   flex-wrap: wrap;
-  margin-top: 12px;
+  margin-top: 16px;
 }
 .queue-hint {
-  margin: 10px 0 0;
+  margin: 14px 0 2px;
+}
+/* A janela da espera e a pergunta "Sair da fila?": um pouco mais de borda que a janela padrão. */
+.modal-card.queue-wait,
+.queue-leave .modal-card {
+  padding: 22px 20px 20px;
+}
+.queue-leave .modal-card p {
+  margin: 0 0 18px;
+}
+/* Com a pílula embaixo, o fim da página ganha espaço para o último conteúdo rolar por cima dela (`QueueDock`).
+   Depois do `#root`, e não no `body`: os dois têm a altura da tela, e a página transborda deles. */
+html.queue-pill-open #root::after {
+  content: '';
+  display: block;
+  height: calc(76px + env(safe-area-inset-bottom));
 }
 .queue-pill {
   position: fixed;
   left: 50%;
-  bottom: calc(14px + env(safe-area-inset-bottom));
+  bottom: calc(18px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   /* acima da barra do site (40), abaixo das janelas (50) */
   z-index: 45;
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: calc(100vw - 24px);
-  padding: 9px 16px 9px 13px;
+  max-width: calc(100vw - 32px);
+  padding: 11px 20px 11px 16px;
   border: 1px solid rgba(253, 245, 224, 0.28);
   border-radius: 999px;
   background: var(--navy);
@@ -8015,16 +8030,44 @@ tr.clickable:hover td {
   box-shadow: 0 8px 24px rgba(var(--shadow2-rgb), 0.35);
   cursor: pointer;
 }
-/* Nas telas de mesa (assistir, replay) as bordas são da partida: a pílula sobe e fica só com o ponto e o tempo
-   (o nome continua no `aria-label`). */
-.queue-pill.top {
-  top: calc(6px + env(safe-area-inset-top));
-  bottom: auto;
-  padding: 6px 12px 6px 10px;
-  font-size: 13px;
+/* Nas telas de mesa (assistir, replay) as bordas são todas da partida: lá a busca minimizada é uma etiqueta no
+   canto da mesa, do tamanho das vizinhas ("Assistindo", chat), e não a pílula solta. */
+.queue-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #12304b;
+  color: #fdf5e0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.18);
+  cursor: pointer;
 }
-.queue-pill.top span {
-  display: none;
+.spectator-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.queue-chip b {
+  font-variant-numeric: tabular-nums;
+  color: #f2b733;
+}
+.queue-chip .queue-pill-dot {
+  width: 7px;
+  height: 7px;
+}
+.queue-chip:focus-visible {
+  outline: 2px solid #f2b733;
+  outline-offset: 2px;
+}
+.queue-chip.anim-full .queue-pill-dot {
+  animation: queue-pill-pulse 1.6s ease-in-out infinite;
 }
 .queue-pill span {
   overflow: hidden;
@@ -8075,15 +8118,16 @@ tr.clickable:hover td {
 .queue-stopped {
   position: fixed;
   left: 50%;
-  bottom: calc(14px + env(safe-area-inset-bottom));
+  bottom: calc(18px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 45;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   width: max-content;
-  max-width: calc(100vw - 24px);
-  padding: 10px 12px 10px 16px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 12px 12px 20px;
+  line-height: 1.4;
   border-radius: 16px;
   background: var(--navy);
   color: var(--cream);
@@ -8096,9 +8140,9 @@ tr.clickable:hover td {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 12px 0 0;
-  padding: 10px 8px 12px 14px;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 14px 14px 16px 16px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--panel);
@@ -8120,7 +8164,7 @@ tr.clickable:hover td {
   color: var(--muted);
 }
 .wait-tip p {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   font-size: 14px;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -8205,10 +8249,10 @@ tr.clickable:hover td {
 /* Sala privada à espera do oponente: o cartão não estica a coluna da sala. */
 .online-wait .wait-tips {
   max-width: 460px;
-  margin: 14px auto;
+  margin: 18px auto;
 }
 .wait-hand-status {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -8217,9 +8261,21 @@ tr.clickable:hover td {
 .wait-hand-sheet .ht-hand {
   --cw: 64px;
 }
+/* O painel da mão de teste nasceu na coluna estreita do construtor; na folha da espera ele tem espaço para respirar. */
+.wait-hand-sheet .hand-test {
+  padding: 14px;
+  gap: 12px;
+}
+.wait-hand-sheet .sheet-head {
+  padding: 18px 18px 10px 20px;
+}
+.wait-hand-sheet .sheet-body {
+  padding: 4px 20px 22px;
+}
 @media (prefers-reduced-motion: reduce) {
   .queue-pill,
   .queue-pill .queue-pill-dot,
+  .queue-chip .queue-pill-dot,
   .wait-tips .wait-tip {
     animation: none;
   }

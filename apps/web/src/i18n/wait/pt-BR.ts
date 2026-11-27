@@ -16,6 +16,7 @@ const waitPtBR = {
   'wait.leaveStay': 'Continuar na fila',
   'wait.leaveGo': 'Sair da fila e abrir',
   'wait.stopped': 'A busca por oponente parou: {reason}',
+  'wait.watchingShort': '👁 {n}',
   // ---- cartão de dicas ----
   'wait.tipsLabel': 'Enquanto você espera',
   'wait.kickerRule': 'Dica de regra',
