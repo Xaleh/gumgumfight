@@ -1958,6 +1958,8 @@ export default {
   'game.stepDamage': 'ダメージステップ',
   'game.stepAttack': 'アタック',
   'game.blockedStatus': 'ブロックされた · {status}',
+  'game.promptAttacker': 'アタック側 · {who}',
+  'game.promptTarget': '対象 · {who}',
   // ---- エンジンからの問いかけ ----
   'game.peek': '👁 場を見る',
   'game.peekTitle': '質問を折りたたんで場と手札を確認できます。確認したら戻って答えてください',

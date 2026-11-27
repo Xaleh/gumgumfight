@@ -1960,6 +1960,8 @@ export default {
   'game.stepDamage': 'Étape des dégâts',
   'game.stepAttack': 'Attaque',
   'game.blockedStatus': 'Bloqué · {status}',
+  'game.promptAttacker': 'Attaquant · {who}',
+  'game.promptTarget': 'Cible · {who}',
   // ---- engine prompts ----
   'game.peek': '👁 Voir la table',
   'game.peekTitle': 'Réduit la question pour que vous puissiez regarder la table et votre main ; revenez ensuite pour répondre',

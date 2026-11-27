@@ -158,3 +158,41 @@ test.describe('a mesa com o mouse e o teclado', () => {
     await expect(page.locator('.side.bottom')).not.toHaveClass(/\bactive-side\b/);
   });
 });
+
+test.describe('a pergunta no meio de um ataque', () => {
+  /**
+   * Uma mesa do Sandbox (as mesmas cartas sempre, a mesma pessoa nos dois lados): o Líder do lado A, com 2 DON!!,
+   * ataca a Jewelry Bonney, que no ataque do oponente pergunta se usa o efeito dela.
+   */
+  const spec = {
+    turn: 3,
+    active: 0,
+    sides: [
+      { leader: { id: 'ST01-001', don: 2 }, donActive: 3 },
+      { leader: { id: 'OP07-019' }, donActive: 3 },
+    ],
+  };
+
+  test('a janela da pergunta diz embaixo quem ataca quem e com quanto poder', async ({ page }) => {
+    await page.goto(`/?sandbox=${Buffer.from(JSON.stringify(spec)).toString('base64url')}`);
+    await page.getByRole('button', { name: label('sandbox.play'), exact: true }).click();
+    await drag(page, await point(myLeader(page)), await point(theirLeader(page)));
+
+    // A pergunta cobre a mesa; a batalha vem embaixo dela, na visão de quem responde (o lado B, o alvo).
+    await expect(page.getByRole('button', { name: label('game.payAndUse'), exact: true })).toBeVisible();
+    const battle = page.getByRole('group', {
+      name: label('log.attacks', { card: 'Monkey.D.Luffy', power: 7000, target: 'Jewelry Bonney', targetPower: 5000 }),
+      exact: true,
+    });
+    await expect(battle).toBeVisible();
+    await expect(battle.getByText(label('game.promptAttacker', { who: label('sandbox.sideA') }), { exact: true })).toBeVisible();
+    await expect(battle.getByText(label('game.promptTarget', { who: label('menu.you') }), { exact: true })).toBeVisible();
+    await expect(battle.getByText(label('game.needToDefend', { n: 3000 }), { exact: true })).toBeVisible();
+
+    // "Ver a mesa" recolhe a janela e a batalha com ela (a mesa já mostra o confronto); a volta traz as duas.
+    await page.getByRole('button', { name: label('game.peek'), exact: true }).click();
+    await expect(battle).toBeHidden();
+    await page.getByRole('button', { name: label('game.backToQuestion'), exact: true }).click();
+    await expect(battle).toBeVisible();
+  });
+});

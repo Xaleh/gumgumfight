@@ -4,7 +4,7 @@
 import { type Action, cardDef, type GameState, getPower, type PlayerId } from '@gumgum/engine';
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { coachTip } from '../../game/tutorial/coachTips';
-import { useT, useTryT } from '../../i18n';
+import { type Translate, useT, useTryT } from '../../i18n';
 import { Icon } from '../Icons';
 import type { Drag, Mode } from './shared';
 
@@ -190,18 +190,27 @@ function EyeIcon({ closed }: { closed: boolean }) {
   );
 }
 
-/** Poder do atacante contra o alvo, com o que falta para defender (como o "Dano previsto" do Pocket). */
-export function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null }) {
-  const t = useT();
+/**
+ * O confronto da batalha em curso: o poder do atacante e o do alvo, se o ataque acerta e o que falta para acertar
+ * (quem ataca) ou para defender (quem é atacado).
+ */
+export function battleClash(state: GameState, human: PlayerId | null, t: Translate): { atk: number; def: number; hits: boolean; status: string } {
   const b = state.battle!;
   const atk = getPower(state, b.attacker) ?? 0;
   const def = getPower(state, b.target) ?? 0;
   const defender = state.cards[b.target].owner;
   const hits = atk >= def;
-  const need = atk - def + 1000;
   let status: string;
-  if (human !== null && defender === human) status = hits ? t('game.needToDefend', { n: need }) : t('game.defendedBang');
+  if (human !== null && defender === human) status = hits ? t('game.needToDefend', { n: atk - def + 1000 }) : t('game.defendedBang');
   else status = hits ? t('game.attackWillHit') : t('game.needToHit', { n: def - atk });
+  return { atk, def, hits, status: b.blocked ? t('game.blockedStatus', { status }) : status };
+}
+
+/** Poder do atacante contra o alvo, com o que falta para defender (como o "Dano previsto" do Pocket). */
+export function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null }) {
+  const t = useT();
+  const b = state.battle!;
+  const { atk, def, hits, status } = battleClash(state, human, t);
   // Etapa da batalha (a visão do oponente também traz o tipo da escolha pendente).
   // A carta do [Trigger] em resolução está fora das áreas (nem Vida nem descarte): aparece aqui.
   const trigger = state.limbo?.find((u) => state.cards[u]);
@@ -231,9 +240,7 @@ export function BattleInfo({ state, human }: { state: GameState; human: PlayerId
           <b key={def}>{def}</b>
         </span>
       </div>
-      <div className={['battle-status', hits ? 'hit' : 'safe'].join(' ')}>
-        {b.blocked ? t('game.blockedStatus', { status }) : status}
-      </div>
+      <div className={['battle-status', hits ? 'hit' : 'safe'].join(' ')}>{status}</div>
     </div>
   );
 }

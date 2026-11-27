@@ -1960,6 +1960,8 @@ export default {
   'game.stepDamage': 'Schadensschritt',
   'game.stepAttack': 'Angriff',
   'game.blockedStatus': 'Geblockt · {status}',
+  'game.promptAttacker': 'Angreifer · {who}',
+  'game.promptTarget': 'Ziel · {who}',
   // ---- Fragen der Engine ----
   'game.peek': '👁 Tisch ansehen',
   'game.peekTitle': 'Klappt die Frage ein, damit du Tisch und Hand ansehen kannst; komm danach zurück und antworte',

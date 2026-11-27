@@ -1960,6 +1960,8 @@ export default {
   'game.stepDamage': 'Damage Step',
   'game.stepAttack': 'Attack',
   'game.blockedStatus': 'Blocked · {status}',
+  'game.promptAttacker': 'Attacker · {who}',
+  'game.promptTarget': 'Target · {who}',
   // ---- engine prompts ----
   'game.peek': '👁 See the table',
   'game.peekTitle': 'Collapses the question so you can look at the table and your hand; then come back and answer',
