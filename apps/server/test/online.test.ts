@@ -1564,6 +1564,7 @@ describe('modo espectador', () => {
       handsOwn: false,
       delayTournaments: false,
       chat: true,
+      kind: 'match',
       minHandsDelayS: 60,
     });
     expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: null })).statusCode).toBe(409);

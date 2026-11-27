@@ -541,6 +541,28 @@ que quatro capitães jogam cada um por si e vence o último de pé. As regras se
   lugares. Sair no meio da partida é desistir.
 - **Mesa local (contra três bots):** a partida roda no navegador, sem servidor e sem relógio.
 
+**Assistir e transmitir uma mesa online:**
+
+- **Quem assiste:** quem tem o **código da mesa** assiste sem sentar nela: na entrada do Yonko, o botão
+  **Assistir** ao lado de "Entrar", ou o campo do código em **Assistir partidas**. A mesa só aparece na lista de
+  **Assistir partidas** se quem criou marcar, na sala de espera, **Mostrar a mesa em "Assistir partidas"**. O
+  espectador vê o que é público (campo, descarte, Vida virada para cima, cartas reveladas e o registro público):
+  **a mão de ninguém**, só os versos. A tela é a mesma mesa, só para olhar: o lugar de baixo é o do jogador que ele
+  acompanha, escolhido na ordem dos turnos da barra de cima ou nas opções da mesa (um jogador, ou "quem está
+  jogando"). Dá para chegar antes de a partida começar (a tela espera) e ficar para o "jogar de novo". Quem joga
+  vê quantos assistem na sala de espera e, no computador, na barra de cima da mesa. Espectador não conta como
+  presença de jogador (o relógio e o abandono seguem iguais) nem segura a mesa aberta.
+- **Modo transmissão (Streamer, Organizador e Admin):** a mesa do Yonko vai para a tela do OBS como as partidas de
+  dois: o botão **📡 Transmitir** na lista e no campo do código de **Assistir partidas**, e **📡 Transmitir esta
+  partida** na sala de espera e nas opções da mesa de quem joga. As opções da transmissão valem como lá: o
+  streamer que **joga** a mesa mostra a **própria mão** (com o atraso que escolher, até nenhum; a dos outros nunca
+  aparece); quem só assiste mostra as **mãos de todos** apenas se quem criou a mesa marcou **Liberar as mãos para
+  quem transmite** na sala de espera (todos na sala veem o aviso, e marcar ou desmarcar pede o "pronto" de novo),
+  e sempre com **pelo menos 1 minuto de atraso**. Com as mãos de todos, a tela acompanha quem está jogando. A
+  mesa atrasada segue o ritmo real da partida, com o relógio daquele momento, e mostra a partida até o fim mesmo
+  que a mesa seja reaberta antes de o atraso passar. O **Ver mãos** de quem assiste pelo app segue a mesma regra
+  (perfil, mesa liberada, nunca a própria mesa, sempre com atraso).
+
 **Deck:** o formato pede **60 cartas da cor do Líder, uma cópia de cada número**. No construtor, a opção **"Montar
 para o Yonko (60, 1 de cada)"** troca o alvo para 60 e o limite para uma cópia, com o selo "Yonko" quando o deck
 fecha as regras (ela liga sozinha ao abrir ou importar uma lista com mais de 50 cartas). Na biblioteca, esses decks
@@ -571,7 +593,7 @@ e o ataque no centro, o impacto no alvo, a faixa de troca de turno) e os mesmos 
 **Animações** das Configurações (completas, suaves ou desligadas), que também abre pelo botão de opções da própria
 mesa, junto com os volumes: desligadas, a mesa muda na hora e nada se move.
 
-O que ainda **não** tem: espectadores, replay, chat e avisos no celular na mesa online; reordenar a mão e
+O que ainda **não** tem: replay, chat e avisos no celular na mesa online; o painel de decklists de quem transmite; reordenar a mão e
 devolver um DON!! anexado arrastando; dar o valor de Counter a outra carta que não a atacada; e o bot com busca (os
 bots são o bot simples, que completa a mesa mas joga mal).
 
@@ -1798,7 +1820,8 @@ pode chamar sem login nem token:
 | GET | `/api/stats/suggestions?leader=` | Números de um Líder para as sugestões do construtor (mesmos filtros de `/api/stats`): partidas e vitórias do Líder, de cada carta e o Deck médio |
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups de uma fila, tendência e a comparação com as partidas daqui (404 sem a chave) |
 | GET | `/api/online/stats` · `/api/online/live` · `/api/online/rooms/:id` | Contadores do menu, partidas para assistir e o resumo de uma sala |
-| GET · POST | `/api/yonko/active` · `/api/yonko/tables` · `/api/yonko/tables/join` · `/api/yonko/tables/:id/…` | Mesas online do Yonko: as suas (com o token), criar, entrar pelo código, o canal `events` (SSE) e os pedidos da mesa (`deck`, `ready`, `rules`, `bot`, `clear`, `start`, `action`, `reopen`, `leave`), todos com o token do lugar |
+| GET · POST | `/api/yonko/active` · `/api/yonko/tables` · `/api/yonko/tables/join` · `/api/yonko/tables/:id/…` | Mesas online do Yonko: as suas (com o token), criar, entrar pelo código, o canal `events` (SSE) e os pedidos da mesa (`deck`, `ready`, `rules`, `options`, `bot`, `clear`, `start`, `action`, `reopen`, `leave`), todos com o token do lugar |
+| GET | `/api/yonko/live` · `/api/yonko/watch/:code` · `/api/yonko/tables/:id` · `/api/yonko/tables/:id/watch` | Assistir a uma mesa do Yonko: as mesas abertas em "Assistir partidas", a mesa pelo código, o resumo público e o canal do espectador (SSE; `hands=1` para quem pode ver as mãos, `k=<chave>` para a tela de transmissão) |
 | GET | `/api/tournaments` · `/api/tournaments/:id` | Torneios e o detalhe de um torneio (o que quem pede pode fazer vem na resposta) |
 | GET | `/api/sponsors` · `/api/support` · `/api/support/supporters` | Lojas parceiras, apoio ao projeto e lista pública de apoiadores |
 | POST | `/api/monitor/errors` | Relato de erro do navegador para o monitoramento (`{kind, message, stack?, url?, release?}`; 20 por IP a cada 10 min) |

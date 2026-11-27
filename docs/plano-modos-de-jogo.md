@@ -2,10 +2,11 @@
 
 > Status (22/11/2026): **All Blue, Pré-release (Selado de uma coleção), Pack Rush (selado e draft), Draft e Draft Cubo
 > implementados**; o README (seções "All Blue", "Selado", "Pack Rush", "Draft" e "Draft Cubo") descreve o que existe.
-> **Yonko: fases 1, 2 e 3 feitas** (o motor com até 4 jogadores pelas regras do manual do formato, a mesa online
-> com código para até 4 pessoas e bots nos lugares vagos, a mesa local contra bots, e o construtor de decks de 60;
-> ver a seção 4, [`regras-yonko.md`](regras-yonko.md) e a seção "Yonko" do README). Falta a fase 4 (espectador e
-> replay) e o bot com busca.
+> **Yonko: fases 1 a 4 feitas** (o motor com até 4 jogadores pelas regras do manual do formato, a mesa online
+> com código para até 4 pessoas e bots nos lugares vagos, a mesa local contra bots, o construtor de decks de 60 e,
+> em 27/11/2026, o espectador e a transmissão da mesa online; ver a seção 4, [`regras-yonko.md`](regras-yonko.md) e
+> a seção "Yonko" do README). O replay da mesa de 4 saiu do plano (decisão de 27/11/2026), e o bot com busca
+> ficou de fora da fase 4.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
 > as imagens `.webp` da pasta são as mesmas telas). As cartas das telas são ilustrativas e os números são de exemplo.
 
@@ -18,7 +19,7 @@
 | **Selado: Draft** ✅ | Pod de 8 (bots nos lugares vazios): cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
 | **Pack Rush** ✅ (selado e draft) | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
 | **Draft Cubo** ✅ | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
-| **Yonko** 🚧 (jogável online; falta espectador e replay) | Mesa de 4, todos contra todos, deck de 60 sem repetição: o formato da comunidade "Four Emperors". | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
+| **Yonko** ✅ (online, com espectador e transmissão; sem replay) | Mesa de 4, todos contra todos, deck de 60 sem repetição: o formato da comunidade "Four Emperors". | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
 
 Em esforço relativo, com o All Blue valendo 1: Pré-release ≈ 3, Draft ≈ +2, Pack Rush ≈ +1, Cubo ≈ +1,5 e Yonko ≈ 8
 ou mais. O Yonko é o único que muda o motor de regras; os outros são regras de deck e telas novas em volta da partida
@@ -308,7 +309,8 @@ a proposta é 25 minutos por jogador (hoje são 17:30 no 1x1), correndo só nas 
    ficou").
 3. ✅ **Mesa** no computador e no celular (feita antes da fase 2, como mesa local contra bots; ver "Fase 3: como
    ficou").
-4. **Bot** para completar mesa (o bot simples já completa a mesa local), espectador e replay.
+4. ✅ **Espectador e transmissão** da mesa online (ver "Fase 4: como ficou"). O replay, que estava nesta fase, saiu
+   do plano em 27/11/2026; o bot com busca também ficou de fora (o bot simples completa a mesa).
 
 ### Fase 1: como ficou
 
@@ -353,8 +355,8 @@ O que a simulação **não** mede: se cada efeito faz o que um jogador esperaria
 quebra; a leitura das cartas segue o manual, e os casos estranhos vão aparecer jogando. O bot simples também não usa
 Evento [Counter] na batalha dos outros; essa parte é exercitada só pelas ações aleatórias.
 
-**Ficou para as próximas fases:** o bot com busca, o replay, o espectador e o editor de cenários, que continuam de
-dois jogadores (`bot/planner.ts`, `replay.ts`, `motion.ts`, `scenario.ts`). O bot simples (`bot/simple.ts`) já joga
+**Ficou para as próximas fases:** o bot com busca, o replay e o editor de cenários, que continuam de dois jogadores
+(`bot/planner.ts`, `replay.ts`, `motion.ts`, `scenario.ts`); o espectador entrou na fase 4, pela sala do Yonko. O bot simples (`bot/simple.ts`) já joga
 em mesa: mira quem tem menos Vida.
 
 ### Fase 2: como ficou
@@ -379,8 +381,8 @@ lugar e POST para cada pedido. A seção "Yonko" do README descreve o que o joga
   lugar, relógio, abandono, reinício do servidor) e uma partida inteira com dois navegadores (computador e
   celular), com recarga no meio e "jogar de novo".
 
-**Diferenças para a proposta:** sem formato de cartas nem escolha de relógio na sala (25 minutos fixos); sem chat,
-espectadores e avisos no celular; o bot é o simples.
+**Diferenças para a proposta:** sem formato de cartas nem escolha de relógio na sala (25 minutos fixos); sem chat
+e avisos no celular; o bot é o simples. (Os espectadores entraram na fase 4.)
 
 ### Construtor de decks de 60
 
@@ -425,6 +427,36 @@ a mesa de quem joga, atacante até o alvo, DON!! ativo até uma carta), com o mo
 da Vida abre no centro com o [Trigger] e a escolha (antes era só uma linha na faixa de ação). A pergunta de usar um
 efeito ganhou a janela da mesa de dois (a carta ao lado, o custo, o texto e as duas respostas), e a janela de ler
 a carta, que saía cortada, foi refeita com a carta grande e o texto ao lado.
+
+### Fase 4: como ficou
+
+Em 27/11/2026 a fase 4 foi reduzida, por decisão do dono do projeto, ao **espectador e à transmissão** da mesa
+online: o replay da mesa de 4 saiu do plano. Tudo ficou na sala do Yonko (`apps/server/src/yonko/`) e na mesa que já
+existia; o motor não mudou (`viewFor` já montava a visão sem jogador para N lugares). A seção "Yonko" do README
+descreve o que o jogador encontra, e "Mesas do Yonko", na documentação técnica, como funciona.
+
+- **Espectador:** um canal próprio (`/api/yonko/tables/:id/watch`), sem lugar e sem token, com a visão pública: a
+  mão de ninguém. Assiste quem tem o código (o botão "Assistir" na entrada do Yonko e o campo do código em
+  "Assistir partidas"); a mesa só entra na lista se quem criou marcar isso na sala de espera. O espectador não
+  conta como presença de jogador (relógio, abandono, faxina) e recebe a sala sem o código e sem o nome dos decks.
+- **A tela:** a mesma `YonkoTable`, só para olhar. O lugar de baixo é o do jogador acompanhado (um lugar fixo, ou
+  quem está jogando), escolhido na ordem dos turnos ou nas opções da mesa; a mão dele aparece em versos. Quem joga
+  vê quantos assistem. No celular funciona igual, com os oponentes em abas.
+- **Transmissão:** a mesa do Yonko vai para a tela do OBS pelo mesmo modo transmissão das partidas de dois
+  (`/api/broadcast/room` aceita o id da mesa; a tela usa `YonkoWatch`). O streamer que joga a mesa mostra a própria
+  mão, com o atraso que escolher; as mãos de todos só aparecem se quem criou a mesa as liberou na sala de espera, e
+  sempre com pelo menos 1 minuto de atraso.
+- **Mesa atrasada:** a mesa passou a gravar o horário e o relógio de cada ação (`timeline`). Cada atraso em uso tem
+  a sua mesa, refeita das ações e avançada no ritmo real; ela segue a partida até o fim mesmo que a mesa seja
+  reaberta ("jogar de novo") antes de o atraso passar.
+- **Testes:** `apps/server/test/yonko.test.ts` (a visão de quem assiste sem a mão de ninguém, presença e faxina,
+  código e lista, as mãos só na mesa liberada e atrasada, o streamer que joga, o "jogar de novo" com atraso, o
+  reinício do servidor e as permissões do canal) e, no navegador, `e2e/yonko.spec.ts` (quem cria a mesa, quem
+  assiste pelo código e a lista "Assistir partidas").
+
+**Ficou de fora:** o replay (fora do plano); o bot com busca; chat e avisos no celular; o painel de decklists de
+quem transmite; e, na tela de quem assiste, a janela da carta da Vida e da pergunta de efeito (a faixa de ação
+diz quem a mesa espera).
 
 ### Fora da v1
 

@@ -1,5 +1,5 @@
 // Mesas online do Yonko (yonko/): sala com código, bots, regras, começar, a visão de cada lugar, relógio,
-// abandono, reinício do servidor e saída.
+// abandono, reinício do servidor e saída; e quem assiste (espectador, mesa atrasada e modo transmissão).
 
 import {
   type Action,
@@ -14,9 +14,12 @@ import {
 } from '@gumgum/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
+import { createSession, getUser, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
+import { DEFAULT_SETTINGS, yonkoBroadcastView } from '../src/online/broadcast';
 import { type DB, getDeck, listCards, openDb, upsertDeck } from '../src/db';
+import { HANDS_DELAY_MS, MIN_HANDS_DELAY_MS } from '../src/online/room';
 import { seed } from '../src/seed';
-import { YONKO_ABANDON_MS, YONKO_TIME_BANK_MS, type YonkoConnection, type YonkoTable } from '../src/yonko/table';
+import { YONKO_ABANDON_MS, YONKO_TIME_BANK_MS, type YonkoConnection, type YonkoTable, type YonkoWatch } from '../src/yonko/table';
 import type { YonkoTables } from '../src/yonko/routes';
 
 const OWNERS = ['alice', 'bob', 'carol', 'dave'].map((n) => ({ 'x-deck-owner': `${n}-0123456789abcdef`.padEnd(22, '0') }));
@@ -38,18 +41,21 @@ const tablesOf = (app: App) => (app as unknown as { yonkoTables: YonkoTables }).
 const tableOf = (app: App, id: string) => tablesOf(app).get(id)!;
 
 /** Canal de teste: guarda a sala e a mesa como o navegador montaria (definições e registro acumulados). */
-function client(token: string) {
+function client(token: string | null, watch?: YonkoWatch) {
   const events: Array<{ event: string; data: any }> = [];
   let defs: Record<string, CardDef> = {};
   let log: LogEntry[] = [];
   let latest: any = null;
   const conn: YonkoConnection = {
     token,
+    ...(watch ? { watch } : {}),
     sentDefs: new Set(),
     sentLog: 0,
     send: (event, data: any) => {
       events.push({ event, data });
       if (event !== 'state') return;
+      // Partida nova (ou outra mesa atrasada): o servidor manda tudo de novo, com o registro a partir do 0.
+      if (data.log.from === 0) defs = {};
       defs = { ...defs, ...data.defs };
       log = [...log.slice(0, data.log.from), ...data.log.entries];
       latest = data;
@@ -82,6 +88,9 @@ async function openTable(app: App) {
   expect(joined.json().id).toBe(id);
   return { id, code, alice, bob: joined.json().token as string };
 }
+
+/** Quem assiste (sem lugar na mesa): `watch` é o que a conexão pede para ver. */
+const watcher = (watch: YonkoWatch = {}) => client(null, watch);
 
 const wait = () => new Promise((r) => setTimeout(r, 0));
 
@@ -392,6 +401,388 @@ describe('Yonko online: relógio e abandono', () => {
     }
     expect(table.state!.players[1].out).toBe(true);
     expect(table.state!.log.find((e) => e.key === 'log.eliminated' && e.player === 1)?.text).toContain('abandonou');
+    await app.close();
+  });
+});
+
+describe('Yonko online: espectador e transmissão', () => {
+  const login = (db: DB, sub: string, role: Role = 'player') => {
+    const u = upsertGoogleUser(db, { sub, email: `${sub}@example.com`, emailVerified: true, name: sub, picture: null });
+    setUserRole(db, u.id, role);
+    return { cookie: `gg_session=${createSession(db, u.id)}`, id: u.id };
+  };
+  /** As cartas da mão do lugar `p` que esta visão mostra de frente. */
+  const shown = (v: GameState, p: number) => v.players[p].hand.filter((u) => v.cards[u].cardId !== HIDDEN_CARD);
+
+  /**
+   * Mesa de 3 pessoas (Alice, Bob e Carol), sem bots, com o relógio do servidor nas mãos do teste: nada anda
+   * sozinho. `options`: o que Alice, que criou a mesa, marca antes de começar.
+   */
+  async function three(options?: { listed?: boolean; showHands?: boolean }, db: DB = freshDb()) {
+    const clock = { t: 1_000_000 };
+    const { app } = setup(db, () => clock.t);
+    const t = await openTable(app);
+    const carol = (await post(app, '/api/yonko/tables/join', { code: t.code, deckId: 'st03-crocodile' }, CAROL)).json().token as string;
+    if (options) expect((await post(app, `/api/yonko/tables/${t.id}/options`, { t: t.alice, ...options })).statusCode).toBe(200);
+    await post(app, `/api/yonko/tables/${t.id}/ready`, { t: t.bob, ready: true }, BOB);
+    await post(app, `/api/yonko/tables/${t.id}/ready`, { t: carol, ready: true }, CAROL);
+    expect((await post(app, `/api/yonko/tables/${t.id}/start`, { t: t.alice })).statusCode).toBe(200);
+    const table = tableOf(app, t.id);
+    const tokens = [t.alice, t.bob, carol];
+    const seats = tokens.map((token) => client(token));
+    for (const c of seats) table.attach(c.conn);
+    /** Quem a mesa espera faz uma jogada (a do bot simples, sobre a visão do lugar dele). */
+    const play = () => {
+      const p = actingPlayer(table.state!)!;
+      const v = seats[p].view!;
+      const r = table.act(tokens[p], v.actionCount, chooseSimpleBotAction(v, p));
+      expect(r.ok, JSON.stringify(r)).toBe(true);
+    };
+    /** O tempo passa (o relógio do servidor e os temporizadores juntos). */
+    const step = (ms: number) => {
+      clock.t += ms;
+      vi.advanceTimersByTime(ms);
+    };
+    return { app, db, clock, table, tokens, seats, play, step, ...t, carol };
+  }
+
+  it('quem assiste vê a mesa sem a mão de ninguém, e a mesa sabe quantos assistem', async () => {
+    const { app, table, seats, play, code } = await three();
+    const w = watcher();
+    table.attach(w.conn);
+    // O resumo de quem assiste: sem lugar, sem o código da mesa e sem o nome dos decks.
+    expect(w.room).toMatchObject({ you: null, player: null, code: '', spectators: 1, watch: { pov: null, hands: false, delay: 0 } });
+    expect(w.room.seats.every((s: { deckName: string } | null) => !s || s.deckName === '')).toBe(true);
+    expect(seats[0].room.code).toBe(code);
+    // Os jogadores ficam sabendo por um aviso curto (a mesa não é reenviada).
+    expect(seats[0].events.at(-1)).toEqual({ event: 'presence', data: { spectators: 1 } });
+    expect([table.spectators, table.connections]).toEqual([1, 3]);
+
+    for (let i = 0; i < 60 && table.state!.phase !== 'gameover'; i++) {
+      play();
+      const v = w.view!;
+      expect(v.actionCount).toBe(table.state!.actionCount);
+      // Só aparece de frente a carta da mão que um efeito revelou a todos.
+      const known = new Set(table.state!.knownHand ?? []);
+      for (const ps of table.state!.players) {
+        expect(shown(v, ps.id).length, `mão do lugar ${ps.id} à vista de quem assiste`).toBeLessThanOrEqual(ps.hand.filter((u) => known.has(u)).length);
+        expect(v.players[ps.id].unseen).toBeUndefined();
+      }
+      // As linhas secretas do registro (o que cada um comprou) ficam com o dono.
+      expect(v.log.some((e) => 'secret' in e)).toBe(false);
+    }
+    expect(table.state!.turn).toBeGreaterThan(0);
+
+    table.detach(w.conn);
+    expect(table.spectators).toBe(0);
+    expect(seats[0].events.at(-1)).toEqual({ event: 'presence', data: { spectators: 0 } });
+    await app.close();
+  });
+
+  it('espectador não conta como presença do jogador nem segura a mesa aberta', async () => {
+    const { app, clock, table, seats } = await three();
+    const w = watcher();
+    table.attach(w.conn);
+    const p = actingPlayer(table.state!)!;
+    // O jogador da vez fecha o navegador; só quem assiste continua ligado.
+    table.detach(seats[p].conn);
+    expect(w.room.players[p].connected).toBe(false);
+    clock.t += YONKO_ABANDON_MS + 1;
+    table.tick();
+    expect(table.state!.players[p].out).toBe(true);
+    // Sem nenhum jogador ligado, a faxina não espera por quem assiste.
+    for (const c of seats) table.detach(c.conn);
+    expect([table.connections, table.spectators]).toEqual([0, 1]);
+    clock.t += 7 * 60 * 60_000;
+    tablesOf(app).sweep();
+    expect(tablesOf(app).get(table.id)).toBeNull();
+    expect(w.events.at(-1)!.event).toBe('closed');
+    await app.close();
+  });
+
+  it('assiste quem tem o código; a mesa só entra na lista se quem criou a abriu', async () => {
+    const { app } = setup();
+    const t = await openTable(app);
+    const get = (url: string, headers: Record<string, string> = {}) => app.inject({ method: 'GET', url, headers });
+    // Na espera: o código acha a mesa, a lista não.
+    const waiting = await get(`/api/yonko/watch/${t.code.toLowerCase()}`);
+    expect(waiting.json()).toMatchObject({ id: t.id, status: 'waiting', listed: false, handsAllowed: false, mine: false });
+    expect(waiting.json().players.map((p: { name: string }) => p.name)).toHaveLength(2);
+    expect((await get(`/api/yonko/watch/${t.code}`, ALICE)).json().mine).toBe(true);
+    expect((await get('/api/yonko/watch/ZZZZZZ')).statusCode).toBe(404);
+    expect((await get('/api/yonko/tables/nope')).statusCode).toBe(404);
+
+    // Só quem criou abre a mesa e libera as mãos; liberar as mãos pede o "pronto" de novo.
+    await post(app, `/api/yonko/tables/${t.id}/ready`, { t: t.bob, ready: true }, BOB);
+    expect((await post(app, `/api/yonko/tables/${t.id}/options`, { t: t.bob, listed: true }, BOB)).statusCode).toBe(403);
+    expect((await post(app, `/api/yonko/tables/${t.id}/options`, { t: t.alice, listed: true })).statusCode).toBe(200);
+    const table = tableOf(app, t.id);
+    expect(table.data.seats[1]!.ready).toBe(true);
+    expect((await post(app, `/api/yonko/tables/${t.id}/options`, { t: t.alice, showHands: true })).statusCode).toBe(200);
+    expect(table.data.seats[1]!.ready).toBe(false);
+    expect(table.data).toMatchObject({ listed: true, showHands: true });
+    const a = client(t.alice);
+    table.attach(a.conn);
+    expect(a.room).toMatchObject({ listed: true, showHands: true });
+    expect((await get('/api/yonko/live')).json()).toEqual({ tables: [], hands: false });
+
+    await post(app, `/api/yonko/tables/${t.id}/bot`, { t: t.alice });
+    await post(app, `/api/yonko/tables/${t.id}/ready`, { t: t.bob, ready: true }, BOB);
+    expect((await post(app, `/api/yonko/tables/${t.id}/start`, { t: t.alice })).statusCode).toBe(200);
+    // Com a partida em andamento não se mexe mais nisso: quem joga começou sabendo o que valia.
+    expect((await post(app, `/api/yonko/tables/${t.id}/options`, { t: t.alice, showHands: false })).statusCode).toBe(409);
+    const live = (await get('/api/yonko/live', BOB)).json();
+    expect(live.tables).toHaveLength(1);
+    expect(live.tables[0]).toMatchObject({ id: t.id, status: 'playing', listed: true, handsAllowed: true, mine: true, spectators: 0 });
+    expect(live.tables[0].players).toHaveLength(3);
+    expect(live.tables[0].players[2]).toMatchObject({ bot: true, out: false });
+    expect(live.tables[0]).not.toHaveProperty('code');
+    expect((await get(`/api/yonko/tables/${t.id}`)).json()).toMatchObject({ id: t.id, mine: false });
+    await app.close();
+  });
+
+  it('as mãos de todos só onde a mesa liberou, e sempre na mesa atrasada', async () => {
+    const { app, clock, table, play, step } = await three({ showHands: true });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const live = watcher();
+    const hands = watcher({ hands: true });
+    table.attach(live.conn);
+    table.attach(hands.conn);
+    expect(live.room.watch).toEqual({ pov: null, hands: false, delay: 0 });
+    expect(hands.room.watch).toEqual({ pov: null, hands: true, delay: HANDS_DELAY_MS });
+
+    step(10_000);
+    const first = actingPlayer(table.state!)!;
+    // Joga até todos terem a mão inicial (a largada e a mão de cada um).
+    while (table.state!.phase === 'mulligan') play();
+    const n = table.state!.actionCount;
+    expect(table.state!.players.every((ps) => ps.hand.length > 0)).toBe(true);
+    const actedAt = clock.t;
+    // Ao vivo: na hora, sem mãos. Com as mãos: nada ainda.
+    expect(live.view!.actionCount).toBe(n);
+    expect(table.state!.players.every((ps) => shown(live.view!, ps.id).length === 0)).toBe(true);
+    expect(hands.view!.actionCount).toBe(0);
+    expect(hands.room.clock.remaining).toEqual([YONKO_TIME_BANK_MS, YONKO_TIME_BANK_MS, YONKO_TIME_BANK_MS]);
+    // Quem chega agora pedindo as mãos também começa atrás; pedir menos que o mínimo dá o mínimo.
+    const late = watcher({ hands: true });
+    const quick = watcher({ hands: true, delay: 0 });
+    table.attach(late.conn);
+    table.attach(quick.conn);
+    expect(late.view!.actionCount).toBe(0);
+    expect(quick.room.watch.delay).toBe(MIN_HANDS_DELAY_MS);
+    expect(quick.view!.actionCount).toBe(0);
+
+    step(MIN_HANDS_DELAY_MS + 1_000);
+    expect(quick.view!.actionCount).toBe(n);
+    expect(hands.view!.actionCount).toBe(0);
+    step(HANDS_DELAY_MS - MIN_HANDS_DELAY_MS - 2_000);
+    expect(hands.view!.actionCount).toBe(0);
+    step(2_000);
+    expect(clock.t - HANDS_DELAY_MS).toBeGreaterThanOrEqual(actedAt);
+    for (const c of [hands, late]) {
+      const v = c.view!;
+      expect(v.actionCount).toBe(n);
+      // As mãos de todos, de frente; os decks continuam escondidos.
+      for (const ps of table.state!.players) {
+        expect(shown(v, ps.id)).toHaveLength(ps.hand.length);
+        expect(v.players[ps.id].deck.every((u) => v.cards[u].cardId === HIDDEN_CARD)).toBe(true);
+      }
+      // Um estado por ação (as animações acompanham).
+      expect(c.events.filter((e) => e.event === 'state').slice(-n).map((e) => e.data.view.actionCount)).toEqual(Array.from({ length: n }, (_, i) => i + 1));
+    }
+    // O relógio é o daquele momento: quem começou gastou 10 s antes da primeira jogada, e o tempo de quem a
+    // mesa espera anda no ritmo da mesa atrasada.
+    const running = actingPlayer(table.state!)!;
+    const since = clock.t - HANDS_DELAY_MS - actedAt;
+    expect(hands.room.clock.running).toBe(running);
+    expect(hands.room.clock.remaining[first]).toBe(YONKO_TIME_BANK_MS - 10_000 - (running === first ? since : 0));
+    for (const p of [0, 1, 2].filter((x) => x !== first)) expect(hands.room.clock.remaining[p]).toBe(YONKO_TIME_BANK_MS - (running === p ? since : 0));
+
+    // O fim chega depois do atraso.
+    for (const p of [0, 1, 2].filter((x) => x !== first).slice(0, 2)) table.act(table.data.players![p].token, null, { type: 'concede', player: p });
+    expect(table.status).toBe('finished');
+    expect(live.room.status).toBe('finished');
+    expect(hands.room.status).toBe('playing');
+    step(HANDS_DELAY_MS + 1_000);
+    expect(hands.room.status).toBe('finished');
+    expect(hands.view!.winner).toBe(first);
+    await app.close();
+  });
+
+  it('mesa que não liberou as mãos: pedir as mãos não mostra nada a mais', async () => {
+    const { app, table, play } = await three();
+    while (table.state!.phase === 'mulligan') play();
+    const w = watcher({ hands: true });
+    table.attach(w.conn);
+    expect(w.room.watch).toEqual({ pov: null, hands: false, delay: 0 });
+    expect(table.state!.players.every((ps) => shown(w.view!, ps.id).length === 0)).toBe(true);
+    await app.close();
+  });
+
+  it('o streamer que joga mostra só a própria mão, com o atraso que escolher, e a transmissão segue no "jogar de novo"', async () => {
+    const { app, clock, table, tokens, seats, play, step, id, alice } = await three();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // Bob transmite a própria partida: ao vivo numa tela, com 2 minutos de atraso na outra.
+    const own = watcher({ as: tokens[1] });
+    const delayed = watcher({ as: tokens[1], delay: 120_000 });
+    // Um token que não é de ninguém da mesa não vira ponto de vista.
+    const stranger = watcher({ as: 'nao-existe' });
+    for (const c of [own, delayed, stranger]) table.attach(c.conn);
+    expect(own.room.watch).toEqual({ pov: 1, hands: false, delay: 0 });
+    expect(delayed.room.watch).toEqual({ pov: 1, hands: false, delay: 120_000 });
+    expect(stranger.room.watch.pov).toBeNull();
+    expect(own.room.player).toBeNull();
+
+    step(5_000);
+    while (table.state!.phase === 'mulligan') play();
+    const n = table.state!.actionCount;
+    const v = own.view!;
+    expect(shown(v, 1)).toHaveLength(table.state!.players[1].hand.length);
+    expect(shown(v, 0)).toHaveLength(0);
+    expect(shown(v, 2)).toHaveLength(0);
+    expect(delayed.view!.actionCount).toBe(0);
+    step(121_000);
+    expect(delayed.view!.actionCount).toBe(n);
+    expect(shown(delayed.view!, 1)).toHaveLength(table.state!.players[1].hand.length);
+    expect(shown(delayed.view!, 0)).toHaveLength(0);
+
+    // A partida acaba e quem criou a reabre logo em seguida: a tela atrasada ainda mostra a partida até o fim.
+    table.act(tokens[1], null, { type: 'concede', player: 1 });
+    table.act(tokens[2], null, { type: 'concede', player: 2 });
+    expect(table.status).toBe('finished');
+    step(10_000);
+    expect(table.reopen(alice).ok).toBe(true);
+    expect(own.room.status).toBe('waiting');
+    expect(own.view).toBeNull();
+    expect(delayed.room.status).toBe('playing');
+    expect(delayed.view!.actionCount).toBe(n);
+    step(111_000);
+    // Passou o atraso desde o fim: a tela atrasada vê o resultado, e ainda não a reabertura.
+    expect(delayed.room.status).toBe('finished');
+    expect(delayed.view!.winner).toBe(0);
+    step(10_000);
+    expect(delayed.room.status).toBe('waiting');
+    expect(delayed.view).toBeNull();
+
+    // A partida seguinte: os mesmos lugares, e cada tela volta a receber a mesa do zero.
+    for (const p of [1, 2]) expect((await post(app, `/api/yonko/tables/${id}/ready`, { t: tokens[p], ready: true }, OWNERS[p])).statusCode).toBe(200);
+    expect(table.start(alice).ok).toBe(true);
+    expect(own.room.status).toBe('playing');
+    expect(own.room.watch.pov).toBe(1);
+    expect(own.view!.actionCount).toBe(0);
+    expect(own.view!.log).toHaveLength(table.state!.log.length);
+    expect(delayed.view!.actionCount).toBe(0);
+    expect(seats[0].view!.actionCount).toBe(0);
+    step(1_000);
+    play();
+    expect(own.view!.actionCount).toBe(1);
+    expect(delayed.view!.actionCount).toBe(0);
+    step(120_500);
+    expect(delayed.view!.actionCount).toBe(1);
+
+    // Bob sai da mesa na espera seguinte: o token dele deixa de valer como ponto de vista.
+    for (const p of [0, 2]) table.act(tokens[p], null, { type: 'concede', player: p });
+    table.reopen(alice);
+    table.leaveWaiting(tokens[1]);
+    expect(own.room.watch.pov).toBeNull();
+    expect(clock.t).toBeGreaterThan(1_000_000);
+    await app.close();
+  });
+
+  it('a mesa atrasada é refeita depois de reiniciar o servidor', async () => {
+    const db = freshDb();
+    const { app, clock, table, tokens, play, step, id } = await three(undefined, db);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    step(1_000);
+    while (table.state!.phase === 'mulligan') play();
+    const n = table.state!.actionCount;
+    await app.close();
+    const again = setup(db, () => clock.t).app;
+    const restored = tableOf(again, id);
+    expect(restored.data.timeline).toHaveLength(n);
+    const w = watcher({ as: tokens[0], delay: 60_000 });
+    restored.attach(w.conn);
+    expect(w.view!.actionCount).toBe(0);
+    step(61_000);
+    expect(w.view!.actionCount).toBe(n);
+    await again.close();
+  });
+
+  it('o canal de quem assiste: as mãos pedem o perfil e a mesa liberada; a chave da transmissão decide o que a tela vê', async () => {
+    const { app, db } = setup();
+    const nami = login(db, 'nami', 'streamer');
+    const usopp = login(db, 'usopp');
+    const send = (method: 'POST' | 'PUT', url: string, cookie: string, payload?: object) => app.inject({ method, url, headers: { cookie }, payload });
+    // Nami cria a mesa com a conta dela; Bob entra e um bot completa.
+    const created = await app.inject({ method: 'POST', url: '/api/yonko/tables', headers: { cookie: nami.cookie }, payload: { deckId: 'st01-luffy' } });
+    expect(created.statusCode).toBe(201);
+    const { id, code, token } = created.json();
+    const bob = (await post(app, '/api/yonko/tables/join', { code, deckId: 'st02-kid' }, BOB)).json().token as string;
+    const table = tableOf(app, id);
+    // Outra mesa, de outra pessoa (cada um espera numa mesa por vez).
+    const other = tableOf(app, (await post(app, '/api/yonko/tables', { deckId: 'st03-crocodile' }, CAROL)).json().id);
+
+    // O que a transmissão pede a cada mesa sai das opções do streamer.
+    const user = getUser(db, nami.id)!;
+    const s = { ...DEFAULT_SETTINGS };
+    expect(yonkoBroadcastView(s, table, user)).toEqual({});
+    expect(yonkoBroadcastView({ ...s, handsOwn: true }, table, user)).toEqual({ as: token, delay: 180_000 });
+    expect(yonkoBroadcastView({ ...s, handsOwn: true, delayS: 0 }, table, user)).toEqual({ as: token, delay: 0 });
+    // Mesa de outros: as mãos só se quem criou liberou, e nunca com menos de 1 minuto de atraso.
+    expect(yonkoBroadcastView(s, other, user)).toEqual({});
+    other.data.showHands = true;
+    expect(yonkoBroadcastView({ ...s, delayS: 10 }, other, user)).toEqual({ hands: true, delay: MIN_HANDS_DELAY_MS });
+    expect(yonkoBroadcastView({ ...s, handsPlayers: false }, other, user)).toEqual({});
+
+    // A mesa do Yonko vai para a transmissão, mesmo na sala de espera.
+    const key = (await send('POST', '/api/broadcast/key', nami.cookie)).json().key as string;
+    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: 'yk-nope' })).statusCode).toBe(404);
+    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: id })).json()).toMatchObject({ key, roomId: id, kind: 'yonko' });
+    expect((await app.inject({ url: `/api/broadcast/${key}` })).json()).toMatchObject({ roomId: id, kind: 'yonko' });
+    await send('PUT', '/api/broadcast/settings', nami.cookie, { handsOwn: true, delayS: 0 });
+
+    await post(app, `/api/yonko/tables/${id}/bot`, { t: token }, { cookie: nami.cookie } as never);
+    await post(app, `/api/yonko/tables/${id}/ready`, { t: bob, ready: true }, BOB);
+    expect((await post(app, `/api/yonko/tables/${id}/start`, { t: token }, { cookie: nami.cookie } as never)).statusCode).toBe(200);
+
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = app.server.address() as { port: number };
+    /** Abre o canal de quem assiste e devolve o status e, se abriu, o primeiro `state`. */
+    const open = async (tableId: string, query = '', cookie?: string) => {
+      const ctrl = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${port}/api/yonko/tables/${tableId}/watch${query}`, { signal: ctrl.signal, headers: cookie ? { cookie } : {} });
+      let data: any = null;
+      if (res.status === 200) {
+        const reader = res.body!.getReader();
+        let text = '';
+        while (!/event: state\ndata: .*\n\n/.test(text)) text += new TextDecoder().decode((await reader.read()).value);
+        data = JSON.parse(/event: state\ndata: (.*)\n\n/.exec(text)![1]);
+      }
+      ctrl.abort();
+      return { status: res.status, data };
+    };
+    // Sem nada: a visão pública, para qualquer um.
+    const plain = await open(id);
+    expect(plain.status).toBe(200);
+    expect(plain.data.room.watch).toEqual({ pov: null, hands: false, delay: 0 });
+    expect((await open('yk-nope')).status).toBe(404);
+    // A chave da transmissão: a mesa como Nami a vê (a mão dela), ao vivo, como ela escolheu.
+    const tv = await open(id, `?k=${key}`);
+    expect(tv.status).toBe(200);
+    expect(tv.data.room.watch).toEqual({ pov: 0, hands: false, delay: 0 });
+    expect(tv.data.room.code).toBe('');
+    expect((await open(id, '?k=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')).status).toBe(403);
+    // "Ver mãos" no app: só o perfil, só na mesa liberada e nunca na própria.
+    expect((await open(id, '?hands=1')).status).toBe(403);
+    expect((await open(id, '?hands=1', usopp.cookie)).status).toBe(403);
+    expect((await open(id, '?hands=1', nami.cookie)).status).toBe(403);
+    table.data.showHands = true;
+    expect((await open(id, '?hands=1', nami.cookie)).status).toBe(403);
+    const seen = await open(other.id, '?hands=1', nami.cookie);
+    expect(seen.status).toBe(200);
+    // Mesa em espera: chega só a sala.
+    expect(seen.data.view).toBeNull();
+    expect(seen.data.room.status).toBe('waiting');
     await app.close();
   });
 });

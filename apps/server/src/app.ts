@@ -483,8 +483,23 @@ export function buildApp(
   app.get<{ Querystring: { leader?: string } }>('/api/bot/hand-guess', async (req) => ({ guess: handGuesses.forLeader(req.query.leader ?? null, viewerHash(req)) }));
   // O agente fora da partida: só com a chave (BOT_AGENT_API_KEY); os testes passam um `complete` falso.
   const agentComplete = opts.agentComplete ?? (server.botAgent ? sdkCompleter(server.botAgent) : null);
+  // Mesas do Yonko (todos contra todos): sala com código, bots nos lugares vagos e partida de 3 ou 4 (yonko/).
+  // Vêm antes das salas de dois: o modo transmissão (nas rotas delas) também aceita uma mesa do Yonko.
+  const yonkoTables = registerYonkoRoutes(app, {
+    db,
+    viewerHash,
+    user: auth.viewer,
+    present,
+    now: opts.now,
+    botDelayMs: opts.botDelayMs,
+    rateLimit: opts.onlineRateLimit,
+    sweepMs: opts.now ? 0 : undefined,
+    sse,
+  });
+  app.decorate('yonkoTables', yonkoTables);
   const lobby = registerOnlineRoutes(app, {
     db,
+    yonko: yonkoTables,
     viewerHash,
     user: auth.viewer,
     present,
@@ -504,19 +519,6 @@ export function buildApp(
   app.decorate('onlineLobby', lobby);
   // Amigos e convite direto para partida (só com login; o status vem da presença do lobby).
   registerFriendRoutes(app, { db, user: auth.viewer, lobby, notifier, now: opts.now });
-  // Mesas do Yonko (todos contra todos): sala com código, bots nos lugares vagos e partida de 3 ou 4 (yonko/).
-  const yonkoTables = registerYonkoRoutes(app, {
-    db,
-    viewerHash,
-    user: auth.viewer,
-    present,
-    now: opts.now,
-    botDelayMs: opts.botDelayMs,
-    rateLimit: opts.onlineRateLimit,
-    sweepMs: opts.now ? 0 : undefined,
-    sse,
-  });
-  app.decorate('yonkoTables', yonkoTables);
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
   registerTournamentRoutes(app, {
     db,

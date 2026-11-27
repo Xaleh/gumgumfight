@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api, type BroadcastInfo, type BroadcastSettings, broadcastUrl, type LiveRoom, modeLabel, ROLE_LABEL, type WatchTarget } from '../api';
+import { api, ApiError, type BroadcastInfo, type BroadcastSettings, broadcastUrl, type LiveRoom, modeLabel, ROLE_LABEL, type WatchTarget, type YonkoLiveTable } from '../api';
 import { useAuth } from '../auth';
 import { useT } from '../i18n';
 import { poll } from '../poll';
+import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
 import { QUEUE_LABEL, tierName } from './Online';
 
@@ -21,6 +22,10 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
   const t = useT();
   const { user } = useAuth();
   const [rooms, setRooms] = useState<LiveRoom[] | null>(null);
+  /** Mesas do Yonko abertas para assistir (as outras, só pelo código). */
+  const [tables, setTables] = useState<YonkoLiveTable[]>([]);
+  /** A mesa do Yonko na transmissão, quando ela não está na lista (escolhida pelo código). */
+  const [airTable, setAirTable] = useState<YonkoLiveTable | null>(null);
   const [canHands, setCanHands] = useState(false);
   const [hands, setHands] = useState(savedHands);
   const [code, setCode] = useState('');
@@ -34,11 +39,13 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
     let stop = false;
     const cancel = poll(
       () =>
-        api.online.live().then(
-          (r) => {
+        // As mesas do Yonko vêm de outro endereço; se ele falhar (servidor antigo), a lista segue sem elas.
+        Promise.all([api.online.live(), api.yonko.live().catch(() => ({ tables: [] as YonkoLiveTable[] }))]).then(
+          ([r, y]) => {
             if (stop) return;
             setRooms(r.rooms);
             setCanHands(r.hands);
+            setTables(y.tables);
           },
           (e) => {
             if (!stop) setError(e instanceof Error ? e.message : String(e));
@@ -68,19 +75,47 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
   // As mãos só aparecem no torneio e nas salas privadas liberadas, e nunca na própria partida.
   const watch = (r: Pick<LiveRoom, 'id' | 'mine' | 'handsAllowed'>) => onWatch({ roomId: r.id, hands: canHands && hands && !r.mine && Boolean(r.handsAllowed) });
   /** Manda a partida para a tela de transmissão (o que ela mostra sai das opções do painel). */
-  const transmit = (r: LiveRoom | null) => {
+  const transmit = (r: Pick<LiveRoom, 'id'> | null) => {
     setError(null);
     api.broadcast.choose(r?.id ?? null).then(setBroadcast, fail);
   };
   const onAir = broadcast?.key ? broadcast.roomId : null;
+  /** Mesa do Yonko: as mãos de todos só onde quem criou as liberou, e nunca na mesa em que se joga. */
+  const watchTable = (y: Pick<YonkoLiveTable, 'id' | 'mine' | 'handsAllowed'>) => onWatch({ roomId: y.id, hands: canHands && hands && !y.mine && y.handsAllowed, yonko: true });
 
-  /** Sala privada pelo código: assistir ou mandar para a transmissão. */
+  // A mesa do Yonko que está na transmissão e não aparece na lista (as mesas fechadas só se acham pelo código).
+  const airYonko = broadcast?.kind === 'yonko' ? onAir : null;
+  const airListed = tables.some((y) => y.id === airYonko);
+  useEffect(() => {
+    if (!airYonko || airListed) return setAirTable(null);
+    let stop = false;
+    api.yonko.table(airYonko).then(
+      (y) => !stop && setAirTable(y),
+      () => !stop && setAirTable(null),
+    );
+    return () => {
+      stop = true;
+    };
+  }, [airYonko, airListed]);
+  const yonkoOnAir = airYonko ? (tables.find((y) => y.id === airYonko) ?? (airTable?.id === airYonko ? airTable : null)) : null;
+  const roomOnAir = rooms?.find((r) => r.id === onAir) ?? null;
+
+  /** Pelo código: uma sala privada de dois ou uma mesa do Yonko; assistir ou mandar para a transmissão. */
   const byCode = async (send = false) => {
     setError(null);
     try {
-      const room = await api.online.byCode(code);
-      if (send) transmit(room);
-      else watch(room);
+      let notFound: unknown = null;
+      const room = await api.online.byCode(code).catch((e: unknown) => {
+        if (!(e instanceof ApiError && e.status === 404)) throw e;
+        notFound = e;
+        return null;
+      });
+      if (room) return send ? transmit(room) : watch(room);
+      const table = await api.yonko.byCode(code).catch(() => null);
+      // Nenhuma das duas: o aviso de sempre ("nenhuma partida com esse código").
+      if (!table) throw notFound;
+      if (send) transmit(table);
+      else watchTable(table);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -109,7 +144,13 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
         {broadcast && (
           <BroadcastPanel
             info={broadcast}
-            onAir={rooms?.find((r) => r.id === onAir) ?? null}
+            onAir={
+              roomOnAir
+                ? { names: roomOnAir.players.map((p) => p.name).join(` ${t('watch.vs')} `), shows: broadcastShows(broadcast, roomOnAir) }
+                : yonkoOnAir
+                  ? { names: yonkoOnAir.players.map((p) => p.name).join(' · '), shows: yonkoBroadcastShows(broadcast, yonkoOnAir) }
+                  : null
+            }
             onNewKey={() => {
               if (broadcast.key && !window.confirm(t('broadcast.newKeyConfirm'))) return;
               api.broadcast.newKey().then(setBroadcast, fail);
@@ -124,7 +165,7 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
 
         <div className="watch-list">
           {rooms === null && !error && <p className="muted">{t('common.loading')}</p>}
-          {rooms?.length === 0 && <p className="muted">{t('watch.empty')}</p>}
+          {rooms?.length === 0 && tables.length === 0 && <p className="muted">{t('watch.empty')}</p>}
           {rooms?.map((r) => (
             <div key={r.id} className={['watch-room-row', onAir === r.id ? 'on-air' : ''].join(' ')}>
               <LiveRoomRow room={r} onClick={() => watch(r)} />
@@ -139,11 +180,27 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
               )}
             </div>
           ))}
+          {tables.map((y) => (
+            <div key={y.id} className={['watch-room-row', onAir === y.id ? 'on-air' : ''].join(' ')}>
+              <YonkoTableRow table={y} onClick={() => watchTable(y)} />
+              {broadcast?.key && (
+                <button
+                  className={['btn', 'small', 'broadcast-btn', onAir === y.id ? 'primary' : ''].join(' ')}
+                  onClick={() => transmit(onAir === y.id ? null : y)}
+                  title={onAir === y.id ? t('broadcast.onAirTitle') : t('broadcast.transmitTitle')}
+                >
+                  {onAir === y.id ? t('broadcast.onAir') : t('broadcast.transmit')}
+                </button>
+              )}
+            </div>
+          ))}
         </div>
 
         <div className="field">
           <label>{t('watch.privateRoom')}</label>
-          <p className="muted small">{t('watch.privateHint')}</p>
+          <p className="muted small">
+            {t('watch.privateHint')} {t('watch.yonkoCodeHint')}
+          </p>
           <div className="join-row">
             <input
               className="code-input"
@@ -208,6 +265,41 @@ export function LiveRoomRow({ room: r, onClick, short, current }: { room: LiveRo
   );
 }
 
+/** Linha de uma mesa do Yonko ao vivo: a rodada, quem assiste e os jogadores (Vida e mão; quem caiu, riscado). */
+export function YonkoTableRow({ table: y, onClick }: { table: YonkoLiveTable; onClick: () => void }) {
+  const t = useT();
+  const alive = y.players.filter((p) => !p.out).length;
+  return (
+    <button className="watch-room yonko" onClick={onClick}>
+      <div className="watch-meta">
+        <span className="watch-queue">{t('watch.queue.yonko')}</span>
+        {y.mine && (
+          <span className="muted small" title={t('watch.mineTitle')}>
+            {t('watch.mine')}
+          </span>
+        )}
+        <span className="muted small">
+          {y.status === 'waiting' ? t('yonko.watchWaitingTitle') : y.turn ? t('yonko.round', { n: Math.ceil(y.turn / Math.max(1, alive)) }) : t('watch.openingHand')}
+          {y.spectators ? ` · 👁 ${y.spectators}` : ''}
+        </span>
+      </div>
+      <div className="watch-players yonko">
+        {y.players.map((p, i) => (
+          <div key={i} className={['watch-player', p.out ? 'out' : ''].join(' ')}>
+            <LeaderArt name={p.leaderName} image={p.leaderImage} colors={p.colors} size="small" />
+            <span className="watch-name">
+              <b>
+                {p.bot && <Icon name="bot" size={13} />} {p.name}
+              </b>
+              <span className="muted small">{p.out ? t('yonko.tagOut') : `❤ ${p.life} · ✋ ${p.hand}`}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </button>
+  );
+}
+
 /** Atrasos oferecidos (s); 0 = ao vivo onde o atraso não é obrigatório. */
 const DELAYS = [0, 60, 120, 180, 300, 600];
 
@@ -218,6 +310,13 @@ export function broadcastShows(s: BroadcastInfo, room: Pick<LiveRoom, 'mine' | '
   // Torneio com mãos ao vivo: vale o atraso escolhido, até nenhum; fora disso, nunca abaixo do mínimo.
   if (s.handsPlayers && room.handsAllowed) return { what: 'players', delayS: room.handsLive ? s.delayS : Math.max(s.minHandsDelayS, s.delayS) };
   return { what: 'none', delayS: plain };
+}
+
+/** O mesmo numa mesa do Yonko (`yonkoBroadcastView`, no servidor): a própria mão, ou as mãos de todos onde quem criou liberou. */
+export function yonkoBroadcastShows(s: BroadcastInfo, table: Pick<YonkoLiveTable, 'mine' | 'handsAllowed'>): { what: 'players' | 'own' | 'none'; delayS: number } {
+  if (table.mine) return s.handsOwn ? { what: 'own', delayS: s.delayS } : { what: 'none', delayS: 0 };
+  if (s.handsPlayers && table.handsAllowed) return { what: 'players', delayS: Math.max(s.minHandsDelayS, s.delayS) };
+  return { what: 'none', delayS: 0 };
 }
 
 const SHOWS_LABEL = { players: 'broadcast.showsPlayers', own: 'broadcast.showsOwn', none: 'broadcast.showsNone' } as const;
@@ -231,8 +330,8 @@ function BroadcastPanel({
   onSettings,
 }: {
   info: BroadcastInfo;
-  /** A partida na transmissão, se ainda está na lista. */
-  onAir: LiveRoom | null;
+  /** A partida na transmissão, se ainda dá para achá-la: quem joga e o que a live mostra dela. */
+  onAir: { names: string; shows: ReturnType<typeof broadcastShows> } | null;
   onNewKey: () => void;
   onClear: () => void;
   onSettings: (s: Partial<BroadcastSettings>) => void;
@@ -250,7 +349,7 @@ function BroadcastPanel({
     }
   };
   const delayText = (sec: number) => (sec ? t('broadcast.delayMin', { n: Math.round((sec / 60) * 10) / 10 }) : t('broadcast.delayLive'));
-  const shows = onAir ? broadcastShows(info, onAir) : null;
+  const shows = onAir?.shows ?? null;
   const flag = (key: 'handsPlayers' | 'handsOwn' | 'delayTournaments' | 'chat', label: string, hint?: string) => (
     <label className="check">
       <input type="checkbox" checked={info[key]} onChange={(e) => onSettings({ [key]: e.target.checked })} /> {label}
@@ -280,7 +379,7 @@ function BroadcastPanel({
             {info.roomId ? (
               <>
                 <b>{t('broadcast.nowOnAir')}</b>{' '}
-                {onAir ? onAir.players.map((p) => p.name).join(` ${t('watch.vs')} `) : t('broadcast.onAirEnded')}
+                {onAir ? onAir.names : t('broadcast.onAirEnded')}
                 {shows && ` · ${t(SHOWS_LABEL[shows.what])} · ${delayText(shows.delayS)}`}
               </>
             ) : (

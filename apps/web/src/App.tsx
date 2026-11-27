@@ -23,6 +23,7 @@ import { TeamBot } from './components/TeamBot';
 import { Tournaments } from './components/Tournaments';
 import { Yonko } from './components/Yonko';
 import { YonkoOnline } from './components/YonkoOnline';
+import { YonkoWatch } from './components/YonkoWatch';
 import { LocalYonkoTable } from './components/YonkoTable';
 import { Watch } from './components/Watch';
 import { type FriendLink, friendLinkFrom } from './friendLink';
@@ -61,7 +62,7 @@ type Screen =
    * `tournament`: veio da página de um torneio (e volta para ela; `lobby`: para o lobby dele);
    * `home`: veio do "Ao vivo agora" do menu.
    */
-  | { name: 'watch'; target: WatchTarget; tournament?: string; lobby?: boolean; home?: boolean }
+  | { name: 'watch'; target: WatchTarget; tournament?: string; lobby?: boolean; home?: boolean; /** Veio da entrada do Yonko (sair volta para lá). */ hub?: boolean }
   /** `lobby`: abre direto o lobby do torneio (chamado de Judge na notificação). */
   | { name: 'tournaments'; id?: string; lobby?: boolean }
   /** `back`: tela para onde "Voltar" leva (replay aberto da página de um torneio ou da administração). */
@@ -95,7 +96,8 @@ function savedScreen(): Screen {
       return { name: 'yonko-online', seat: { id: s.seat.id, code: String(s.seat.code ?? ''), token: s.seat.token } };
     }
     if (s?.name === 'watch' && typeof s.target?.roomId === 'string') {
-      return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands), ...(s.target.judge ? { judge: true } : {}) }, tournament, ...lobby };
+      const target = { roomId: s.target.roomId, hands: Boolean(s.target.hands), ...(s.target.judge ? { judge: true } : {}), ...(s.target.yonko ? { yonko: true } : {}) };
+      return { name: 'watch', target, tournament, ...lobby, ...(s.hub ? { hub: true } : {}) };
     }
   } catch {
     /* sem armazenamento */
@@ -322,6 +324,9 @@ function MainApp() {
   if (screen.name === 'watch-list') {
     return <Watch onExit={() => setScreen({ name: 'menu' })} onWatch={(target) => setScreen({ name: 'watch', target })} />;
   }
+  if (screen.name === 'watch' && screen.target.yonko) {
+    return <YonkoWatch key={screen.target.roomId} target={screen.target} onExit={() => setScreen(screen.hub ? { name: 'yonko' } : screen.home ? { name: 'menu' } : { name: 'watch-list' })} />;
+  }
   if (screen.name === 'watch') {
     return (
       <WatchGameScreen
@@ -374,6 +379,7 @@ function MainApp() {
         again={screen.again}
         code={screen.code}
         onOnline={(seat) => setScreen({ name: 'yonko-online', seat })}
+        onWatch={(target) => setScreen({ name: 'watch', target, hub: true })}
         onExit={() => setScreen({ name: 'menu' })}
         onBuildDecks={() => setScreen({ name: 'builder', yonko: true, back: { name: 'yonko' } })}
         onStart={(setup) => setScreen({ name: 'yonko-game', setup, key: Date.now() })}

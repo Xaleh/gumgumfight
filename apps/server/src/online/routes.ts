@@ -103,6 +103,8 @@ interface Deps {
   botProfile?: (deckId: string | null, leader: string | null) => DeckProfile | undefined;
   /** O deck provável do Líder do oponente do bot (`stats/handguess.ts`). */
   botHandGuess?: (leader: string | null, ownerHash: string | null) => DeckGuess | null;
+  /** As mesas do Yonko (yonko/routes.ts), que também podem ir para a transmissão. */
+  yonko?: { get: (id: string) => unknown };
 }
 
 /**
@@ -731,9 +733,11 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return account;
   };
   /** Transmissão da conta para o app (sem a versão, que é da tela de transmissão). */
+  /** A partida escolhida é uma sala de dois (`match`) ou uma mesa do Yonko (`yonko`): cada uma tem o seu canal. */
+  const kindOf = (roomId: string | null) => (roomId && deps.yonko?.get(roomId) ? 'yonko' : 'match');
   const mine = (b: Broadcast | null) => {
     const { rev: _, ...rest } = b ?? { key: null, roomId: null, rev: 0, ...DEFAULT_SETTINGS };
-    return { ...rest, minHandsDelayS: MIN_HANDS_DELAY_MS / 1000 };
+    return { ...rest, kind: kindOf(rest.roomId), minHandsDelayS: MIN_HANDS_DELAY_MS / 1000 };
   };
   const noKey = (reply: FastifyReply) => reply.code(409).send(fail('broadcastNoKey', 'Crie o link da transmissão antes (Assistir partidas → Modo transmissão).'));
 
@@ -751,13 +755,17 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return mine(newBroadcastKey(db, account.id));
   });
 
-  /** Escolhe a partida que vai para a transmissão (`roomId` null tira a partida da tela); vale a própria partida. */
+  /**
+   * Escolhe a partida que vai para a transmissão (`roomId` null tira a partida da tela); vale a própria partida.
+   * Também vale uma mesa do Yonko, mesmo na sala de espera (a partida aparece quando começar).
+   */
   app.put<{ Body: { roomId?: unknown } }>('/api/broadcast/room', async (req, reply) => {
     const account = broadcaster(req, reply);
     if (!account) return reply;
     if (!getBroadcast(db, account.id)) return noKey(reply);
     const roomId = req.body?.roomId;
     if (roomId === null) return mine(setBroadcastRoom(db, account.id, null));
+    if (typeof roomId === 'string' && deps.yonko?.get(roomId)) return mine(setBroadcastRoom(db, account.id, roomId));
     const room = typeof roomId === 'string' ? watchable(roomId) : null;
     if (!room || room.status === 'waiting') return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     return mine(setBroadcastRoom(db, account.id, room.id));
@@ -773,15 +781,15 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   });
 
   /**
-   * O que a tela de transmissão (fonte do OBS) mostra agora: a partida escolhida no app, se o chat
-   * aparece e a versão (`rev`, que muda a cada troca: a tela reconecta). Sem login: a chave é o
+   * O que a tela de transmissão (fonte do OBS) mostra agora: a partida escolhida no app (`kind`: sala de dois
+   * ou mesa do Yonko), se o chat aparece e a versão (`rev`, que muda a cada troca: a tela reconecta). Sem login: a chave é o
    * segredo. Some (404) se o link foi trocado ou a conta perdeu o perfil.
    */
   app.get<{ Params: { key: string } }>('/api/broadcast/:key', async (req, reply) => {
     const found = broadcastByKey(db, req.params.key);
     if (!found || !seesHands(found.user.role)) return reply.code(404).send(fail('broadcastNotFound', 'Link de transmissão inválido. Copie o link de novo no app.'));
     const { roomId, chat, rev } = found.broadcast;
-    return { roomId, chat, rev };
+    return { roomId, chat, rev, kind: kindOf(roomId) };
   });
 
   type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown; text?: unknown; vx?: unknown; vy?: unknown; visible?: unknown };

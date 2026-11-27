@@ -411,7 +411,7 @@ cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores d
 ### Mesa com mais de dois jogadores (Yonko)
 
 O motor, a mesa local e a mesa online (fases 1 a 3 de `docs/plano-modos-de-jogo.md`, seção 4; o servidor está em
-"Mesas do Yonko", na seção 11): replay, espectador e o bot com busca continuam de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
+"Mesas do Yonko", na seção 11, que também traz o espectador e a transmissão): o replay e o bot com busca continuam de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
 é interpretação nossa. `createGame` aceita de 2 a `MAX_PLAYERS` (4) em `players`; `PlayerId` é o lugar (índice em
 `players`) e a ordem dos turnos segue os lugares. Com mais de dois (`isMultiplayer`), o estado ganha `table`
 (`TableRules`: `extraLife`, `curveChoice`, `eliminationDraw`; `YONKO_TABLE` é o do manual), `eliminated` (ordem de
@@ -1463,10 +1463,36 @@ tem, e `lastAction`.
   por `actionFromView`; sem pessoas na partida, sem espera.
 - **Faxina:** `sweep` (a cada minuto) fecha espera e fim sem ninguém conectado há 30 minutos e partidas sem
   conexão há 6 horas. `reopen` (quem criou) volta a mesa terminada para a espera com os mesmos lugares.
+- **Espectadores:** uma conexão sem lugar (`YonkoConnection.watch`, `token` null) entra pelo canal
+  `GET /api/yonko/tables/:id/watch` e recebe o mesmo `state`, com a visão pública (`viewFor` sem jogador) e um
+  `room` sem o código da mesa e sem o nome dos decks, com `watch` (`pov`, `hands`, `delay`). Acha a mesa quem tem
+  o código (`/api/yonko/watch/:code`) ou, com `listed` (quem criou marca na espera, `POST …/options`), quem olha
+  `/api/yonko/live`. As conexões com a mesma visão dividem um `state` montado uma vez (`send`). Entrar e sair manda
+  só `presence` (`{ spectators }`) a todos. `connected`, `connections`, o abandono e a faxina contam só os
+  jogadores; no máximo `MAX_SPECTATORS` por mesa.
+- **Mesa atrasada:** `timeline` (gravado com a mesa) guarda, por ação, o horário e o relógio de cada jogador. Cada
+  atraso em uso tem uma `LateTable` (em memória): o estado refeito de `Game.initial()` com as ações até `agora −
+  atraso`, avançado por temporizador no ritmo em que elas aconteceram (`advanceTable`), com o relógio daquele
+  momento (`lateClock`). `Game` é a partida (jogadores, ações, `timeline`, apelidos): `reopen` e `start` trocam os
+  vetores da mesa em vez de esvaziá-los, então a mesa atrasada segue a partida que acabou até o atraso passar pela
+  reabertura (`closedAt`) e só então leva quem assistia para a mesa de agora. `changed` avisa só quem recebe a mesa
+  de agora.
+- **Transmissão:** `PUT /api/broadcast/room` aceita o id de uma mesa do Yonko (as rotas online recebem
+  `deps.yonko`; por isso as mesas do Yonko são registradas antes) e `GET /api/broadcast/:key` responde `kind`
+  (`match` ou `yonko`). A tela do OBS abre o canal `watch?k=<chave>`, e `yonkoBroadcastView`
+  (`online/broadcast.ts`) decide o pedido pelas opções do streamer: `as` (o token do lugar dele, e não o número do
+  jogador, que muda de uma partida para a outra) com o atraso escolhido, ou `hands` (as mãos de todos, só com
+  `showHands` e nunca abaixo de `MIN_HANDS_DELAY_MS`), ou nada (a visão pública). `viewOf` resolve o pedido a cada
+  envio: `as` vira o jogador da partida que a conexão está vendo, e `hands` só vale na mesa atrasada de uma partida
+  que começou com as mãos liberadas (`Game.hands`). `hands=1` (o "Ver mãos" do app) exige o perfil, a mesa liberada
+  e que a conta não jogue nela.
 - **No app:** `components/Yonko.tsx` (entrada: deck, regras, criar/entrar, mesa local), `components/YonkoOnline.tsx`
   (sala de espera e mesa online), `components/YonkoRules.tsx` (painel de regras), `game/useYonkoOnline.ts` (o canal
   e as jogadas) e `components/YonkoTable.tsx` (a mesa, comum à local e à online). A tela `yonko-online` fica em
-  `sessionStorage` (recarregar volta para ela) e `/?yonko=CÓDIGO` abre a entrada com o código preenchido.
+  `sessionStorage` (recarregar volta para ela) e `/?yonko=CÓDIGO` abre a entrada com o código preenchido. Quem
+  assiste usa `components/YonkoWatch.tsx` (`useYonkoWatch`, o mesmo canal sem jogadas) com a `YonkoTable` em modo
+  `watch` (sem jogadas, perguntas nem arrasto; `me` é o jogador acompanhado); a tela `watch` do `App.tsx` e a
+  `Broadcast.tsx` a abrem quando o alvo é uma mesa do Yonko (`WatchTarget.yonko`, `kind: 'yonko'`).
 
 ## 12. Torneios
 

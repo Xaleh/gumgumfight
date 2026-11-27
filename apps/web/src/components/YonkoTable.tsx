@@ -9,6 +9,10 @@
 // no centro, o impacto do ataque), que seguem a opção "Animações" do jogador: completas, suaves ou desligadas. A mesa recebe
 // o jogo de fora: a partida local contra bots (`useYonkoGame`, em `LocalYonkoTable`) ou a mesa online
 // (`useYonkoOnline`, em `YonkoOnline.tsx`).
+//
+// Quem assiste (`watch`, em `YonkoWatch.tsx`) usa a mesma tela, só para olhar: o lugar de baixo é o do jogador que
+// ele acompanha (um lugar fixo, ou quem está jogando), sem jogadas, sem perguntas e sem arrasto. A mão desse lugar
+// aparece como o servidor a mandou: os versos, ou as cartas onde a mesa as mostra a quem transmite.
 
 import {
   type Action,
@@ -79,6 +83,20 @@ export interface TableExtras {
   notice?: string | null;
   /** No fim: sem "Jogar de novo" (quem não criou a mesa espera), com este aviso no lugar. */
   rematchNote?: string;
+  /** Na mesa online: quantos assistem agora (o olho na barra de cima; com zero, nada). */
+  spectators?: number;
+  /** Mais itens nas opções da mesa (o botão de mandar a mesa para a transmissão). */
+  options?: ReactNode;
+}
+
+/** Quem assiste: de quem é o lugar de baixo e o que a tela esconde (ver o começo do arquivo). */
+export interface TableWatch {
+  /** O lugar de baixo é de um jogador fixo ou de quem está jogando (`'turn'`). */
+  follow: PlayerId | 'turn';
+  /** Troca quem é acompanhado; sem isso a escolha é fixa (a transmissão de quem joga a partida). */
+  onFollow?: (follow: PlayerId | 'turn') => void;
+  /** Tela de transmissão (fonte do OBS): sem os botões de sair e de opções. */
+  broadcast?: boolean;
 }
 
 const COLOR_VAR: Record<string, string> = {
@@ -479,10 +497,12 @@ function Result({
   onClose,
 }: {
   s: GameState;
-  me: PlayerId;
+  /** Quem está na tela; null para quem assiste (ninguém é "você"). */
+  me: PlayerId | null;
   t: Translate;
   tryT: TryT;
-  onExit: () => void;
+  /** Sem isso (tela de transmissão), o resultado não tem botões. */
+  onExit?: () => void;
   onRematch?: () => void;
   rematchNote?: string;
   onClose: () => void;
@@ -502,7 +522,7 @@ function Result({
   );
   return (
     <div className="yk-result-back" onClick={onClose}>
-      <div className={['yk-result', s.winner === me ? 'won' : ''].join(' ')} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div className={['yk-result', me !== null && s.winner === me ? 'won' : ''].join(' ')} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         {s.winner !== null && (
           <div className="yk-result-crown" style={vars({ '--pc': seatColor(s, s.winner) })}>
             <span className="yk-result-rays" aria-hidden="true" />
@@ -519,16 +539,20 @@ function Result({
           {standing.map((id, i) => row(id, '–', t('yonko.resultStanding'), ranked.length + i))}
         </ol>
         {rematchNote && <p className="muted small">{rematchNote}</p>}
-        <div className="yk-result-actions">
-          {onRematch && (
-            <button type="button" className="yk-btn primary" onClick={onRematch}>
-              {t('yonko.rematch')}
-            </button>
-          )}
-          <button type="button" className="yk-btn" onClick={onExit}>
-            {t('yonko.exit')}
-          </button>
-        </div>
+        {(onRematch || onExit) && (
+          <div className="yk-result-actions">
+            {onRematch && (
+              <button type="button" className="yk-btn primary" onClick={onRematch}>
+                {t('yonko.rematch')}
+              </button>
+            )}
+            {onExit && (
+              <button type="button" className="yk-btn" onClick={onExit}>
+                {t('yonko.exit')}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -744,15 +768,19 @@ export function YonkoTable({
   onExit,
   onRematch,
   extras = {},
+  watch,
 }: {
   game: TableGame;
-  /** O jogador de quem está na tela. */
+  /** O jogador de quem está na tela (para quem assiste, o jogador acompanhado). */
   me: PlayerId;
   onExit: () => void;
   onRematch?: () => void;
   extras?: TableExtras;
+  /** Quem assiste: a mesa só para olhar, e `me` é o jogador acompanhado. */
+  watch?: TableWatch;
 }) {
   const { state: s, dispatch } = game;
+  const watching = Boolean(watch);
   const t = useT();
   const tryT = useTryT();
   const { locale, animations } = useSettings();
@@ -765,7 +793,7 @@ export function YonkoTable({
   const board = useRef<HTMLDivElement>(null);
   useBoardSize(board);
   const motion = useBoardMotion(s, { enabled: animate, tempo: 0.85, lastAction: game.lastAction, lang: locale, calm: !showy, root: '.yk' });
-  useMatchAudio(s, { enabled: true, animate: showy, tempo: 0.85, human: me, lastAction: game.lastAction });
+  useMatchAudio(s, { enabled: true, animate: showy, tempo: 0.85, human: watching ? null : me, lastAction: game.lastAction });
 
   /** Carta própria selecionada (na mão ou em campo), com a vez livre. */
   const [sel, setSel] = useState<string | null>(null);
@@ -794,8 +822,9 @@ export function YonkoTable({
   const opponents = useMemo(() => order.slice(order.indexOf(me) + 1).concat(order.slice(0, order.indexOf(me))), [order, me]);
 
   const pending = s.pending;
-  const myPending = pending && pending.player === me ? pending : null;
-  const legal = useMemo(() => legalActions(s, me), [s, me]);
+  // Quem assiste não joga: nenhuma pergunta é dele e nenhuma jogada está aberta, mesmo vendo a mesa como um jogador.
+  const myPending = !watching && pending && pending.player === me ? pending : null;
+  const legal = useMemo(() => (watching ? [] : legalActions(s, me)), [s, me, watching]);
   const myTurnIdle = !pending && s.phase === 'main' && s.activePlayer === me && legal.some((a) => a.type === 'endTurn');
 
   // Cada ação zera as marcações; a seleção só vale enquanto a carta continua minha e a vez livre.
@@ -838,7 +867,8 @@ export function YonkoTable({
   useEffect(() => {
     if (!turnKey || !animate) return setFlash(null);
     const p = s.activePlayer;
-    setFlash({ key: turnKey, text: p === me ? t('game.yourTurn') : t('game.turnOf', { name: s.players[p].name }), kicker: t('yonko.round', { n: round }), mine: p === me, color: seatColor(s, p) });
+    const own = p === me && !watching;
+    setFlash({ key: turnKey, text: own ? t('game.yourTurn') : t('game.turnOf', { name: s.players[p].name }), kicker: t('yonko.round', { n: round }), mine: own, color: seatColor(s, p) });
     const timer = setTimeout(() => setFlash(null), 1150);
     return () => clearTimeout(timer);
   }, [turnKey, animate]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -952,11 +982,11 @@ export function YonkoTable({
   const fieldDrop: DropState = drag?.kind === 'hand' && dropValid(drag, 'field') ? (drag.over === 'field' ? 'over' : 'ok') : null;
 
   const name = (uid: string) => cardDef(s, uid).name;
-  const who = (id: PlayerId) => (id === me ? t('yonko.you') : s.players[id].name);
+  const who = (id: PlayerId) => (id === me && !watching ? t('yonko.you') : s.players[id].name);
 
   /** O que a faixa do meio mostra agora: a pergunta aberta, a carta selecionada ou de quem é a vez. */
   const banner = ((): BannerView => {
-    const cancel: Btn[] = cancelAllowed(s, me) ? [{ label: t('yonko.undo'), onClick: () => send({ type: 'cancel', player: me }) }] : [];
+    const cancel: Btn[] = !watching && cancelAllowed(s, me) ? [{ label: t('yonko.undo'), onClick: () => send({ type: 'cancel', player: me }) }] : [];
     if (myPending) {
       const p = myPending;
       switch (p.kind) {
@@ -1057,7 +1087,7 @@ export function YonkoTable({
     }
     if (!myTurnIdle) {
       const active = s.players[s.activePlayer];
-      return { icon: 'bot', mine: false, waiting: s.phase !== 'gameover', text: s.activePlayer === me ? t('yonko.resolving') : t('yonko.turnOf', { name: active.name }), buttons: [] };
+      return { icon: 'bot', mine: false, waiting: s.phase !== 'gameover', text: s.activePlayer === me && !watching ? t('yonko.resolving') : t('yonko.turnOf', { name: active.name }), buttons: [] };
     }
     if (sel && mine.hand.includes(sel)) {
       const why = playError(s, me, sel);
@@ -1118,7 +1148,7 @@ export function YonkoTable({
     </div>
   );
   const leave = () => {
-    if (s.phase === 'gameover' || window.confirm(t('yonko.leaveConfirm'))) onExit();
+    if (watching || s.phase === 'gameover' || window.confirm(t('yonko.leaveConfirm'))) onExit();
   };
   const endTurn = () => send({ type: 'endTurn', player: me });
 
@@ -1131,9 +1161,10 @@ export function YonkoTable({
         const atk = getPower(s, battle.attacker) ?? 0;
         const def = getPower(s, battle.target) ?? 0;
         const hits = atk >= def;
+        const mineHit = defender === me && !watching;
         const status =
-          defender === me ? (hits ? t('game.needToDefend', { n: atk - def + 1000 }) : t('game.defendedBang')) : hits ? t('game.attackWillHit') : t('game.needToHit', { n: def - atk });
-        const label = t(defender === me ? 'yonko.battleMine' : 'yonko.battle', { attacker: name(battle.attacker), power: atk, target: name(battle.target), defense: def, owner: defender !== null ? s.players[defender].name : '' });
+          mineHit ? (hits ? t('game.needToDefend', { n: atk - def + 1000 }) : t('game.defendedBang')) : hits ? t('game.attackWillHit') : t('game.needToHit', { n: def - atk });
+        const label = t(mineHit ? 'yonko.battleMine' : 'yonko.battle', { attacker: name(battle.attacker), power: atk, target: name(battle.target), defense: def, owner: defender !== null ? s.players[defender].name : '' });
         return { atk, def, hits, status, label };
       })()
     : null;
@@ -1170,9 +1201,19 @@ export function YonkoTable({
   const sheetTitle =
     sheet === 'log' ? t('yonko.log') : sheet === 'card' ? t('yonko.card') : sheet === 'options' ? t('yonko.tableOptions') : trashOf !== null ? t('game.trashOf', { name: who(trashOf), n: s.players[trashOf].trash.length }) : '';
 
+  /** Um jogador na ordem dos turnos: para quem assiste (e pode escolher), o toque passa a acompanhá-lo. */
+  const seatButton = (id: PlayerId, body: ReactNode) =>
+    watch?.onFollow ? (
+      <button type="button" className="yk-track-btn" aria-pressed={watch.follow === id} title={t('yonko.followSeat', { name: s.players[id].name })} onClick={() => watch.onFollow!(id)}>
+        {body}
+      </button>
+    ) : (
+      body
+    );
+
   return (
     <PickOrderContext.Provider value={pickOrder}>
-      <div className={['yk', `anim-${animations}`, s.phase === 'gameover' ? 'over' : '', drag ? 'dragging' : ''].join(' ')} onPointerDown={gestures.onPointerDown} onClickCapture={gestures.onClickCapture}>
+      <div className={['yk', `anim-${animations}`, s.phase === 'gameover' ? 'over' : '', drag ? 'dragging' : '', watching ? 'watching' : '', watch?.broadcast ? 'broadcast' : ''].join(' ')} onPointerDown={gestures.onPointerDown} onClickCapture={gestures.onClickCapture}>
         <header className="yk-top">
           <button type="button" className="yk-back" onClick={leave} aria-label={t('yonko.exit')}>
             <Icon name="chevron" size={18} />
@@ -1187,25 +1228,37 @@ export function YonkoTable({
               const on = s.phase === 'main' && s.activePlayer === id;
               return (
                 <li key={id} className={[on ? 'on' : '', ps.out ? 'out' : '', id === me ? 'me' : ''].join(' ')} style={vars({ '--pc': seatColor(s, id) })} aria-current={on ? 'step' : undefined}>
-                  <Avatar s={s} id={id} />
-                  <span className="yk-track-text">
-                    <b>{who(id)}</b>
-                    <small>
-                      {ps.out ? (
-                        t('yonko.tagOut')
-                      ) : (
-                        <>
-                          <Icon name="heart" size={10} /> {lifeNow(s, id)}
-                        </>
-                      )}
-                    </small>
-                  </span>
+                  {seatButton(
+                    id,
+                    <>
+                      <Avatar s={s} id={id} />
+                      <span className="yk-track-text">
+                        <b>{who(id)}</b>
+                        <small>
+                          {ps.out ? (
+                            t('yonko.tagOut')
+                          ) : (
+                            <>
+                              <Icon name="heart" size={10} /> {lifeNow(s, id)}
+                            </>
+                          )}
+                        </small>
+                      </span>
+                    </>,
+                  )}
                 </li>
               );
             })}
           </ol>
           <span className="yk-sp" />
-          {s.phase === 'main' && <span className="yk-pill round">{s.activePlayer === me ? t('yonko.pillTurnMine', { round }) : t('yonko.pillTurn', { round, name: s.players[s.activePlayer].name })}</span>}
+          {Boolean(extras.spectators) && (
+            <span className="yk-pill eye" title={t('yonko.spectators', { n: extras.spectators })} aria-label={t('yonko.spectators', { n: extras.spectators })}>
+              <Icon name="eye" size={13} /> {extras.spectators}
+            </span>
+          )}
+          {s.phase === 'main' && (
+            <span className="yk-pill round">{s.activePlayer === me && !watching ? t('yonko.pillTurnMine', { round }) : t('yonko.pillTurn', { round, name: s.players[s.activePlayer].name })}</span>
+          )}
           {s.phase === 'gameover' && !resultOpen && (
             <button type="button" className="yk-pill btnlike" onClick={() => setResultOpen(true)}>
               {t('yonko.showResult')}
@@ -1354,9 +1407,11 @@ export function YonkoTable({
                   </div>
                 )}
               </div>
-              <button type="button" className={['yk-end', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
-                {t('yonko.endTurn')}
-              </button>
+              {!watching && (
+                <button type="button" className={['yk-end', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
+                  {t('yonko.endTurn')}
+                </button>
+              )}
               {flash && s.phase === 'main' && (
                 <div key={flash.key} className={['turn-banner', 'yk-flash', flash.mine ? 'mine' : 'theirs', showy ? 'sweep' : ''].join(' ')} style={vars({ '--pc': flash.color })}>
                   <div className="tb-stripe">
@@ -1371,7 +1426,7 @@ export function YonkoTable({
               className={['yk-mat', 'yk-me', s.activePlayer === me && s.phase === 'main' ? 'playing' : '', defender === me ? 'focus' : '', mine.out ? 'out' : '', fieldDrop ? `drop-${fieldDrop}` : ''].join(' ')}
               data-drop="field"
               style={vars({ '--pc': seatColor(s, me), '--i': opponents.length })}
-              aria-label={t('yonko.yourTable')}
+              aria-label={watching ? t('yonko.tableOf', { name: mine.name }) : t('yonko.yourTable')}
             >
               <div className="yk-me-row">
                 <LifeStack s={s} id={me} h={h} t={t} />
@@ -1383,18 +1438,21 @@ export function YonkoTable({
               <div className="yk-me-foot">
                 <span className="yk-plate">
                   <span className="yk-ord">{t('yonko.place', { n: placeOf(me) })}</span>
-                  <b className="yk-name">{t('yonko.you')}</b>
+                  <b className="yk-name">{who(me)}</b>
+                  {watching && <span className="yk-leader-name">{cardDef(s, mine.leader.uid).name}</span>}
                   {mine.out ? <span className="yk-tag out">{t('yonko.tagOut')}</span> : defender === me ? <span className="yk-tag">{t('yonko.tagTarget')}</span> : null}
                   {!mine.out && <SeatClock status={extras.status?.(me)} t={t} />}
                 </span>
                 <DonRow ps={mine} t={t} draggable={canAttachDon} dragging={drag?.kind === 'don' ? drag.dons : undefined} />
-                <button type="button" className={['yk-end', 'small', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
-                  {t('yonko.endTurn')}
-                </button>
+                {!watching && (
+                  <button type="button" className={['yk-end', 'small', myTurnIdle ? 'ready' : ''].join(' ')} disabled={!myTurnIdle} onClick={endTurn}>
+                    {t('yonko.endTurn')}
+                  </button>
+                )}
               </div>
             </section>
 
-            <section className="yk-hand" data-drop="hand" aria-label={t('yonko.yourHand', { n: hand.length })}>
+            <section className="yk-hand" data-drop="hand" aria-label={watching ? t('yonko.handOf', { name: mine.name, n: hand.length }) : t('yonko.yourHand', { n: hand.length })}>
               <div className="yk-hand-fan" data-anchor={`hand-${me}`} style={vars({ '--n': Math.max(hand.length, 1) })} onPointerMove={onHandMove} onPointerLeave={() => setPeek(null)}>
                 {hand.map((uid, i) => {
                   const offset = i - (hand.length - 1) / 2;
@@ -1405,7 +1463,7 @@ export function YonkoTable({
                       data-hand-uid={uid}
                       style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}
                     >
-                      <TableCard s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onHover={() => undefined} drag="hand" />
+                      <TableCard s={s} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} onHover={() => undefined} drag={watching ? undefined : 'hand'} />
                     </div>
                   );
                 })}
@@ -1490,6 +1548,23 @@ export function YonkoTable({
                     <b>{t('settings.music')}</b>
                     <VolumeControl kind="musicVolume" />
                   </div>
+                  {watch?.onFollow && (
+                    <div className="yk-option">
+                      <b>{t('yonko.follow')}</b>
+                      <div className="yk-follow" role="group" aria-label={t('yonko.follow')}>
+                        <button type="button" className={['yk-btn', watch.follow === 'turn' ? 'primary' : ''].join(' ')} aria-pressed={watch.follow === 'turn'} onClick={() => watch.onFollow!('turn')}>
+                          {t('yonko.followTurn')}
+                        </button>
+                        {order.map((id) => (
+                          <button key={id} type="button" className={['yk-btn', watch.follow === id ? 'primary' : ''].join(' ')} aria-pressed={watch.follow === id} onClick={() => watch.onFollow!(id)}>
+                            {s.players[id].name}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="muted small">{t('yonko.followHint')}</p>
+                    </div>
+                  )}
+                  {extras.options}
                 </div>
               ) : trashOf !== null && s.players[trashOf].trash.length ? (
                 <div className="yk-trash-grid">
@@ -1505,7 +1580,7 @@ export function YonkoTable({
         )}
 
         {s.phase === 'gameover' && resultOpen && (
-          <Result s={s} me={me} t={t} tryT={tryT} onExit={onExit} onRematch={onRematch} rematchNote={extras.rematchNote} onClose={() => setResultOpen(false)} />
+          <Result s={s} me={watching ? null : me} t={t} tryT={tryT} onExit={watch?.broadcast ? undefined : onExit} onRematch={onRematch} rematchNote={extras.rematchNote} onClose={() => setResultOpen(false)} />
         )}
       </div>
     </PickOrderContext.Provider>

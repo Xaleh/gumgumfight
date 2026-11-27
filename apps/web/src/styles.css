@@ -21799,6 +21799,106 @@ div.dk-tile-main {
   }
 }
 
+/* ---- Yonko: quem assiste (espectador e tela de transmissão) ----
+   Sem animação nova: o que aparece aqui muda de uma vez (e `anim-off` já tira as transições da mesa). */
+.yk-pill.eye {
+  gap: 5px;
+  flex: none;
+}
+/* Quem assiste escolhe, na ordem dos turnos, de quem é o lugar de baixo. */
+.yk-track-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.yk-track-btn:focus-visible {
+  outline: 2px solid var(--brand-yellow);
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+.yk.watching .yk-track li.me {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--pc) 70%, var(--cream));
+}
+.yk.watching .yk-me-foot .yk-plate {
+  min-width: 0;
+}
+.yk.watching .yk-me-foot .yk-leader-name {
+  flex: 0 1 auto;
+}
+.yk-follow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.yk-follow .yk-btn {
+  flex: 1 1 120px;
+}
+.yk-transmit {
+  align-items: flex-start;
+}
+/* Tela de transmissão (fonte do OBS): ninguém clica nela. */
+.yk.broadcast .yk-back,
+.yk.broadcast .yk-tabs .yk-back {
+  display: none;
+}
+/* A espera de quem assiste: quem está sentado à mesa. */
+.yk-watch-seats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+/* A sala de espera: quem pode assistir e o que a transmissão pode mostrar. */
+.yk-audience h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* A caixinha, o texto ao lado e a explicação embaixo do texto. */
+.yk-audience .check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+  align-items: center;
+  margin: 10px 0;
+  color: inherit;
+}
+.yk-audience .check .muted {
+  grid-column: 2;
+  font-weight: 400;
+}
+.yk-hands-on {
+  color: var(--accent);
+  font-weight: 800;
+}
+/* A lista "Assistir partidas": uma mesa do Yonko tem até quatro jogadores lado a lado. */
+.watch-players.yonko {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.watch-players.yonko .watch-player {
+  grid-row: auto;
+}
+.watch-player.out {
+  opacity: 0.5;
+}
+.watch-player.out b {
+  text-decoration: line-through;
+}
+@media (max-width: 720px) {
+  .watch-players.yonko {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ---- desafio do dia (DailyChallenge.tsx): o painel reaproveita o treinador; o cartão da home, o do tutorial */
 .daily-banner {
   background: var(--brown);

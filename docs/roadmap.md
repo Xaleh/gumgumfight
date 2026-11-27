@@ -183,11 +183,14 @@ O objetivo do projeto: ajudar quem quer melhorar no jogo.
   *Pronto quando:* a escolha aparece ao jogar contra o bot e cada personalidade tem teste que mostra o estilo dela.
   *Feito em:* 2026-11-25 — [PR #230](https://github.com/Xaleh/gumgumfight/pull/230)
 
-- [ ] **D4. Yonko, fase 4** 🧱
-  Espectador e replay da mesa de 4 e o bot com busca, que o [`plano-modos-de-jogo.md`](plano-modos-de-jogo.md) aponta
-  como pendentes.
-  *Pronto quando:* dá para assistir e rever uma mesa Yonko, e o bot com busca joga na mesa.
-  *Feito em:* —
+- [x] **D4. Yonko, fase 4** 🧱
+  Espectador e transmissão da mesa de 4 online. O item pedia também o replay e o bot com busca, que o
+  [`plano-modos-de-jogo.md`](plano-modos-de-jogo.md) apontava como pendentes: em 27/11/2026 o dono do projeto
+  tirou o replay e deixou no item só o espectador e a transmissão; o bot com busca ficou de fora.
+  *Pronto quando:* dá para assistir a uma mesa Yonko (pelo código, ou pela lista se quem criou a abrir) sem ver a
+  mão de ninguém, e mandá-la para a tela de transmissão com as opções do streamer.
+  *Plano:* [`plano-modos-de-jogo.md`](plano-modos-de-jogo.md), seção 4, "Fase 4: como ficou".
+  *Feito em:* 27/11/2026
 
 ## Fase E — Social e comunidade
 

@@ -4,7 +4,7 @@
 
 import { type CardData, type DeckList, type GameConfig, type TableRules, yonkoTableDeck } from '@gumgum/engine';
 import { useEffect, useMemo, useState } from 'react';
-import { api, type DeckSummary, type YonkoSeatRef } from '../api';
+import { api, type DeckSummary, type WatchTarget, type YonkoSeatRef } from '../api';
 import { useAuth } from '../auth';
 import { rememberDeck, yonkoLegal } from '../deckLibrary';
 import type { YonkoSetup } from '../game/useYonkoGame';
@@ -67,6 +67,7 @@ export function Yonko({
   onExit,
   onStart,
   onOnline,
+  onWatch,
   onBuildDecks,
   again,
   code: initialCode,
@@ -74,6 +75,8 @@ export function Yonko({
   onExit: () => void;
   onStart: (setup: YonkoSetup) => void;
   onOnline: (seat: YonkoSeatRef) => void;
+  /** Assistir à mesa do código, sem sentar nela. */
+  onWatch: (target: WatchTarget) => void;
   onBuildDecks: () => void;
   again?: YonkoSetup;
   /** Código de um convite (`/?yonko=CODE`): já vem preenchido em "Entrar com código". */
@@ -93,7 +96,7 @@ export function Yonko({
   const [rules, setRules] = useState<TableRules>(savedRules);
   const [bots, setBots] = useState<DeckSummary[]>([]);
   const [picking, setPicking] = useState(false);
-  const [busy, setBusy] = useState<null | 'local' | 'create' | 'join'>(null);
+  const [busy, setBusy] = useState<null | 'local' | 'create' | 'join' | 'watch'>(null);
   const [joinCode, setJoinCode] = useState(initialCode ?? '');
   const [active, setActive] = useState<YonkoSeatRef[]>([]);
 
@@ -193,6 +196,21 @@ export function Yonko({
       const seat = await api.yonko.join(code, mine.id);
       remember();
       onOnline(seat);
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(null);
+    }
+  };
+
+  /** Assistir à mesa do código: não precisa de deck nem de lugar vago. */
+  const watch = async () => {
+    const code = joinCode.trim().toUpperCase();
+    if (!code) return;
+    setBusy('watch');
+    setError(null);
+    try {
+      const table = await api.yonko.byCode(code);
+      onWatch({ roomId: table.id, hands: false, yonko: true });
     } catch (e) {
       setError(errorText(e));
       setBusy(null);
@@ -303,6 +321,9 @@ export function Yonko({
                 />
                 <button type="submit" className="btn primary" disabled={!mine || joinCode.trim().length < 6 || busy !== null}>
                   {busy === 'join' ? t('yonko.joining') : t('yonko.join')}
+                </button>
+                <button type="button" className="btn" disabled={joinCode.trim().length < 6 || busy !== null} title={t('yonko.watchByCodeTitle')} onClick={() => void watch()}>
+                  {t('watch.watch')}
                 </button>
               </div>
             </form>

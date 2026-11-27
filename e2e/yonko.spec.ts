@@ -1,4 +1,5 @@
-// Mesa local do Yonko (todos contra todos, contra três bots): da tela inicial ao primeiro turno de quem joga.
+// Mesa do Yonko (todos contra todos). Local, contra três bots: da tela inicial ao primeiro turno de quem joga.
+// Online: quem tem o código da mesa assiste, sem lugar e sem ver a mão de ninguém.
 
 import { expect, test } from './support/fixtures';
 import { openHome } from './support/app';
@@ -109,5 +110,76 @@ test.describe('Yonko', () => {
     await expect(page.locator('.yk-me.drop-over')).toBeVisible();
     await page.mouse.up();
     await expect(page.locator(`.yk-hand [data-hand-uid="${uid}"]`)).toHaveCount(0);
+  });
+
+  test('mesa online: quem tem o código assiste sem jogar e sem ver a mão de ninguém', async ({ page, newPlayer }) => {
+    test.setTimeout(4 * 60_000);
+    // Quem cria abre a mesa em "Assistir partidas" e completa os lugares com bots.
+    await openHome(page);
+    await page.getByRole('button', { name: label('yonko.homeAction'), exact: true }).click();
+    await page.getByRole('button', { name: label('yonko.create'), exact: true }).click();
+    const code = (await page.locator('.yk-code b').innerText()).trim();
+    expect(code).toMatch(/^[A-Z2-9]{6}$/);
+    for (let i = 1; i <= 3; i++) {
+      await page.getByRole('button', { name: label('yonko.addBot'), exact: true }).first().click();
+      await expect(page.getByRole('button', { name: label('yonko.removeBot'), exact: true })).toHaveCount(i);
+    }
+    const listed = page.getByRole('checkbox', { name: new RegExp(`^${label('yonko.optListed')}`) });
+    await listed.click();
+    await expect(listed).toBeChecked();
+
+    // Quem assiste entra pelo código, na entrada do Yonko, com a mesa ainda na espera.
+    const viewer = await newPlayer();
+    await openHome(viewer);
+    await viewer.getByRole('button', { name: label('yonko.homeAction'), exact: true }).click();
+    await viewer.locator('#yk-code').fill(code);
+    await viewer.getByRole('button', { name: label('watch.watch'), exact: true }).click();
+    await expect(viewer.getByRole('heading', { name: label('yonko.watchWaitingTitle'), exact: true })).toBeVisible();
+
+    // A partida começa: a mesa aparece para quem assiste, só para olhar, e quem joga vê que há alguém assistindo.
+    await page.getByRole('button', { name: label('yonko.startOnline'), exact: true }).click();
+    const mine = page.getByRole('region', { name: label('yonko.yourTable'), exact: true });
+    await expect(mine).toBeVisible();
+    await expect(viewer.locator('.yk.watching')).toBeVisible();
+    await expect(viewer.getByRole('button', { name: label('yonko.endTurn'), exact: true })).toHaveCount(0);
+    await expect(page.locator('.yk-pill.eye')).toHaveText(/1/);
+
+    // Quem joga responde à preparação (e ao que os bots perguntarem) até o primeiro turno dele.
+    const endTurn = page.getByRole('button', { name: label('yonko.endTurn'), exact: true }).first();
+    const answer = page.locator('.yk-reveal .yk-btn, .yk-banner .yk-btn.primary').first();
+    await expect(async () => {
+      if (await endTurn.isEnabled({ timeout: 500 }).catch(() => false)) return;
+      if (await answer.isEnabled({ timeout: 300 }).catch(() => false)) await answer.click({ timeout: 1_000 });
+      throw new Error('"Encerrar turno" ainda não acendeu');
+    }).toPass({ timeout: 3 * 60_000, intervals: [400] });
+
+    // Quem assiste passa a acompanhar quem joga (o único que não é bot): o lugar de baixo é o dele, com a mão em
+    // versos, na mesma conta de cartas.
+    const seat = viewer.locator('.yk-track-btn').filter({ hasNot: viewer.locator('b').filter({ hasText: /^Bot \d+$/ }) });
+    await expect(seat).toHaveCount(1);
+    const name = (await seat.locator('b').innerText()).trim();
+    await seat.click();
+    await expect(viewer.locator('.yk-me')).toHaveAttribute('aria-label', label('yonko.tableOf', { name }));
+    const hand = viewer.locator('.yk-hand [data-hand-uid]');
+    await expect(hand).toHaveCount(await page.locator('.yk-hand [data-hand-uid]').count());
+    for (const uid of await hand.evaluateAll((els) => els.map((e) => e.getAttribute('data-hand-uid') ?? ''))) {
+      expect(uid, 'carta da mão de quem joga, na tela de quem assiste').toMatch(/^~/);
+    }
+    await expect(viewer.locator('.yk-hand .card:not(.back)')).toHaveCount(0);
+
+    // A mesa de quem assiste anda com a partida: encerrado o turno, a vez passa para um bot.
+    await expect(viewer.locator('.yk-track li.on')).toContainText(name);
+    await endTurn.click();
+    await expect(viewer.locator('.yk-track li.on')).not.toContainText(name);
+
+    // A mesa aberta aparece em "Assistir partidas", e a linha dela leva de volta à mesa.
+    // (Sair da mesa volta para a entrada do Yonko, de onde quem assiste veio.)
+    await viewer.getByRole('button', { name: label('yonko.exit'), exact: true }).first().click();
+    await viewer.getByRole('button', { name: label('common.back'), exact: true }).click();
+    await viewer.getByRole('button', { name: label('menu.watchMatches'), exact: true }).click();
+    const row = viewer.locator('.watch-room.yonko');
+    await expect(row).toContainText(name);
+    await row.click();
+    await expect(viewer.locator('.yk.watching')).toBeVisible();
   });
 });

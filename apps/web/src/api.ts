@@ -128,6 +128,41 @@ export interface YonkoRoomInfo {
   player: number | null;
   players: Array<{ seat: number; name: string; bot: boolean; connected: boolean; leader: string; test: boolean }> | null;
   clock: { remaining: number[]; running: number | null; total: number; awaySince: number | null; abandonMs: number } | null;
+  /** Quantos assistem agora; servidores antigos não mandam. */
+  spectators?: number;
+  /** A mesa aparece em "Assistir partidas", e as mãos podem aparecer para quem transmite (quem criou decide). */
+  listed?: boolean;
+  showHands?: boolean;
+  /**
+   * Só para quem assiste: de quem é a visão que chega (null = a pública, sem a mão de ninguém), se as mãos de
+   * todos vêm junto e o atraso da mesa (ms; 0 = ao vivo).
+   */
+  watch?: { pov: number | null; hands: boolean; delay: number } | null;
+}
+
+/** Uma mesa do Yonko para assistir: a lista "Assistir partidas" e a busca pelo código. */
+export interface YonkoLiveTable {
+  id: string;
+  status: 'waiting' | 'playing' | 'finished';
+  /** Quem pede tem lugar nela: as mãos dos outros nunca aparecem. */
+  mine?: boolean;
+  listed: boolean;
+  /** Quem criou liberou as mãos para quem transmite. */
+  handsAllowed: boolean;
+  spectators: number;
+  turn: number;
+  createdAt: number;
+  players: Array<{
+    name: string;
+    bot: boolean;
+    leader: string;
+    leaderName: string;
+    leaderImage: string | null;
+    colors: string[];
+    life: number;
+    hand: number;
+    out: boolean;
+  }>;
 }
 
 /** Deck com a mesma lista que o construtor tentou salvar (resposta 409 `deckDuplicate`). */
@@ -1130,6 +1165,17 @@ export const api = {
     reopen: (id: string, t: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/reopen`, { t }),
     leave: (id: string, t: string) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/leave`, { t }),
     eventsUrl: (id: string, t: string) => `/api/yonko/tables/${encodeURIComponent(id)}/events?t=${encodeURIComponent(t)}`,
+    /** Quem criou a mesa a abre em "Assistir partidas" e libera as mãos para quem transmite (só na sala de espera). */
+    options: (id: string, t: string, o: { listed?: boolean; showHands?: boolean }) => send<{ ok: true }>('POST', `/api/yonko/tables/${encodeURIComponent(id)}/options`, { t, ...o }),
+    /** Mesas abertas para assistir. `hands`: quem pede pode ligar "Ver mãos" (nas mesas que as liberaram). */
+    live: () => get<{ tables: YonkoLiveTable[]; hands: boolean }>('/api/yonko/live'),
+    /** Mesa pelo código, para assistir. */
+    byCode: (code: string) => get<YonkoLiveTable>(`/api/yonko/watch/${encodeURIComponent(code)}`),
+    /** Resumo de uma mesa (404 = não existe mais). */
+    table: (id: string) => get<YonkoLiveTable>(`/api/yonko/tables/${encodeURIComponent(id)}`),
+    /** Canal de quem assiste. `key`: tela de transmissão (a chave do streamer decide o que ela vê). */
+    watchUrl: (id: string, hands: boolean, key?: string) =>
+      `/api/yonko/tables/${encodeURIComponent(id)}/watch${key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
   },
   online: {
     config: () => get<{ timeBankMs: number; botRooms: boolean }>('/api/online/config'),
@@ -1199,7 +1245,7 @@ export const api = {
     choose: (roomId: string | null) => send<BroadcastInfo>('PUT', '/api/broadcast/room', { roomId }),
     settings: (s: Partial<BroadcastSettings>) => send<BroadcastInfo>('PUT', '/api/broadcast/settings', s),
     /** O que a fonte do OBS mostra agora (sem login: a chave é o segredo); `rev` muda a cada troca. */
-    byKey: (key: string) => get<{ roomId: string | null; chat: boolean; rev: number }>(`/api/broadcast/${encodeURIComponent(key)}`),
+    byKey: (key: string) => get<{ roomId: string | null; chat: boolean; rev: number; kind?: 'match' | 'yonko' }>(`/api/broadcast/${encodeURIComponent(key)}`),
   },
 };
 
@@ -1221,6 +1267,8 @@ export interface BroadcastSettings {
 export interface BroadcastInfo extends BroadcastSettings {
   key: string | null;
   roomId: string | null;
+  /** O que foi escolhido: uma sala de dois ou uma mesa do Yonko (servidores antigos não mandam: sala de dois). */
+  kind?: 'match' | 'yonko';
   minHandsDelayS: number;
 }
 
@@ -1244,6 +1292,8 @@ export interface WatchTarget {
   key?: string;
   /** Judge do torneio (ou organizador): entra na sala vendo as duas mãos ao vivo, retoma a partida pausada e dá warnings. */
   judge?: boolean;
+  /** `roomId` é uma mesa do Yonko (outro canal e outra tela: `YonkoWatch`). */
+  yonko?: boolean;
 }
 
 export type RoomQueue = 'private' | QueueKind | 'bot' | 'tournament';

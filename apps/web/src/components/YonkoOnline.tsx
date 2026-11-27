@@ -1,9 +1,10 @@
-// Mesa online do Yonko: a sala de espera (lugares, decks, "pronto", bots, regras e o código para convidar) e,
-// quando a partida começa, a mesa (`YonkoTable`) ligada ao servidor, com o relógio de cada jogador.
+// Mesa online do Yonko: a sala de espera (lugares, decks, "pronto", bots, regras, o código para convidar e quem
+// pode assistir) e, quando a partida começa, a mesa (`YonkoTable`) ligada ao servidor, com o relógio de cada jogador.
 
 import { type PlayerId, type TableRules, yonkoBannedIn } from '@gumgum/engine';
 import { useEffect, useMemo, useState } from 'react';
-import { api, type DeckSummary, type YonkoRoomInfo, type YonkoSeatRef } from '../api';
+import { api, type DeckSummary, seesHands, type YonkoRoomInfo, type YonkoSeatRef } from '../api';
+import { useAuth } from '../auth';
 import { yonkoLegal } from '../deckLibrary';
 import { useYonkoOnline } from '../game/useYonkoOnline';
 import { type Translate, useT, useTryT } from '../i18n';
@@ -69,26 +70,63 @@ export function YonkoOnline({ seat, onExit, onBuildDecks }: { seat: YonkoSeatRef
 
 type Online = ReturnType<typeof useYonkoOnline>;
 
-function OnlineTable({ online, room, seat, onExit }: { online: Online; room: YonkoRoomInfo; seat: YonkoSeatRef; onExit: () => void }) {
-  const t = useT();
-  const state = online.state!;
-  const me = room.player!;
+/**
+ * O relógio e a conexão de cada jogador, para as placas da mesa (de quem joga e de quem assiste). `clockAt`:
+ * quando o último resumo chegou; o relógio da vez anda entre uma mensagem do servidor e outra.
+ */
+export function useSeatStatus(room: YonkoRoomInfo, clockAt: number) {
   const [now, setNow] = useState(() => performance.now());
-  // O relógio da vez anda entre uma mensagem do servidor e outra.
   useEffect(() => {
     if (room.status !== 'playing') return;
     const timer = setInterval(() => setNow(performance.now()), 1000);
     return () => clearInterval(timer);
   }, [room.status]);
 
-  const status = (id: PlayerId): SeatStatus => {
+  return (id: PlayerId): SeatStatus => {
     const clock = room.clock;
     const player = room.players?.[id];
     if (!clock || !player) return {};
     const ticking = clock.running === id && room.status === 'playing';
-    const left = Math.max(0, clock.remaining[id] - (ticking ? now - online.clockAt : 0));
+    const left = Math.max(0, clock.remaining[id] - (ticking ? now - clockAt : 0));
     return { ...(player.bot ? {} : { clock: fmtClock(left), low: left < 120_000, ticking }), away: !player.connected };
   };
+}
+
+/**
+ * Quem transmite (perfil Streamer, Organizador ou Admin) manda esta mesa para a tela do OBS; o que ela mostra sai
+ * das opções da transmissão (Assistir partidas → Modo transmissão). Para os outros perfis, nada aparece.
+ */
+export function TransmitTable({ tableId }: { tableId: string }) {
+  const t = useT();
+  const { user } = useAuth();
+  const [note, setNote] = useState<string | null>(null);
+  if (!seesHands(user?.role)) return null;
+  const transmit = () => {
+    setNote(null);
+    api.broadcast.choose(tableId).then(
+      () => setNote(t('broadcast.sent')),
+      (e) => setNote(e instanceof Error ? e.message : String(e)),
+    );
+  };
+  return (
+    <div className="yk-option yk-transmit">
+      <button type="button" className="btn small" onClick={transmit} title={t('broadcast.transmitTitle')}>
+        {t('broadcast.sendThis')}
+      </button>
+      {note && (
+        <p className="muted small" role="status">
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function OnlineTable({ online, room, seat, onExit }: { online: Online; room: YonkoRoomInfo; seat: YonkoSeatRef; onExit: () => void }) {
+  const t = useT();
+  const state = online.state!;
+  const me = room.player!;
+  const status = useSeatStatus(room, online.clockAt);
 
   const host = room.you === room.host;
   const out = state.players[me]?.out;
@@ -109,6 +147,8 @@ function OnlineTable({ online, room, seat, onExit }: { online: Online; room: Yon
         status,
         notice: online.link === 'lost' ? t('yonko.linkLost') : null,
         rematchNote: host ? undefined : t('yonko.rematchWait'),
+        spectators: room.spectators,
+        options: <TransmitTable tableId={seat.id} />,
       }}
     />
   );
@@ -262,6 +302,35 @@ function WaitingRoom({ online, room, seat, onExit, onBuildDecks }: { online: Onl
             <section className="yk-panel">
               <h3>{t('yonko.howWin')}</h3>
               <p className="muted">{t('yonko.onlineHowText')}</p>
+            </section>
+            <section className="yk-panel yk-audience">
+              <h3>
+                {t('yonko.audience')}
+                {Boolean(room.spectators) && (
+                  <span className="yk-chip" title={t('yonko.spectators', { n: room.spectators })}>
+                    <Icon name="eye" size={13} /> {room.spectators}
+                  </span>
+                )}
+              </h3>
+              <p className="muted small">{t('yonko.audienceCode')}</p>
+              {host ? (
+                <>
+                  <label className="check">
+                    <input type="checkbox" checked={Boolean(room.listed)} onChange={(e) => ask(api.yonko.options(seat.id, seat.token, { listed: e.target.checked }))} /> {t('yonko.optListed')}
+                    <span className="muted small">{t('yonko.optListedHint')}</span>
+                  </label>
+                  <label className="check">
+                    <input type="checkbox" checked={Boolean(room.showHands)} onChange={(e) => ask(api.yonko.options(seat.id, seat.token, { showHands: e.target.checked }))} /> {t('yonko.optShowHands')}
+                    <span className="muted small">{t('yonko.optShowHandsHint')}</span>
+                  </label>
+                </>
+              ) : (
+                <>
+                  {room.listed && <p className="small">{t('yonko.listedOn')}</p>}
+                  {room.showHands && <p className="small yk-hands-on">{t('yonko.handsOn')}</p>}
+                </>
+              )}
+              <TransmitTable tableId={seat.id} />
             </section>
             {host ? (
               <>

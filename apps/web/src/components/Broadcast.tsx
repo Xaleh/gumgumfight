@@ -1,7 +1,8 @@
 // Tela de transmissão (`/?transmissao=<chave>`): a fonte de navegador do OBS. Mostra a
 // partida que o streamer escolheu no app (Assistir partidas → Transmitir), sem menus nem
 // botões, com o destaque da carta jogada. Consulta a escolha a cada poucos segundos: o
-// endereço no OBS nunca muda. Com as mãos, a mesa chega atrasada (ver online/room.ts).
+// endereço no OBS nunca muda. Com as mãos, a mesa chega atrasada (ver online/room.ts). A partida escolhida
+// também pode ser uma mesa do Yonko (`YonkoWatch`).
 
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type WatchTarget } from '../api';
@@ -9,6 +10,7 @@ import { useT } from '../i18n';
 import { poll } from '../poll';
 import { type TableBroadcast, WatchGameScreen } from './GameScreen';
 import { BroadcastIdle } from './Online';
+import { YonkoWatch } from './YonkoWatch';
 
 /** Intervalo entre as consultas da partida escolhida no app. */
 const POLL_MS = 3000;
@@ -40,7 +42,7 @@ export function Broadcast({ broadcastKey }: { broadcastKey: string }) {
           if (id === chosen.current) return;
           chosen.current = id;
           // A chave decide o que a conexão vê (mãos, a visão do streamer, atraso): ver online/broadcast.ts.
-          setTarget(b.roomId ? { roomId: b.roomId, hands: false, key: broadcastKey } : null);
+          setTarget(b.roomId ? { roomId: b.roomId, hands: false, key: broadcastKey, ...(b.kind === 'yonko' ? { yonko: true } : {}) } : null);
         })
         .catch((e) => {
           if (stop) return;
@@ -65,6 +67,8 @@ export function Broadcast({ broadcastKey }: { broadcastKey: string }) {
 
   if (invalid) return <BroadcastIdle title={t('broadcast.invalid')} text={t('broadcast.invalidHint')} />;
   if (!target) return <BroadcastIdle title={loaded ? t('broadcast.waiting') : t('common.loading')} text={loaded ? t('broadcast.waitingHint') : undefined} />;
+  // Mesa do Yonko: a mesma tela de quem assiste, sem menus (ela segue sozinha para o "jogar de novo" da mesa).
+  if (target.yonko) return <YonkoWatch key={`${target.roomId}|${chosen.current}`} target={target} broadcast onExit={() => setTarget(null)} />;
   return (
     <WatchGameScreen
       key={`${target.roomId}|${chosen.current}`}

@@ -3,14 +3,20 @@
 // Transporte igual ao das partidas de dois jogadores (online/routes.ts): SSE do servidor para o navegador
 // (`/events`, com o token do lugar) e POST para cada pedido. O token fica no navegador de quem senta: é ele que
 // permite voltar para a mesa depois de recarregar a página (`/api/yonko/active` lista as mesas da pessoa).
+//
+// Espectadores usam outro canal (`/watch`), sem token: assiste quem tem o código da mesa (`/api/yonko/watch/:code`)
+// ou, se quem criou a abriu, quem a encontra em "Assistir partidas" (`/api/yonko/live`). A tela de transmissão
+// entra pelo mesmo canal com a chave do streamer (`k`); o que ela vê está em online/broadcast.ts.
 
 import { randomBytes, randomInt } from 'node:crypto';
 import { type CardData, type DeckList, validateDeck, yonkoBannedIn, yonkoTableDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { SseMetrics } from '../monitor/sse';
-import type { User } from '../auth/store';
+import { accountOwnerKey, seesHands, type User } from '../auth/store';
 import { type DB, deleteYonkoTable, getCards, getDeck, listCards, listDecks, listYonkoTables, saveYonkoTable } from '../db';
 import { type ErrorParams, fail } from '../errors';
+import { broadcastByKey, handsDelayFor, yonkoBroadcastView } from '../online/broadcast';
+import { MAX_SPECTATORS, MIN_HANDS_DELAY_MS } from '../online/room';
 import type { ApiCard } from '../present';
 import { ensurePlayer } from '../stats/store';
 import {
@@ -26,6 +32,7 @@ import {
   type YonkoSeat,
   YonkoTable,
   type YonkoTableData,
+  type YonkoWatch,
 } from './table';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -145,6 +152,11 @@ export class YonkoTables {
       if (token) out.push({ id: t.id, code: t.data.code, status: t.status, token });
     }
     return out;
+  }
+
+  /** As mesas da lista "Assistir partidas": as que quem criou abriu, com a partida em andamento; as mais novas primeiro. */
+  live(): YonkoTable[] {
+    return [...this.tables.values()].filter((t) => t.data.listed && t.status === 'playing').sort((a, b) => (b.data.startedAt ?? 0) - (a.data.startedAt ?? 0));
   }
 
   /** Fecha as mesas esquecidas: espera ou fim sem ninguém conectado, e partidas paradas há horas. */
@@ -271,18 +283,15 @@ export function registerYonkoRoutes(app: FastifyInstance, deps: YonkoDeps) {
     return { id: table.id, code: table.data.code, token: seat.token };
   });
 
-  /** Canal da mesa (SSE): a sala de espera e, na partida, a mesa vista do lugar de quem conecta. */
-  app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/yonko/tables/:id/events', (req, res) => {
-    const table = tables.get(req.params.id);
-    const token = req.query.t;
-    if (!table || typeof token !== 'string' || table.seatOfToken(token) === null) return res.code(404).send(fail('yonkoNotFound', 'Mesa não encontrada.'));
+  /** Abre o canal SSE de uma conexão (jogador ou espectador) e a liga à mesa até o navegador fechar. */
+  const stream = (req: FastifyRequest, res: FastifyReply, table: YonkoTable, who: Pick<YonkoConnection, 'token' | 'watch'>, metricKey: string) => {
     res.hijack();
     const raw = res.raw;
     raw.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache, no-transform', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     raw.write('retry: 2000\n\n');
-    const metric = deps.sse?.track('yonko', `${table.id}:${token}`);
+    const metric = deps.sse?.track('yonko', metricKey);
     const conn: YonkoConnection = {
-      token,
+      ...who,
       sentDefs: new Set(),
       sentLog: 0,
       send: (event, data) => {
@@ -303,6 +312,66 @@ export function registerYonkoRoutes(app: FastifyInstance, deps: YonkoDeps) {
     req.raw.on('close', close);
     raw.on('error', close);
     raw.on('close', () => metric?.close());
+  };
+
+  /** Canal da mesa (SSE): a sala de espera e, na partida, a mesa vista do lugar de quem conecta. */
+  app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/yonko/tables/:id/events', (req, res) => {
+    const table = tables.get(req.params.id);
+    const token = req.query.t;
+    if (!table || typeof token !== 'string' || table.seatOfToken(token) === null) return res.code(404).send(fail('yonkoNotFound', 'Mesa não encontrada.'));
+    stream(req, res, table, { token }, `${table.id}:${token}`);
+  });
+
+  // ---------------------------------------------------------------- espectadores
+
+  /** O resumo público de uma mesa, com `mine`: quem pede tem lugar nela (nela, as mãos dos outros nunca aparecem). */
+  const publicSummary = (req: FastifyRequest, table: YonkoTable) => ({ ...table.summary(), mine: table.isPlayer(viewerHash(req), user(req)?.id ?? null) });
+
+  /**
+   * Mesas para assistir: as que quem criou abriu (as outras, só com o código). `hands`: quem pede pode ligar
+   * "Ver mãos" (nas mesas que as liberaram).
+   */
+  app.get('/api/yonko/live', async (req) => ({ tables: tables.live().map((t) => publicSummary(req, t)), hands: seesHands(user(req)?.role) }));
+
+  /** Mesa pelo código, para assistir (em espera, em andamento ou terminada). */
+  app.get<{ Params: { code: string } }>('/api/yonko/watch/:code', async (req, res) => {
+    const table = /^[A-Za-z0-9]{6}$/.test(req.params.code) ? tables.byCode(req.params.code) : null;
+    if (!table) return res.code(404).send(fail('yonkoCodeNotFound', 'Nenhuma mesa com esse código.'));
+    return publicSummary(req, table);
+  });
+
+  /** Resumo de uma mesa (o espectador confere se ela ainda existe antes de reconectar). */
+  app.get<{ Params: { id: string } }>('/api/yonko/tables/:id', async (req, res) => {
+    const table = tables.get(req.params.id);
+    return table ? publicSummary(req, table) : res.code(404).send(fail('yonkoNotFound', 'Mesa não encontrada.'));
+  });
+
+  /**
+   * Canal do espectador (SSE): a mesa sem a mão de ninguém. `hands=1`: as mãos de todos (perfil Streamer,
+   * Organizador ou Admin, só na mesa que as liberou e nunca na própria), na mesa atrasada. `k`: tela de
+   * transmissão; a chave faz as vezes do login e as opções do streamer decidem o que a conexão vê
+   * (`yonkoBroadcastView`). Vale em qualquer momento da mesa: na espera chega só a sala, e a partida aparece
+   * quando começar (a transmissão segue sozinha para o "jogar de novo").
+   */
+  app.get<{ Params: { id: string }; Querystring: { hands?: string; k?: string } }>('/api/yonko/tables/:id/watch', (req, res) => {
+    const table = tables.get(req.params.id);
+    if (!table) return res.code(404).send(fail('yonkoNotFound', 'Mesa não encontrada.'));
+    let watch: YonkoWatch = {};
+    if (req.query.k !== undefined) {
+      const found = broadcastByKey(db, String(req.query.k));
+      if (!found || !seesHands(found.user.role)) return res.code(403).send(fail('broadcastNotFound', 'Link de transmissão inválido. Copie o link de novo no app.'));
+      watch = yonkoBroadcastView(found.broadcast, table, found.user);
+    } else if (req.query.hands === '1') {
+      const account = user(req);
+      if (!account || !seesHands(account.role)) return res.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers, organizadores e administradores.'));
+      if (!table.data.showHands) return res.code(403).send(fail('yonkoHandsClosed', 'As mãos dos jogadores só aparecem nas mesas em que quem criou as liberou.'));
+      if (table.isPlayer(accountOwnerKey(account.id), account.id) || table.isPlayer(viewerHash(req), null)) {
+        return res.code(403).send(fail('handsOwnMatch', 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.'));
+      }
+      watch = { hands: true, delay: handsDelayFor(db, account.id, { minHandsDelay: MIN_HANDS_DELAY_MS }) };
+    }
+    if (table.spectators >= MAX_SPECTATORS) return res.code(429).send(fail('tooManySpectators', 'Esta partida já tem espectadores demais.'));
+    stream(req, res, table, { token: null, watch }, `${table.id}:watch`);
   });
 
   type Body = { t?: unknown; [k: string]: unknown };
@@ -331,6 +400,13 @@ export function registerYonkoRoutes(app: FastifyInstance, deps: YonkoDeps) {
     const table = found(req.params.id, req.body);
     if (isRefusal(table)) return reply(res, table);
     return reply(res, table.setRules(req.body.t, req.body.rules));
+  });
+
+  /** Quem criou a mesa a abre em "Assistir partidas" (`listed`) e libera as mãos para quem transmite (`showHands`). */
+  app.post<{ Params: { id: string }; Body: Body }>('/api/yonko/tables/:id/options', async (req, res) => {
+    const table = found(req.params.id, req.body);
+    if (isRefusal(table)) return reply(res, table);
+    return reply(res, table.setOptions(req.body.t, req.body));
   });
 
   app.post<{ Params: { id: string }; Body: Body }>('/api/yonko/tables/:id/bot', async (req, res) => {
