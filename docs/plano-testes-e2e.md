@@ -135,6 +135,8 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   (largada e mão inicial) e as perguntas dos bots são respondidas pelo botão em destaque da faixa de ação até
   "Encerrar turno" acender; o turno passa para um bot; e as opções da mesa abrem com a escolha das animações, que
   desligadas valem na hora (a mesa leva `anim-off`). Entrou com o redesenho da mesa (playmats, animações de voo).
+- `yonko.spec.ts`, arrasto (só no `desktop`): joga até ter uma carta que dá para jogar, arrasta-a da mão até a mesa
+  de quem joga (a mesa mostra que aceita a carta) e a carta sai da mão.
 - No `desktop` a partida corre com as animações completas e o jogador as desliga no fim. No `iphone` ele as desliga
   ainda na preparação, antes do primeiro turno, por causa da queda do WebKit descrita abaixo.
 

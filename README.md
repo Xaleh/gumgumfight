@@ -554,9 +554,13 @@ nos oponentes, a mão num leque de versos (no online, também o relógio e quem 
 no alto, a sua mesa embaixo com a mão em leque, e no meio a **faixa de ação**, que mostra quem a mesa espera, a
 pergunta aberta e, numa batalha, o poder do atacante contra o do alvo; ao lado dela fica **"Encerrar turno"**. A
 barra de cima traz a **ordem dos turnos** com o Líder de cada um, e a coluna do lado a carta em destaque e o
-registro. Tudo é por clique: toque numa carta da mão para jogar, numa carta sua em campo para atacar, dar DON!! ou
-ativar; ao atacar, os alvos válidos acendem nas três mesas e uma seta liga o atacante ao alvo. Só quem foi atacado
-usa Counter (o manual também deixa os outros usarem Evento [Counter]; por ora isso fica desligado).
+registro. Dá para jogar **por clique** (toque numa carta da mão para jogar, numa carta sua em campo para atacar, dar
+DON!! ou ativar) ou **arrastando**, como na mesa de dois: a carta da mão até a sua mesa (joga, ou usa de Counter
+na defesa), o Líder ou um Personagem até o alvo (ataca) e um DON!! ativo até uma carta sua (anexa). Ao atacar, os
+alvos válidos acendem nas três mesas e uma seta liga o atacante ao alvo. Quando uma carta sai da sua **Vida**, ela
+aparece grande no centro, com o texto do **[Trigger]** quando tem, e você escolhe entre ativar e levar para a mão
+("Ver a mesa" recolhe a janela para olhar o campo antes de decidir). Só quem foi atacado usa Counter (o manual
+também deixa os outros usarem Evento [Counter]; por ora isso fica desligado).
 **No celular**, os oponentes viram abas (com o Líder, a Vida e a mão de cada um), a mesa cabe na tela sem rolar, e
 o registro, a carta (toque e segure, ou toque numa carta que não tem ação) e o descarte abrem em janelas.
 
@@ -565,9 +569,9 @@ e o ataque no centro, o impacto no alvo, a faixa de troca de turno) e os mesmos 
 **Animações** das Configurações (completas, suaves ou desligadas), que também abre pelo botão de opções da própria
 mesa, junto com os volumes: desligadas, a mesa muda na hora e nada se move.
 
-O que ainda **não** tem: espectadores, replay, chat e avisos no celular na mesa online; arrastar cartas; dar o
-valor de Counter a outra carta que não a atacada; e o bot com busca (os bots são o bot simples, que completa a mesa
-mas joga mal).
+O que ainda **não** tem: espectadores, replay, chat e avisos no celular na mesa online; reordenar a mão e
+devolver um DON!! anexado arrastando; dar o valor de Counter a outra carta que não a atacada; e o bot com busca (os
+bots são o bot simples, que completa a mesa mas joga mal).
 
 ## Estatísticas
 
