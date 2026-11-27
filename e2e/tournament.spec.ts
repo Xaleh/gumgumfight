@@ -9,7 +9,7 @@ import { label, t } from './support/i18n';
 import { concede, expectResult, playToFirstTurn } from './support/online';
 import { createTournament, inviteUrl, markReady, register } from './support/tournament';
 
-test('torneio suíço: criar, inscrever, jogar a rodada e encerrar', async ({ page: organizer, newPlayer }) => {
+test('torneio suíço: criar, inscrever, jogar a rodada e encerrar @iphone', async ({ page: organizer, newPlayer }) => {
   test.setTimeout(3 * 60_000);
   const ana = await newPlayer();
   const bia = await newPlayer();

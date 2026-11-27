@@ -6,7 +6,7 @@ import { expectGameOver, startBotMatch } from './support/app';
 import { label } from './support/i18n';
 
 test.describe('partida contra o bot', () => {
-  test('do menu ao fim, com o bot jogando pelos dois lados (Auto)', async ({ page }) => {
+  test('do menu ao fim, com o bot jogando pelos dois lados (Auto) @iphone', async ({ page }) => {
     // Uma partida inteira com as esperas das animações leva cerca de 2 minutos.
     test.setTimeout(6 * 60_000);
     await startBotMatch(page);

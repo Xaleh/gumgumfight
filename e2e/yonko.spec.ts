@@ -5,7 +5,7 @@ import { openHome } from './support/app';
 import { label } from './support/i18n';
 
 test.describe('Yonko', () => {
-  test('mesa local: a preparação, um turno de quem joga e a vez dos bots @iphone', async ({ page }, testInfo) => {
+  test('mesa local: a preparação, um turno de quem joga e a vez dos bots @iphone', async ({ page }) => {
     // Quem joga pode ser o último da ordem: até três turnos de bot (com as animações) antes do primeiro dele.
     test.setTimeout(4 * 60_000);
     let crashed = false;
@@ -20,7 +20,8 @@ test.describe('Yonko', () => {
     await expect(page.getByRole('region', { name: label('yonko.yourTable'), exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: new RegExp(`^${label('yonko.tableOf', { name: '' })}`) }).first()).toBeVisible();
 
-    // As opções da mesa: a escolha das animações vale na hora (a mesa leva `anim-off`).
+    // As opções da mesa: a escolha das animações vale na hora (a mesa leva `anim-off`). A partida corre com as
+    // animações completas (a faixa de troca de turno atravessando a mesa) e o jogador as desliga no fim.
     const animationsOff = async () => {
       await page.getByRole('button', { name: label('yonko.tableOptions'), exact: true }).click();
       const options = page.getByRole('dialog', { name: label('yonko.tableOptions'), exact: true });
@@ -29,12 +30,6 @@ test.describe('Yonko', () => {
       await options.getByRole('button', { name: label('yonko.close'), exact: true }).click();
       await expect(options).toBeHidden();
     };
-    // No iphone o jogador desliga as animações ainda na preparação, antes do primeiro turno: no WebKit do CI a
-    // faixa animada de troca de turno (das animações completas) derruba a página, na mesa de dois também (ver
-    // "Conhecido na fase 1" em docs/plano-testes-e2e.md). No desktop a partida corre com as animações completas.
-    const offFirst = testInfo.project.name === 'iphone';
-    if (offFirst) await animationsOff();
-
     // A preparação (largada e mão inicial) e o que os bots perguntarem (bloquear, Counter): sempre o botão em
     // destaque da faixa de ação, até "Encerrar turno" acender.
     const endTurn = page.getByRole('button', { name: label('yonko.endTurn'), exact: true });
@@ -52,6 +47,13 @@ test.describe('Yonko', () => {
     await endTurn.click();
     await expect(endTurn).toBeDisabled();
 
-    if (!offFirst) await animationsOff();
+    // Na vez do bot a faixa de troca de turno atravessa a mesa e sai. Era nela que a página caía no WebKit de Linux
+    // (ver "Queda da mesa no WebKit de Linux" em docs/plano-testes-e2e.md).
+    const sweep = page.locator('.turn-banner.sweep');
+    await sweep.waitFor({ state: 'visible', timeout: 30_000 });
+    await sweep.waitFor({ state: 'hidden' });
+    expect(crashed, 'a página da mesa caiu').toBe(false);
+
+    await animationsOff();
   });
 });
