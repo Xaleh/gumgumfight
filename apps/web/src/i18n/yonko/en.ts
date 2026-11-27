@@ -87,8 +87,6 @@ const yonko = {
   'yonko.mulliganRedraw': 'Redraw',
   'yonko.curve': 'Choose your opening.',
   'yonko.curveHint': 'It applies to your first turn; after that it is 2 DON!! and 1 card per turn.',
-  'yonko.yes': 'Yes',
-  'yonko.no': 'No',
   'yonko.confirm': 'Confirm ({n})',
   'yonko.none': 'None',
   'yonko.options': '{n|# option|# options}',

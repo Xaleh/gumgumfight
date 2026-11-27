@@ -87,8 +87,6 @@ const yonko = {
   'yonko.mulliganRedraw': '引き直す',
   'yonko.curve': 'スタートを選んでください。',
   'yonko.curveHint': '最初のターンにだけ適用。その後は毎ターン ドン!!2枚＋1ドローです。',
-  'yonko.yes': 'はい',
-  'yonko.no': 'いいえ',
   'yonko.confirm': '決定（{n}）',
   'yonko.none': '選ばない',
   'yonko.options': '選択肢{n}',

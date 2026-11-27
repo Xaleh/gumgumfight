@@ -87,8 +87,6 @@ const yonkoPtBR = {
   'yonko.mulliganRedraw': 'Trocar',
   'yonko.curve': 'Escolha a sua largada.',
   'yonko.curveHint': 'Vale para o seu primeiro turno; depois são 2 DON!! e 1 carta por turno.',
-  'yonko.yes': 'Sim',
-  'yonko.no': 'Não',
   'yonko.confirm': 'Confirmar ({n})',
   'yonko.none': 'Nenhum',
   'yonko.options': '{n|# opção|# opções}',

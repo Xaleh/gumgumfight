@@ -559,7 +559,9 @@ DON!! ou ativar) ou **arrastando**, como na mesa de dois: a carta da mão até a
 na defesa), o Líder ou um Personagem até o alvo (ataca) e um DON!! ativo até uma carta sua (anexa). Ao atacar, os
 alvos válidos acendem nas três mesas e uma seta liga o atacante ao alvo. Quando uma carta sai da sua **Vida**, ela
 aparece grande no centro, com o texto do **[Trigger]** quando tem, e você escolhe entre ativar e levar para a mão
-("Ver a mesa" recolhe a janela para olhar o campo antes de decidir). Só quem foi atacado usa Counter (o manual
+("Ver a mesa" recolhe a janela para olhar o campo antes de decidir). A pergunta de **usar um efeito** abre na
+mesma janela da mesa de dois: a carta que pergunta ao lado, o custo numa linha à parte, o texto dela e as duas
+respostas ("Pagar e usar" ou "Usar o efeito", e "Não usar"). Só quem foi atacado usa Counter (o manual
 também deixa os outros usarem Evento [Counter]; por ora isso fica desligado).
 **No celular**, os oponentes viram abas (com o Líder, a Vida e a mão de cada um), a mesa cabe na tela sem rolar, e
 o registro, a carta (toque e segure, ou toque numa carta que não tem ação) e o descarte abrem em janelas.
