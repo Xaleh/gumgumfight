@@ -16,6 +16,11 @@ const handCards = (page: Page) => page.locator('.hand.bottom .hand-card');
 const handOrder = (page: Page) => handCards(page).evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.handUid ?? ''));
 const zoom = (page: Page) => page.locator('.zoom');
 const endTurn = (page: Page) => page.getByRole('button', { name: new RegExp(`^${label('game.endTurn').split('\n').join('\\s*')}$`) });
+/**
+ * Se dá para encerrar o turno agora. Enquanto o jogo pergunta algo (escolher um alvo, por exemplo) o botão nem
+ * está na tela, e `isEnabled()` sem prazo ficaria esperando por ele até estourar o tempo da ação, com erro.
+ */
+const canEndTurn = (page: Page) => endTurn(page).isEnabled({ timeout: 500 }).catch(() => false);
 
 /**
  * O meio de um elemento na tela (ou um ponto dentro dele, em fração da largura e da altura), depois de ele parar
@@ -46,7 +51,7 @@ async function untilPlayable(page: Page): Promise<Locator> {
   const playable = page.locator('.hand.bottom .card.hl-playable');
   const confirm = page.locator('[data-hotkey~="confirm"]:not(:disabled)');
   await expect(async () => {
-    if (await endTurn(page).isEnabled()) {
+    if (await canEndTurn(page)) {
       if ((await playable.count()) > 0) return;
       await endTurn(page).click();
     } else if ((await confirm.count()) > 0) await confirm.first().click({ timeout: 2000 });
@@ -101,9 +106,10 @@ test.describe('a mesa com o mouse e o teclado', () => {
     await expect(inHand).toHaveCount(0);
     // O ataque: o Líder vira (fica "rested") assim que o ataque é declarado.
     await expect(async () => {
-      // Um efeito [Ao Jogar] pode perguntar algo antes: responde pelo botão de confirmar.
+      // A carta jogada pode perguntar algo antes (um [Ao Jogar], o alvo de um Evento): responde pelo botão de
+      // confirmar. Enquanto a pergunta está na tela o "Encerrar turno" não existe.
       const confirm = page.locator('[data-hotkey~="confirm"]:not(:disabled)');
-      if (!(await endTurn(page).isEnabled()) && (await confirm.count()) > 0) await confirm.first().click({ timeout: 2000 });
+      if (!(await canEndTurn(page)) && (await confirm.count()) > 0) await confirm.first().click({ timeout: 2000 });
       await expect(endTurn(page)).toBeEnabled({ timeout: 1000 });
     }).toPass({ timeout: 30_000 });
     await expect(myLeader(page)).not.toHaveClass(/\brested\b/);
