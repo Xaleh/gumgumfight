@@ -21627,7 +21627,9 @@ div.dk-tile-main {
   align-items: center;
   gap: 14px;
   min-width: 0;
-  flex: 1;
+  /* A base (e não 0) é o que faz os botões descerem para a linha de baixo na tela estreita: com base 0 o
+     texto era espremido ao lado da arte e saía por baixo dos botões. */
+  flex: 1 1 340px;
 }
 .yk-deck-info .yk-avatar,
 .yk-deck-info .leader-art {
