@@ -3,8 +3,11 @@ import type { StatsOverview } from '../src/api';
 import ptBR from '../src/i18n/pt-BR';
 import { daysAgo, DECK_MIN_GAMES, deckTips, MATCHUP_MIN_GAMES, metaTip, nextTip, RULE_TIPS, shuffled, spoilerTips, TIP_START, type WaitTip } from '../src/waitTips';
 
-const card = (name: string) => ({ name, category: 'leader', colors: ['red'] });
-const cards = { L1: card('Luffy'), L2: card('Zoro'), L3: card('Nami'), L4: card('Sanji') };
+const card = (name: string, imageUrl?: string) => ({ name, category: 'leader', colors: ['red'], ...(imageUrl ? { imageUrl } : {}) });
+const cards = { L1: card('Luffy', 'https://img.test/L1.webp'), L2: card('Zoro'), L3: card('Nami'), L4: card('Sanji') };
+/** O Líder como vai no item: o nome, as cores e a imagem (quando as estatísticas a trazem), para a arte. */
+const luffy = { name: 'Luffy', colors: ['red'], image: 'https://img.test/L1.webp' };
+const leader = (name: string) => ({ name, colors: ['red'] });
 const win = { firstGames: 0, firstWins: 0 };
 const summary = (games: number, wins: number): StatsOverview['summary'] => {
   const none = { games: 0, wins: 0 };
@@ -25,9 +28,9 @@ describe('cartão de dicas da espera: itens de dados', () => {
     expect(tip).toEqual({
       kind: 'meta',
       leaders: [
-        { name: 'Luffy', pct: 50 },
-        { name: 'Zoro', pct: 30 },
-        { name: 'Nami', pct: 15 },
+        { ...luffy, pct: 50 },
+        { ...leader('Zoro'), pct: 30 },
+        { ...leader('Nami'), pct: 15 },
       ],
     });
   });
@@ -54,9 +57,9 @@ describe('cartão de dicas da espera: itens de dados', () => {
       'L1',
     );
     expect(tips).toEqual([
-      { kind: 'deck', name: 'Luffy', games: 20, wins: 12, pct: 60 },
-      { kind: 'matchup', best: true, name: 'Luffy', opp: 'Zoro', games: 10, pct: 80 },
-      { kind: 'matchup', best: false, name: 'Luffy', opp: 'Nami', games: 6, pct: 33 },
+      { kind: 'deck', leader: luffy, games: 20, wins: 12, pct: 60 },
+      { kind: 'matchup', best: true, leader: luffy, opp: leader('Zoro'), games: 10, pct: 80 },
+      { kind: 'matchup', best: false, leader: luffy, opp: leader('Nami'), games: 6, pct: 33 },
     ]);
   });
 
@@ -64,7 +67,7 @@ describe('cartão de dicas da espera: itens de dados', () => {
     expect(deckTips(null, 'L1')).toEqual([]);
     expect(deckTips({ summary: summary(DECK_MIN_GAMES - 1, 1), matchups: [], cards }, 'L1')).toEqual([]);
     const one = deckTips({ summary: summary(4, 3), matchups: [{ leader: 'L1', oppLeader: 'L2', games: 4, wins: 3, ...win }], cards }, 'L1');
-    expect(one).toEqual([{ kind: 'matchup', best: true, name: 'Luffy', opp: 'Zoro', games: 4, pct: 75 }]);
+    expect(one).toEqual([{ kind: 'matchup', best: true, leader: luffy, opp: leader('Zoro'), games: 4, pct: 75 }]);
     // Dois confrontos com a mesma taxa: não há um pior para mostrar.
     const same = deckTips(
       {
@@ -77,7 +80,9 @@ describe('cartão de dicas da espera: itens de dados', () => {
       },
       'L1',
     );
-    expect(same).toEqual([{ kind: 'matchup', best: true, name: 'Luffy', opp: 'Nami', games: 6, pct: 50 }]);
+    expect(same).toEqual([{ kind: 'matchup', best: true, leader: luffy, opp: leader('Nami'), games: 6, pct: 50 }]);
+    // Líder que as estatísticas não descrevem: vale o número da carta, sem cor nem imagem.
+    expect(deckTips({ summary: summary(6, 3), matchups: [], cards: {} }, 'L9')).toEqual([{ kind: 'deck', leader: { name: 'L9', colors: [] }, games: 6, wins: 3, pct: 50 }]);
   });
 });
 
@@ -111,7 +116,7 @@ describe('cartão de dicas da espera: rotação', () => {
   const rules: WaitTip[] = RULE_TIPS.map((key) => ({ kind: 'rule', key }));
   const data: WaitTip[] = [
     { kind: 'meta', leaders: [] },
-    { kind: 'deck', name: 'Luffy', games: 5, wins: 3, pct: 60 },
+    { kind: 'deck', leader: luffy, games: 5, wins: 3, pct: 60 },
   ];
   const spoiler = (id: string): WaitTip => ({ kind: 'spoiler', card: { id, name: id, category: 'character', colors: ['red'], types: [], text: '' }, daysAgo: 0 });
   const spoilers = [spoiler('EB05-001'), spoiler('EB05-002'), spoiler('EB05-003')];

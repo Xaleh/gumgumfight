@@ -826,6 +826,10 @@ O estado da fila mora na raiz do app, não na tela inicial: `MainApp` (`App.tsx`
   vez ao abrir o cartão: `GET /api/stats?days=7` (os 3 Líderes mais jogados) e `GET /api/stats?mine=1&leader=&opponent=human`
   (o histórico com o Líder do deck: o total a partir de 5 partidas, e o melhor e o pior confronto entre os que têm 3
   ou mais). Sem resposta, o cartão fica só com as dicas.
+- **Imagens do cartão**: a dica de regra leva a ilustração dela (`components/TipArt.tsx`: uma cena em SVG por chave
+  de `RULE_TIPS`, o TypeScript falha se faltar alguma; arte original, de cores fixas sobre um fundo creme, só com
+  números e termos do jogo que não se traduzem). O meta e o histórico levam a arte dos Líderes (`LeaderArt`), com o
+  nome, as cores e a imagem que já vêm em `cards` nas respostas de `/api/stats` (`TipLeader`, em `waitTips.ts`).
 - **Spoilers novos**: a terceira consulta do cartão é `GET /api/spoilers/recent` (as cartas ainda não lançadas que
   entraram no banco nos últimos 7 dias, até 40, da mais nova para a mais antiga, com `addedAt`). Havendo alguma, o
   `nextTip` alterna: um item do ciclo de dicas e dados, um spoiler, cada lista no seu contador. O item mostra a

@@ -700,7 +700,10 @@ está na fila e os espectadores também contam.
   que ele estava editando.
 - **Cartão de dicas**: gira a cada 9 s (ou pelo botão) entre dicas de regra, os Líderes mais jogados da semana e o
   histórico do jogador com o Líder do deck (vitórias contra outras pessoas, o melhor e o pior confronto, quando há
-  partidas suficientes).
+  partidas suficientes). Todo item tem imagem: cada dica de regra tem uma ilustração própria do GumGum Fight (cartas
+  genéricas, sem arte da Bandai nem da Toei), o meta mostra os três Líderes com a arte e a fatia de cada um, e o
+  histórico mostra a arte do Líder do jogador (no confronto, também a do oponente). Com as imagens desligadas, a arte
+  dos Líderes vira a inicial na cor da carta.
 - **Spoilers novos**: quando chegaram cartas de spoiler nos últimos 7 dias, o cartão alterna entre elas e o resto (um
   item sim, um não), da mais nova para a mais antiga, com a miniatura, o nome e "Chegou hoje / ontem / há N dias".
   Tocar na carta abre o texto ampliado, e o cartão espera enquanto ela está aberta. A data é a de quando a carta

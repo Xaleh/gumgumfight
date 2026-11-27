@@ -30,7 +30,7 @@ const wait = {
   'wait.spoilerOpen': 'カードをタップすると読めます。',
   'wait.spoilerView': 'カード「{name}」を見る',
   'wait.next': '次のヒント',
-  'wait.metaTop': '直近7日間でよく使われたリーダー：{list}。',
+  'wait.metaTitle': '直近7日間でよく使われたリーダー',
   'wait.deckRecord': '{name}でほかのプレイヤーと{games|#戦}して{wins}勝（{pct}%）。',
   'wait.matchupBest': '{name}でいちばん相性のよい相手：{opp}（{games|#戦}で勝率{pct}%）。',
   'wait.matchupWorst': '{name}でいちばん苦手な相手：{opp}（{games|#戦}で勝率{pct}%）。',

@@ -30,7 +30,7 @@ const wait = {
   'wait.spoilerOpen': 'Tap the card to read it.',
   'wait.spoilerView': 'View the card {name}',
   'wait.next': 'Next tip',
-  'wait.metaTop': 'Most played Leaders in the last 7 days: {list}.',
+  'wait.metaTitle': 'Most played Leaders in the last 7 days',
   'wait.deckRecord': 'With {name}, you won {wins} of {games|# match|# matches} against other players ({pct}%).',
   'wait.matchupBest': 'Your best matchup with {name}: against {opp}, a {pct}% win rate over {games|# match|# matches}.',
   'wait.matchupWorst': 'Your toughest matchup with {name}: against {opp}, a {pct}% win rate over {games|# match|# matches}.',

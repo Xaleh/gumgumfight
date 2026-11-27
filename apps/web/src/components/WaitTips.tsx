@@ -2,6 +2,9 @@
 // histórico do jogador com o Líder do deck, e os spoilers que chegaram nos últimos 7 dias, alternando com o resto
 // (a carta abre ampliada ao toque). A escolha e a ordem são de `waitTips.ts`.
 //
+// Todo item tem imagem: a dica de regra, uma ilustração própria (`TipArt`); o meta e o histórico, a arte dos
+// Líderes (`LeaderArt`, que cai na inicial quando o jogador desligou as imagens); o spoiler, a carta.
+//
 // Animações (a opção do jogador): em `full` e `soft` o cartão troca sozinho, com uma entrada curta; a barrinha do
 // tempo, que se repete, só existe em `full`; em `off` nada troca sozinho, e o jogador avança pelo botão.
 
@@ -14,6 +17,8 @@ import { deckTips, metaTip, nextTip, RULE_TIPS, shuffled, spoilerTips, TIP_START
 import { StaticCardZoom } from './CardInfo';
 import { StaticCard } from './CardView';
 import { Icon } from './Icons';
+import { LeaderArt } from './LeaderArt';
+import { TipArt } from './TipArt';
 
 /** Quanto tempo cada item fica na tela. */
 export const TIP_MS = 9000;
@@ -23,13 +28,13 @@ function tipText(t: Translate, tip: WaitTip): { kicker: string; text: string } {
     case 'rule':
       return { kicker: t('wait.kickerRule'), text: t(tip.key) };
     case 'meta':
-      return { kicker: t('wait.kickerMeta'), text: t('wait.metaTop', { list: tip.leaders.map((l) => `${l.name} ${l.pct}%`).join(' · ') }) };
+      return { kicker: t('wait.kickerMeta'), text: t('wait.metaTitle') };
     case 'deck':
-      return { kicker: t('wait.kickerDeck'), text: t('wait.deckRecord', { name: tip.name, wins: tip.wins, games: tip.games, pct: tip.pct }) };
+      return { kicker: t('wait.kickerDeck'), text: t('wait.deckRecord', { name: tip.leader.name, wins: tip.wins, games: tip.games, pct: tip.pct }) };
     case 'matchup':
       return {
         kicker: t('wait.kickerDeck'),
-        text: t(tip.best ? 'wait.matchupBest' : 'wait.matchupWorst', { name: tip.name, opp: tip.opp, games: tip.games, pct: tip.pct }),
+        text: t(tip.best ? 'wait.matchupBest' : 'wait.matchupWorst', { name: tip.leader.name, opp: tip.opp.name, games: tip.games, pct: tip.pct }),
       };
     case 'spoiler': {
       const when = tip.daysAgo === 0 ? t('wait.spoilerToday') : tip.daysAgo === 1 ? t('wait.spoilerYesterday') : t('wait.spoilerDays', { n: tip.daysAgo });
@@ -101,7 +106,15 @@ export function WaitTips({ leader }: { leader?: string | null }) {
   const { kicker, text } = tipText(t, tip);
   return (
     <section className={`wait-tips anim-${animations}`} aria-label={t('wait.tipsLabel')}>
-      <div className={tip.kind === 'spoiler' ? 'wait-tip spoiler' : 'wait-tip'} key={step}>
+      <div className={`wait-tip ${tip.kind}`} key={step}>
+        {tip.kind === 'rule' && <TipArt tip={tip.key} />}
+        {tip.kind === 'deck' && <LeaderArt name={tip.leader.name} image={tip.leader.image} colors={tip.leader.colors} />}
+        {tip.kind === 'matchup' && (
+          <div className="wait-tip-duo">
+            <LeaderArt name={tip.leader.name} image={tip.leader.image} colors={tip.leader.colors} size="small" />
+            <LeaderArt name={tip.opp.name} image={tip.opp.image} colors={tip.opp.colors} size="small" />
+          </div>
+        )}
         {tip.kind === 'spoiler' && (
           <button type="button" className="wait-tip-card" onClick={() => setZoom(tip.card)} aria-label={t('wait.spoilerView', { name: tip.card.name })}>
             <StaticCard card={tip.card} />
@@ -115,6 +128,17 @@ export function WaitTips({ leader }: { leader?: string | null }) {
             </strong>
           )}
           <p>{text}</p>
+          {tip.kind === 'meta' && (
+            <ul className="wait-tip-leaders">
+              {tip.leaders.map((l, i) => (
+                <li key={i}>
+                  <LeaderArt name={l.name} image={l.image} colors={l.colors} size="small" />
+                  <b>{l.pct}%</b>
+                  <span title={l.name}>{l.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
       <button type="button" className="wait-tip-next" onClick={advance} aria-label={t('wait.next')} title={t('wait.next')}>
