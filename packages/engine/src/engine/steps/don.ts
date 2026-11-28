@@ -7,7 +7,7 @@ import { fixedOpponent, isMultiplayer, opponentOf, opponentSides, opponentsOf } 
 import { cardDef, locate, ownerOf } from '../queries';
 import { restricted, targetCandidates, totalDonOnField } from '../options';
 import { emit } from '../triggers';
-import { addModifier, askCards, askOption, donTargetOpponent, resolveTargets, upToCount } from '../effects';
+import { addDonSkipRefresh, addSkipRefresh, askCards, askOption, donSkippingRefresh, donTargetOpponent, resolveTargets, upToCount } from '../effects';
 import { describeDonSource, donSources, restCard, summarizeDonSources, takeDon } from '../zones';
 
 /** Os passos desta família (`execStep`, em ../exec-step.ts, manda cada um para cá). */
@@ -252,8 +252,7 @@ export function execDonStep(state: GameState, frame: EffectFrame, step: DonStep,
     case 'restDonOrCharacter': {
       const skip = Boolean(step.skipRefresh);
       // skipRefresh: só cartas viradas que ainda não vão ficar viradas; DON!! virados que ainda não vão ficar.
-      const skippedDon = (id: PlayerId) => (state.donSkipRefresh ?? []).filter((d) => d.player === id).reduce((n, d) => n + d.count, 0);
-      const hasDon = (id: PlayerId) => (skip ? state.players[id].donRested > skippedDon(id) : state.players[id].donActive > 0);
+      const hasDon = (id: PlayerId) => (skip ? state.players[id].donRested > donSkippingRefresh(state, id) : state.players[id].donActive > 0);
       // Mesa com mais de dois: "1 of your opponent's DON!! cards or Characters" é um alvo de qualquer oponente;
       // cada oponente com DON!! que sirva vira uma opção.
       const many = isMultiplayer(state) && fixedOpponent(state, frame.controller) === undefined;
@@ -331,8 +330,7 @@ export function execDonStep(state: GameState, frame: EffectFrame, step: DonStep,
         const opp = raw?.startsWith('don:') ? state.players[Number(raw.slice(4))] : state.players[opponentOf(state, frame.controller)];
         if (pick === 'don') {
           if (skip) {
-            (state.donSkipRefresh ??= []).push({ player: opp.id, count: 1 });
-            log(state, frame.controller, lg('donSkipsRefresh', `1 DON!! de ${opp.name} não fica ativo na próxima Renovação.`, { n: 1, player: opp.name }));
+            if (addDonSkipRefresh(state, opp.id, 1)) log(state, frame.controller, lg('donSkipsRefresh', `1 DON!! de ${opp.name} não fica ativo na próxima Renovação.`, { n: 1, player: opp.name }));
           } else {
             opp.donActive--;
             opp.donRested++;
@@ -346,7 +344,7 @@ export function execDonStep(state: GameState, frame: EffectFrame, step: DonStep,
       if (skip) {
         const t = resolveTargets(state, frame, spec, 'harm', pr('chooseSkipRefreshCard', `${srcName}: escolha a carta que não desvira no próximo turno.`, { source: srcName }));
         if (!t) return false;
-        for (const uid of t) addModifier(state, frame.controller, { uid, kind: 'skipRefresh', amount: 0, duration: 'nextOpponentTurn' });
+        for (const uid of t) addSkipRefresh(state, uid);
         return true;
       }
       const t = resolveTargets(state, frame, spec, 'harm', pr(onlyChars ? 'chooseCharacterToRest' : 'chooseCardToRest', `${srcName}: escolha ${onlyChars ? 'o Personagem' : 'a carta'} a virar.`, { source: srcName }));

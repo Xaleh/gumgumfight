@@ -40,20 +40,22 @@ export function startTurn(state: GameState) {
 /** Resto do Refresh Phase, Draw e DON!! Phase; depois, os "at the start of your Main Phase" (6-5-1). */
 export function refreshDrawDon(state: GameState) {
   const ps = state.players[state.activePlayer];
+  // "rested DON!! cards will not become active": só DON!! que já estavam virados na área de custo (os
+  // dados a cartas voltam virados agora e desviram).
+  const keep = Math.min(ps.donRested, (state.donSkipRefresh ?? []).filter((d) => d.player === ps.id).reduce((n, d) => n + d.count, 0));
+  state.donSkipRefresh = (state.donSkipRefresh ?? []).filter((d) => d.player !== ps.id);
   // Refresh: DON!! anexados voltam à área de custo e tudo fica ativo.
   const fieldCards = [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])];
   for (const fc of fieldCards) {
     ps.donRested += fc.don;
     fc.don = 0;
     delete fc.donLoose;
-    // "will not become active in your opponent's next Refresh Phase"
+    // "will not become active in your (opponent's) next Refresh Phase": vale para esta Renovação e acaba aqui.
     const skip = state.modifiers.some((m) => m.uid === fc.uid && m.kind === 'skipRefresh') || noRefreshByAura(state, fc.uid);
     if (!skip) fc.rested = false;
     else if (fc.rested) (state.refreshSkipped ??= []).push(fc.uid);
   }
   state.modifiers = state.modifiers.filter((m) => !(m.kind === 'skipRefresh' && fieldCards.some((fc) => fc.uid === m.uid)));
-  const keep = Math.min(ps.donRested, (state.donSkipRefresh ?? []).filter((d) => d.player === ps.id).reduce((n, d) => n + d.count, 0));
-  state.donSkipRefresh = (state.donSkipRefresh ?? []).filter((d) => d.player !== ps.id);
   ps.donActive += ps.donRested - keep;
   ps.donRested = keep;
 
