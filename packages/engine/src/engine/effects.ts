@@ -9,7 +9,6 @@ import { conditionHolds } from './conditions';
 import { forgetCard, targetCandidates } from './options';
 import { markRevealed } from './cancel';
 import { setExpiry } from './turn';
-import { FAR_TURN } from './constants';
 import { pushEffect } from './stack';
 import { pushAbilities } from './triggers';
 import { execStep } from './exec-step';
@@ -378,14 +377,6 @@ export function useOwnEffect(state: GameState, frame: EffectFrame, timing: 'main
 /** Registra um modificador; "until the end of your opponent's next turn" calcula o turno em que acaba. */
 export function addModifier(state: GameState, controller: PlayerId, m: Modifier) {
   setExpiry(state, controller, m, m.duration);
-  // "will not become active in your opponent's next Refresh Phase", numa mesa de mais de dois: vale até a próxima
-  // Renovação do dono da carta, que a consome (`refreshDrawDon`). Pela duração comum acabaria no começo do turno de
-  // quem usou o efeito, que pode chegar antes dessa Renovação (um [On K.O.] no turno do oponente, um [Trigger]).
-  if (m.kind === 'skipRefresh' && isMultiplayer(state) && ownerOf(state, m.uid) !== controller) {
-    m.untilTurn = FAR_TURN;
-    delete m.untilStartOf;
-    delete m.untilEndOf;
-  }
   state.modifiers.push(m);
 }
 
