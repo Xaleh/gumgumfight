@@ -1,7 +1,7 @@
 // Resolução de um efeito, um passo por vez: "cada oponente", alvos, perguntas ao jogador e os ajudantes dos passos.
 
 import type { CardFilter, EffectStep, GameState, Modifier, MsgList, PlayerId, TargetRef, TargetSpec } from '../types';
-import type { EffectFrame } from './constants';
+import { FAR_TURN, type EffectFrame } from './constants';
 import { lg, log, pr, type Prompt, promptOf } from './messages';
 import { fixedOpponent, isMultiplayer, markProbeStep, opponentsOf, withOpponent } from './table';
 import { cardDef, getCost, getPower, locate, matchesFilter, ownerOf } from './queries';
@@ -387,6 +387,33 @@ export function addModifier(state: GameState, controller: PlayerId, m: Modifier)
     delete m.untilEndOf;
   }
   state.modifiers.push(m);
+}
+
+/**
+ * "will not become active in your (opponent's) next Refresh Phase": vale até a próxima Renovação do dono
+ * da carta, que o consome (`refreshDrawDon`), seja ela em que turno for. Não acaba pela contagem de
+ * turnos: com um turno extra, ou numa mesa com mais de dois jogadores, a Renovação do dono pode vir
+ * depois do turno em que um "until the end of … next turn" acabaria.
+ */
+export function addSkipRefresh(state: GameState, uid: string) {
+  state.modifiers.push({ uid, kind: 'skipRefresh', amount: 0, duration: 'nextOpponentTurn', untilTurn: FAR_TURN });
+}
+
+/** DON!! virados na área de custo de `player` que já não desviram na próxima Renovação dele. */
+export function donSkippingRefresh(state: GameState, player: PlayerId): number {
+  return (state.donSkipRefresh ?? []).filter((d) => d.player === player).reduce((n, d) => n + d.count, 0);
+}
+
+/**
+ * "Up to N of your opponent's rested DON!! cards will not become active in your opponent's next Refresh
+ * Phase": os alvos são DON!! virados da área de custo na hora do efeito (os dados a cartas não contam,
+ * nem os que virarem depois) que ainda não estão congelados. Devolve quantos ficaram.
+ */
+export function addDonSkipRefresh(state: GameState, player: PlayerId, count: number): number {
+  const n = Math.min(count, state.players[player].donRested - donSkippingRefresh(state, player));
+  if (n <= 0) return 0;
+  (state.donSkipRefresh ??= []).push({ player, count: n });
+  return n;
 }
 
 /**

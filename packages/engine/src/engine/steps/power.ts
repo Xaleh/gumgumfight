@@ -1,14 +1,14 @@
 // Passos de efeito que mudam poder, custo, palavras-chave e o que uma carta pode ou não fazer (atacar, bloquear,
 // ser nocauteada, desvirar): quase todos só criam um modificador ou uma restrição com duração.
 
-import type { EffectStep, GameState, PlayerId, PlayerState, Restriction } from '../../types';
+import type { EffectStep, GameState, PlayerState, Restriction } from '../../types';
 import type { EffectFrame } from '../constants';
 import { lg, log, pr, promptOf } from '../messages';
 import { fixedOpponent, isMultiplayer, opponentOf, opponentSides } from '../table';
-import { basePowerOf, cardDef, getPower, locate, matchesFilter, ownerOf } from '../queries';
+import { basePowerOf, cardDef, getPower, locate, matchesFilter } from '../queries';
 import { targetCandidates } from '../options';
 import { setExpiry } from '../turn';
-import { addModifier, askCards, askOption, donTargetOpponent, resolveTargets } from '../effects';
+import { addDonSkipRefresh, addModifier, addSkipRefresh, askCards, askOption, donSkippingRefresh, donTargetOpponent, resolveTargets } from '../effects';
 import { koCharacter, koProtected } from '../removal';
 import { detach, removeFrom } from '../zones';
 
@@ -114,11 +114,8 @@ export function execPowerStep(state: GameState, frame: EffectFrame, step: PowerS
     case 'skipRefresh': {
       const t = resolveTargets(state, frame, step.target, 'harm', pr('chooseSkipRefreshTarget', `${srcName}: escolha quem não desvira no próximo turno.`, { source: srcName }));
       if (!t) return false;
-      for (const uid of t) {
-        // Carta própria: a sua próxima Renovação (no seu próximo turno).
-        const own = ownerOf(state, uid) === frame.controller;
-        addModifier(state, frame.controller, { uid, kind: 'skipRefresh', amount: 0, duration: own ? 'endOfYourNextTurn' : 'nextOpponentTurn' });
-      }
+      // Da carta própria ou do oponente: a próxima Renovação do dono dela.
+      for (const uid of t) addSkipRefresh(state, uid);
       return true;
     }
     case 'anyNumberForPower': {
@@ -168,19 +165,18 @@ export function execPowerStep(state: GameState, frame: EffectFrame, step: PowerS
       let target = opp;
       if (isMultiplayer(state) && fixedOpponent(state, frame.controller) === undefined) {
         // "Up to 1 of your opponent's rested DON!! cards will not become active": um alvo, de qualquer oponente.
-        const skipped = (id: PlayerId) => (state.donSkipRefresh ?? []).filter((d) => d.player === id).reduce((k, d) => k + d.count, 0);
         const id = donTargetOpponent(
           state,
           frame,
-          opponentSides(state, frame.controller).filter((o) => state.players[o].donRested > skipped(o)),
+          opponentSides(state, frame.controller).filter((o) => state.players[o].donRested > donSkippingRefresh(state, o)),
           pr('whoseDonSkipsRefresh', `${srcName}: o DON!! virado de qual oponente não desvira?`, { source: srcName }),
         );
         if (id === undefined) return false;
         if (id === null) return true;
         target = state.players[id];
       }
-      (state.donSkipRefresh ??= []).push({ player: target.id, count: step.count });
-      log(state, frame.controller, lg('donSkipsRefresh', `${step.count} DON!! de ${target.name} não fica(m) ativo(s) na próxima Renovação.`, { n: step.count, player: target.name }));
+      const n = addDonSkipRefresh(state, target.id, step.count);
+      if (n) log(state, frame.controller, lg('donSkipsRefresh', `${n} DON!! de ${target.name} não fica(m) ativo(s) na próxima Renovação.`, { n, player: target.name }));
       return true;
     }
     case 'powerPerDon': {
