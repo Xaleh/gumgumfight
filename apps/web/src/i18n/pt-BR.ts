@@ -2473,6 +2473,7 @@ const ptBR = {
   'engine.revealedTopOrBottom': '{source}: {card} fica no topo ou vai para o fundo do deck?',
   'engine.deckTopOrBottom': '{source}: colocar no topo ou no fundo do deck?',
   'engine.opponentDeckTopIs': '{source}: a carta do topo do deck do oponente é {card}.',
+  'engine.deckTopOfIs': '{source}: a carta do topo do deck de {opponent} é {card}.',
   // ---- seus Personagens e cartas ----
   'engine.chooseOwnCardsToRest': '{source}: escolha {n|# carta sua|# cartas suas} para virar.',
   'engine.chooseOwnCardsToReturn': '{source}: escolha {n|# carta sua|# cartas suas} para devolver à mão.',
@@ -2499,6 +2500,7 @@ const ptBR = {
   'engine.chooseHandCardsToLifeTop': '{source}: escolha até {n|# carta|# cartas} da mão para o topo da Vida.',
   'engine.peekWhichLife': '{source}: olhar a carta do topo de qual Vida?',
   'engine.lifeTopIsWhere': '{source}: a carta do topo é {card}. Onde deixar?',
+  'engine.lifeTopOfIsWhere': '{source}: a carta do topo da Vida de {opponent} é {card}. Onde deixar?',
   // ---- custos opcionais e substituições ----
   'engine.opponentMayLifeTrash': '{source}: descartar {n|# carta|# cartas} do topo da Vida para evitar o efeito?',
   'engine.opponentMayDiscard': '{source}: descartar {n|# carta|# cartas} da mão para evitar o efeito?',
@@ -2531,6 +2533,7 @@ const ptBR = {
   'engine.optLifeTopFaceUp': 'Colocar no topo da Vida (virada para cima)',
   'engine.optPeekOwnLife': 'Olhar a sua Vida',
   'engine.optPeekOpponentLife': 'Olhar a Vida do oponente',
+  'engine.optPeekLifeOf': 'Olhar a Vida de {player}',
   'engine.optDontPeek': 'Não olhar',
   // ---- mesa com mais de dois jogadores (Yonko) ----
   'engine.whoseDonToRest': '{source}: virar 1 DON!! ativo de qual oponente?',
@@ -2718,6 +2721,8 @@ const ptBR = {
   'log.peeksLifeOwnBottom': '{player} olha a carta do topo da Vida própria e a deixa no fundo.',
   'log.peeksLifeOpponentTop': '{player} olha a carta do topo da Vida do oponente e a deixa no topo.',
   'log.peeksLifeOpponentBottom': '{player} olha a carta do topo da Vida do oponente e a deixa no fundo.',
+  'log.peeksLifeOfBottom': '{player} olha a carta do topo da Vida de {opponent} e a deixa no fundo.',
+  'log.peeksLifeOfTop': '{player} olha a carta do topo da Vida de {opponent} e a deixa no topo.',
   'log.faceUpLifeToBottom': '{card} (Vida virada para cima) vai para o fundo do deck.',
   // ---- mão, deck e descarte ----
   'log.draws': '{player} compra {n|# carta|# cartas}.',
@@ -2733,6 +2738,7 @@ const ptBR = {
   'log.revealsFromDeckToHand': '{player} revela {card} do deck e adiciona à mão.',
   'log.revealsDeckTop': '{player} revela {card} do topo do deck.',
   'log.revealsOppDeckTop': '{player} revela {card} do topo do deck do oponente.',
+  'log.revealsDeckTopOf': '{player} revela {card} do topo do deck de {opponent}.',
   'log.addsToHand': '{player} adiciona {card} à mão.',
   'log.trashToHand': '{player} adiciona {card} do descarte à mão.',
   'log.placesAtBottom': '{player} coloca {n|# carta|# cartas} no fundo do deck.',
@@ -2805,6 +2811,7 @@ const ptBR = {
   'log.lapsedConditionTagged': '{card} {tag}: a condição não vale mais, o efeito não é ativado.',
   'log.onKoConditionFails': '{card} {tag}: a condição não vale, o efeito não é ativado.',
   'log.conditionFails': '{source}: a condição não vale ({reason}), o efeito não acontece.',
+  'log.effectHits': '{source}: o efeito vale para {players}.',
   'log.cond.maxCharacters': '{player} tem {n|# Personagem|# Personagens}; precisa de {limit} ou menos',
   'log.cond.maxCharactersSelf': '{player} tem {n|# Personagem|# Personagens}, contando esta carta; precisa de {limit} ou menos',
   'log.cond.minCharacters': '{player} tem {n|# Personagem|# Personagens}; precisa de {limit} ou mais',

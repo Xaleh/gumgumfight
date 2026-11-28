@@ -87,6 +87,26 @@ Decisões tomadas para o motor funcionar. Todas fáceis de mudar.
     partida inteira, correndo só nas próprias decisões; sem tempo, ou 2 minutos desconectado na própria decisão, o
     jogador sai da mesa como quem desiste.
 
+12. **Quem causou o dano.** "When you deal damage to your opponent's Life" só dispara para quem causou o dano: o
+    dono do atacante ou quem usou o efeito. Os outros oponentes do defensor não causaram nada.
+13. **"If it is your second turn or later".** Contam os turnos que o próprio jogador já jogou, não o número do turno
+    da mesa (os turnos 3 e 4 da mesa são o primeiro turno do 3º e do 4º jogador).
+14. **"Will not become active in your opponent's next Refresh Phase".** Vale até a próxima Renovação do dono da
+    carta, mesmo usado no turno de um oponente ([On K.O.], [Trigger], [Counter]). Não segue a regra 2, que é das
+    durações "até o fim do turno do oponente".
+15. **"Look at up to 1 card from the top of your or your opponent's Life cards".** É uma carta só: quem usa o efeito
+    escolhe uma Vida, a própria ou a de um oponente (uma opção por oponente). Só "your opponent's Life" segue a
+    regra 6 e vale para cada oponente.
+16. **"If the revealed card …" depois de cada oponente revelar uma carta.** O efeito seguinte sobre o oponente confere
+    a carta daquele oponente (Arlong: só quem revelou um Evento perde a Vida). Se o efeito seguinte é um alvo em
+    campo (Cognac Mama-Mash), basta a carta de um oponente servir, como nos patamares (regra 10).
+
+17. **O registro diz para quem o efeito valeu.** Quando um passo roda contra cada oponente (regra 6), o motor
+    escreve "Carta: o efeito vale para Fulano, Beltrano." só com os oponentes para quem a condição do passo vale. As
+    linhas e perguntas que diziam "do oponente" (o topo do deck, a Vida olhada) levam o nome do jogador. Na mesa,
+    essa linha vira um aviso curto, as cartas reveladas por outro jogador abrem numa janela, e a pergunta que vem do
+    efeito de outro jogador diz de quem é o efeito.
+
 ## 5. O que mudou em relação à primeira versão da fase 1
 
 A primeira versão do motor de mesa (antes de o manual chegar) seguia três regras propostas no plano. O manual

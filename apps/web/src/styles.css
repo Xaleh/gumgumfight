@@ -22122,6 +22122,339 @@ div.dk-tile-main {
   color: var(--text);
 }
 
+/*
+ * ---- as janelas de escolha (YonkoPrompts.tsx): a largada, a mão inicial, uma pergunta com opções e a escolha
+ * entre cartas fora da mesa. O mesmo fundo e a mesma moldura da carta da Vida (`.yk-reveal`); "Ver a mesa" e
+ * "Desfazer" num rodapé discreto, como na pergunta de usar um efeito. ----
+ */
+.yk-modal {
+  width: min(520px, 100%);
+  max-height: 96vh;
+  overflow: hidden auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px 0;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #1a3250, #0f1c30);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
+  color: var(--text);
+  text-align: center;
+}
+.yk-modal.wide {
+  width: min(860px, 100%);
+}
+.yk-modal.pick-curve {
+  width: min(640px, 100%);
+}
+/* Com a batalha embaixo (`PromptBackdrop`): a faixa na largura da janela, que cede a altura dela. */
+.yk-modal:not(:last-child) {
+  max-height: calc(96vh - 106px);
+}
+.yk-modal + .prompt-battle {
+  width: min(520px, 100%);
+}
+.yk-modal h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.yk-modal p {
+  margin: 0;
+}
+.yk-modal-kicker {
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 19px;
+  letter-spacing: 1.2px;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--brand-yellow);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+.yk-modal-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px 3px 3px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+/* As cartas da janela: quebram em linhas e, quando são muitas, a lista rola por dentro. */
+.yk-modal-cards {
+  --cw: clamp(84px, 13vw, 128px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-height: min(52vh, calc(var(--cw) * 1.396 * 2 + 34px));
+  overflow-y: auto;
+  padding: 8px 4px;
+  touch-action: pan-y;
+}
+.yk-modal-cards.feature {
+  --cw: clamp(110px, 18vw, 160px);
+}
+.yk-modal-cards .card {
+  width: var(--cw);
+  height: calc(var(--cw) * 1.396);
+  flex: none;
+}
+.yk-modal-cards .card.clickable,
+.yk-modal-source .card {
+  cursor: pointer;
+}
+.yk-modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.yk-modal-options .yk-btn {
+  min-height: 46px;
+  padding: 8px 14px;
+  font-size: 14.5px;
+  line-height: 1.25;
+}
+.yk-modal-answers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+.yk-modal-answers .yk-btn {
+  flex: 1 1 0;
+  min-height: 48px;
+  font-size: 15px;
+  line-height: 1.15;
+}
+/* "Não escolher": discreto e do outro lado do "Confirmar"; armado, pede o segundo toque. */
+.yk-btn.skip {
+  flex: 0 1 auto;
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--muted);
+}
+.yk-btn.skip.armed {
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  border-style: solid;
+  color: var(--danger-text);
+}
+.yk-btn small {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+.yk-banner .yk-btn.two {
+  padding-block: 3px;
+  line-height: 1.15;
+}
+/* A largada: as duas escolhas lado a lado, cada uma com a curva de DON!! turno a turno. */
+.yk-curves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+.yk-btn.yk-curve {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 118px;
+  padding: 14px 12px;
+  font-size: 14px;
+  line-height: 1.25;
+}
+.yk-curve-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+.yk-curve-row i {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  color: #fff;
+  font-style: normal;
+  font-weight: 900;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.yk-btn.primary .yk-curve-row i {
+  background: rgba(74, 50, 0, 0.82);
+  color: var(--brand-yellow);
+}
+.yk-modal-foot {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px -20px 0;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.yk-modal-foot .yk-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--muted);
+}
+.yk-modal-foot .yk-btn:hover {
+  background: var(--panel2);
+  color: var(--text);
+  filter: none;
+}
+.yk-modal-foot .yk-btn.cancel {
+  margin-left: auto;
+  color: var(--danger-text);
+}
+.yk-modal-foot .yk-btn.cancel:hover {
+  background: var(--danger-bg);
+}
+@media (max-width: 620px) {
+  .yk-modal {
+    padding-inline: 14px;
+  }
+  .yk-modal-foot {
+    margin-inline: -14px;
+  }
+  .yk-modal h3 {
+    font-size: 18px;
+  }
+  .yk-modal-kicker {
+    font-size: 16px;
+  }
+  .yk-curves {
+    grid-template-columns: 1fr;
+  }
+  .yk-btn.yk-curve {
+    min-height: 92px;
+  }
+}
+/* De quem é o efeito que pergunta: ao lado do nome da carta, na cor discreta da janela. */
+.yk-modal-source small,
+.yk-ask-from {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.yk-ask-from {
+  margin-left: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.yk-banner .yk-chip.from {
+  border: 1.5px solid color-mix(in srgb, var(--pc) 70%, #fff);
+  background: color-mix(in srgb, var(--pc) 28%, rgba(0, 0, 0, 0.3));
+  color: #fff;
+}
+/* As cartas reveladas por outro jogador: uma linha por revelação, com a cor do lugar de quem revelou. */
+.yk-modal.reveals {
+  padding-bottom: 16px;
+}
+.yk-reveal-line {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.yk-reveal-line + .yk-reveal-line {
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.yk-reveal-line p {
+  padding: 4px 12px;
+  border-left: 4px solid var(--pc, var(--brand-yellow));
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.26);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: left;
+}
+.yk-reveal-times {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--brand-yellow);
+  color: var(--brown);
+  font-size: 12px;
+}
+/*
+ * O aviso curto que sai do registro (por que algo não aconteceu, para quem valeu o efeito): sobre a faixa de
+ * ação, com a cor do lugar de quem causou; some sozinho, e o toque o fecha.
+ */
+.yk-toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 8;
+  width: max-content;
+  max-width: min(94%, 520px);
+  padding: 8px 14px;
+  border: 0;
+  border-left: 5px solid var(--pc, var(--brand-yellow));
+  border-radius: 12px;
+  background: rgba(13, 24, 41, 0.96);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* DON!! marcados para anexar: a pilha com a conta, na frente do medalhão da faixa. */
+.yk-banner-don {
+  --dw: 22px;
+  position: absolute;
+  left: -6px;
+  bottom: -6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: flex-end;
+}
+.yk-banner-don .don-card {
+  width: var(--dw);
+  height: calc(var(--dw) * 1.396);
+  box-shadow: 0 0 0 1.5px #fff, 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.yk-banner-don b {
+  margin-left: -6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--brand-yellow);
+  color: var(--brown);
+  border: 1.5px solid #fff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
 /* A faixa de troca de turno leva a cor de quem joga. */
 .yk .yk-flash.sweep.theirs b {
   color: color-mix(in srgb, var(--pc) 45%, #fff);
@@ -22156,6 +22489,7 @@ div.dk-tile-main {
   animation: yk-text-in 0.25s ease-out;
 }
 .yk:not(.anim-off) .yk-tray,
+.yk:not(.anim-off) .yk-toast,
 .yk:not(.anim-off) .yk-card-panel:not(.empty) {
   animation: fade-in 0.2s ease-out;
 }
@@ -22170,8 +22504,16 @@ div.dk-tile-main {
 .yk:not(.anim-off) .yk-reveal-back {
   animation: fade-in 0.2s ease-out;
 }
-.yk:not(.anim-off) .yk-reveal {
+.yk:not(.anim-off) .yk-reveal,
+.yk:not(.anim-off) .yk-modal {
   animation: pop-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+/* A mão inicial é distribuída carta a carta. */
+.yk:not(.anim-off) .yk-modal-cards.deal > span {
+  animation: deal 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+}
+.yk:not(.anim-off) .yk-don-cards > .don-card {
+  transition: transform 0.12s, box-shadow 0.12s;
 }
 /* A carta sai da Vida virada e desvira. */
 .yk:not(.anim-off) .yk-reveal-card .card {
@@ -22551,7 +22893,8 @@ div.dk-tile-main {
   .yk-banner-actions .yk-btn:not(.ghost) {
     flex: 1;
   }
-  .yk-banner-actions .yk-chip {
+  /* No celular as contas somem; de quem é o efeito que pergunta, não: é o que explica a pergunta. */
+  .yk-banner-actions .yk-chip:not(.from) {
     display: none;
   }
   .yk-clash {

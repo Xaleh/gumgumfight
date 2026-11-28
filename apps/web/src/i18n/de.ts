@@ -2470,6 +2470,7 @@ export default {
   'engine.revealedTopOrBottom': '{source}: {card} oben lassen oder unter das Deck legen?',
   'engine.deckTopOrBottom': '{source}: Oben aufs Deck oder unter das Deck legen?',
   'engine.opponentDeckTopIs': '{source}: Die oberste Karte im Deck deines Gegners ist {card}.',
+  'engine.deckTopOfIs': '{source}: Die oberste Karte im Deck von {opponent} ist {card}.',
   // ---- deine Charaktere und Karten ----
   'engine.chooseOwnCardsToRest': '{source}: Wähle {n|# deiner Karten|# deiner Karten} zum Erschöpfen.',
   'engine.chooseOwnCardsToReturn': '{source}: Wähle {n|# deiner Karten|# deiner Karten}, die auf deine Hand zurückkehren.',
@@ -2496,6 +2497,7 @@ export default {
   'engine.chooseHandCardsToLifeTop': '{source}: Wähle bis zu {n|# Karte|# Karten} von deiner Hand, die oben auf dein Leben kommen.',
   'engine.peekWhichLife': '{source}: Die oberste Karte wessen Lebens ansehen?',
   'engine.lifeTopIsWhere': '{source}: Die oberste Karte ist {card}. Wohin willst du sie legen?',
+  'engine.lifeTopOfIsWhere': '{source}: Die oberste Karte des Lebens von {opponent} ist {card}. Wohin willst du sie legen?',
   // ---- optionale Kosten und Ersetzungen ----
   'engine.opponentMayLifeTrash': '{source}: {n|# Karte|# Karten} von oben aus deinem Leben ablegen, um den Effekt zu vermeiden?',
   'engine.opponentMayDiscard': '{source}: {n|# Karte|# Karten} von deiner Hand ablegen, um den Effekt zu vermeiden?',
@@ -2528,6 +2530,7 @@ export default {
   'engine.optLifeTopFaceUp': 'Oben ins Leben legen (offen)',
   'engine.optPeekOwnLife': 'Dein Leben ansehen',
   'engine.optPeekOpponentLife': 'Leben des Gegners ansehen',
+  'engine.optPeekLifeOf': 'Leben von {player} ansehen',
   'engine.optDontPeek': 'Nicht ansehen',
   // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
   'engine.whoseDonToRest': '{source}: Von welchem Gegner 1 aktive DON!! erschöpfen?',
@@ -2714,6 +2717,8 @@ export default {
   'log.peeksLifeOwnBottom': '{player} sieht sich die oberste Karte seines Lebens an und legt sie nach unten.',
   'log.peeksLifeOpponentTop': '{player} sieht sich die oberste Karte des gegnerischen Lebens an und lässt sie oben.',
   'log.peeksLifeOpponentBottom': '{player} sieht sich die oberste Karte des gegnerischen Lebens an und legt sie nach unten.',
+  'log.peeksLifeOfBottom': '{player} sieht sich die oberste Karte des Lebens von {opponent} an und legt sie nach unten.',
+  'log.peeksLifeOfTop': '{player} sieht sich die oberste Karte des Lebens von {opponent} an und lässt sie oben.',
   'log.faceUpLifeToBottom': '{card} (offenes Leben) kommt unter das Deck.',
   // ---- Hand, Deck und Ablage ----
   'log.draws': '{player} zieht {n|# Karte|# Karten}.',
@@ -2729,6 +2734,7 @@ export default {
   'log.revealsFromDeckToHand': '{player} deckt {card} aus dem Deck auf und nimmt sie auf die Hand.',
   'log.revealsDeckTop': '{player} deckt {card} oben vom Deck auf.',
   'log.revealsOppDeckTop': '{player} deckt {card} oben vom Deck des Gegners auf.',
+  'log.revealsDeckTopOf': '{player} deckt {card} oben vom Deck von {opponent} auf.',
   'log.addsToHand': '{player} nimmt {card} auf die Hand.',
   'log.trashToHand': '{player} nimmt {card} aus der Ablage auf die Hand.',
   'log.placesAtBottom': '{player} legt {n|# Karte|# Karten} unter sein Deck.',
@@ -2801,6 +2807,7 @@ export default {
   'log.lapsedConditionTagged': '{card} {tag}: Die Bedingung gilt nicht mehr, der Effekt wird nicht aktiviert.',
   'log.onKoConditionFails': '{card} {tag}: Die Bedingung ist nicht erfüllt, der Effekt wird nicht aktiviert.',
   'log.conditionFails': '{source}: Die Bedingung ist nicht erfüllt ({reason}), der Effekt tritt nicht ein.',
+  'log.effectHits': '{source}: Der Effekt gilt für {players}.',
   'log.cond.maxCharacters': '{player} hat {n|# Charakter|# Charaktere}; erlaubt sind höchstens {limit}',
   'log.cond.maxCharactersSelf': '{player} hat {n|# Charakter|# Charaktere}, diese Karte mitgezählt; erlaubt sind höchstens {limit}',
   'log.cond.minCharacters': '{player} hat {n|# Charakter|# Charaktere}; nötig sind mindestens {limit}',

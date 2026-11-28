@@ -2470,6 +2470,7 @@ export default {
   'engine.revealedTopOrBottom': '{source}: keep {card} on top or place it at the bottom of the deck?',
   'engine.deckTopOrBottom': '{source}: place them at the top or bottom of the deck?',
   'engine.opponentDeckTopIs': "{source}: the top card of your opponent's deck is {card}.",
+  'engine.deckTopOfIs': "{source}: the top card of {opponent}'s deck is {card}.",
   // ---- your Characters and cards ----
   'engine.chooseOwnCardsToRest': '{source}: choose {n|# of your cards|# of your cards} to rest.',
   'engine.chooseOwnCardsToReturn': '{source}: choose {n|# of your cards|# of your cards} to return to your hand.',
@@ -2496,6 +2497,7 @@ export default {
   'engine.chooseHandCardsToLifeTop': '{source}: choose up to {n|# card|# cards} from your hand to add to the top of Life.',
   'engine.peekWhichLife': "{source}: look at the top card of whose Life?",
   'engine.lifeTopIsWhere': '{source}: the top card is {card}. Where do you want to leave it?',
+  'engine.lifeTopOfIsWhere': "{source}: the top card of {opponent}'s Life is {card}. Where do you want to leave it?",
   // ---- optional costs and replacements ----
   'engine.opponentMayLifeTrash': '{source}: trash {n|# card|# cards} from the top of your Life to avoid the effect?',
   'engine.opponentMayDiscard': '{source}: trash {n|# card|# cards} from your hand to avoid the effect?',
@@ -2528,6 +2530,7 @@ export default {
   'engine.optLifeTopFaceUp': 'Add to the top of Life (face-up)',
   'engine.optPeekOwnLife': 'Look at your Life',
   'engine.optPeekOpponentLife': "Look at your opponent's Life",
+  'engine.optPeekLifeOf': "Look at {player}'s Life",
   'engine.optDontPeek': "Don't look",
   // ---- table with more than two players (Yonko) ----
   'engine.whoseDonToRest': '{source}: rest 1 active DON!! of which opponent?',
@@ -2714,6 +2717,8 @@ export default {
   'log.peeksLifeOwnBottom': '{player} looks at the top card of their Life and places it at the bottom.',
   'log.peeksLifeOpponentTop': "{player} looks at the top card of the opponent's Life and leaves it on top.",
   'log.peeksLifeOpponentBottom': "{player} looks at the top card of the opponent's Life and places it at the bottom.",
+  'log.peeksLifeOfBottom': "{player} looks at the top card of {opponent}'s Life and places it at the bottom.",
+  'log.peeksLifeOfTop': "{player} looks at the top card of {opponent}'s Life and leaves it on top.",
   'log.faceUpLifeToBottom': '{card} (face-up Life) goes to the bottom of the deck.',
   // ---- hand, deck and trash ----
   'log.draws': '{player} draws {n|# card|# cards}.',
@@ -2729,6 +2734,7 @@ export default {
   'log.revealsFromDeckToHand': '{player} reveals {card} from their deck and adds it to their hand.',
   'log.revealsDeckTop': '{player} reveals {card} from the top of their deck.',
   'log.revealsOppDeckTop': "{player} reveals {card} from the top of the opponent's deck.",
+  'log.revealsDeckTopOf': "{player} reveals {card} from the top of {opponent}'s deck.",
   'log.addsToHand': '{player} adds {card} to their hand.',
   'log.trashToHand': '{player} adds {card} from their trash to their hand.',
   'log.placesAtBottom': '{player} places {n|# card|# cards} at the bottom of their deck.',
@@ -2801,6 +2807,7 @@ export default {
   'log.lapsedConditionTagged': "{card} {tag}: the condition no longer holds, the effect doesn't activate.",
   'log.onKoConditionFails': "{card} {tag}: the condition isn't met, the effect doesn't activate.",
   'log.conditionFails': "{source}: the condition isn't met ({reason}), the effect doesn't happen.",
+  'log.effectHits': '{source}: the effect applies to {players}.',
   'log.cond.maxCharacters': '{player} has {n|# Character|# Characters}; needs {limit} or fewer',
   'log.cond.maxCharactersSelf': '{player} has {n|# Character|# Characters}, counting this card; needs {limit} or fewer',
   'log.cond.minCharacters': '{player} has {n|# Character|# Characters}; needs {limit} or more',

@@ -2470,6 +2470,7 @@ export default {
   'engine.revealedTopOrBottom': '{source}: ¿dejar {card} arriba o ponerla en el fondo del mazo?',
   'engine.deckTopOrBottom': '{source}: ¿ponerlas arriba o en el fondo del mazo?',
   'engine.opponentDeckTopIs': '{source}: la carta superior del mazo de tu rival es {card}.',
+  'engine.deckTopOfIs': '{source}: la carta superior del mazo de {opponent} es {card}.',
   // ---- tus Personajes y cartas ----
   'engine.chooseOwnCardsToRest': '{source}: elige {n|# de tus cartas|# de tus cartas} para girar.',
   'engine.chooseOwnCardsToReturn': '{source}: elige {n|# de tus cartas|# de tus cartas} para devolver a tu mano.',
@@ -2496,6 +2497,7 @@ export default {
   'engine.chooseHandCardsToLifeTop': '{source}: elige hasta {n|# carta|# cartas} de tu mano para añadir arriba de la Vida.',
   'engine.peekWhichLife': '{source}: ¿de quién es la Vida cuya carta superior miras?',
   'engine.lifeTopIsWhere': '{source}: la carta superior es {card}. ¿Dónde quieres dejarla?',
+  'engine.lifeTopOfIsWhere': '{source}: la carta superior de la Vida de {opponent} es {card}. ¿Dónde quieres dejarla?',
   // ---- costes opcionales y reemplazos ----
   'engine.opponentMayLifeTrash': '{source}: ¿descartar {n|# carta|# cartas} de la parte superior de tu Vida para evitar el efecto?',
   'engine.opponentMayDiscard': '{source}: ¿descartar {n|# carta|# cartas} de tu mano para evitar el efecto?',
@@ -2528,6 +2530,7 @@ export default {
   'engine.optLifeTopFaceUp': 'Añadir arriba de la Vida (boca arriba)',
   'engine.optPeekOwnLife': 'Mirar tu Vida',
   'engine.optPeekOpponentLife': 'Mirar la Vida de tu rival',
+  'engine.optPeekLifeOf': 'Mirar la Vida de {player}',
   'engine.optDontPeek': 'No mirar',
   // ---- mesa con más de dos jugadores (Yonko) ----
   'engine.whoseDonToRest': '{source}: ¿girar 1 DON!! activo de qué rival?',
@@ -2714,6 +2717,8 @@ export default {
   'log.peeksLifeOwnBottom': '{player} mira la carta superior de su Vida y la pone abajo.',
   'log.peeksLifeOpponentTop': '{player} mira la carta superior de la Vida del rival y la deja arriba.',
   'log.peeksLifeOpponentBottom': '{player} mira la carta superior de la Vida del rival y la pone abajo.',
+  'log.peeksLifeOfBottom': '{player} mira la carta superior de la Vida de {opponent} y la pone abajo.',
+  'log.peeksLifeOfTop': '{player} mira la carta superior de la Vida de {opponent} y la deja arriba.',
   'log.faceUpLifeToBottom': '{card} (Vida boca arriba) va al fondo del mazo.',
   // ---- mano, mazo y descarte ----
   'log.draws': '{player} roba {n|# carta|# cartas}.',
@@ -2729,6 +2734,7 @@ export default {
   'log.revealsFromDeckToHand': '{player} revela {card} de su mazo y la añade a su mano.',
   'log.revealsDeckTop': '{player} revela {card} de la parte superior de su mazo.',
   'log.revealsOppDeckTop': '{player} revela {card} de la parte superior del mazo del rival.',
+  'log.revealsDeckTopOf': '{player} revela {card} de la parte superior del mazo de {opponent}.',
   'log.addsToHand': '{player} añade {card} a su mano.',
   'log.trashToHand': '{player} añade {card} de su descarte a su mano.',
   'log.placesAtBottom': '{player} pone {n|# carta|# cartas} en el fondo de su mazo.',
@@ -2801,6 +2807,7 @@ export default {
   'log.lapsedConditionTagged': '{card} {tag}: la condición ya no se cumple, el efecto no se activa.',
   'log.onKoConditionFails': '{card} {tag}: la condición no se cumple, el efecto no se activa.',
   'log.conditionFails': '{source}: la condición no se cumple ({reason}), el efecto no ocurre.',
+  'log.effectHits': '{source}: el efecto se aplica a {players}.',
   'log.cond.maxCharacters': '{player} tiene {n|# Personaje|# Personajes}; necesita {limit} o menos',
   'log.cond.maxCharactersSelf': '{player} tiene {n|# Personaje|# Personajes}, contando esta carta; necesita {limit} o menos',
   'log.cond.minCharacters': '{player} tiene {n|# Personaje|# Personajes}; necesita {limit} o más',

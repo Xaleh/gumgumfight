@@ -25,7 +25,8 @@ const NOTICE_KEYS = new Set([
   'log.retarget',
 ]);
 const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virada|não pode ativar \[Blocker\]|o ataque passa a mirar/;
-const isNotice = (e: { key?: string; text: string }) => (e.key ? NOTICE_KEYS.has(e.key) : NOTICE_RE.test(e.text));
+/** A linha do histórico explica por que algo não aconteceu? (A mesa de Yonko usa a mesma lista: `useYonkoNotices`.) */
+export const isNotice = (e: { key?: string; text: string }) => (e.key ? NOTICE_KEYS.has(e.key) : NOTICE_RE.test(e.text));
 
 export function useTableNotices({
   game,

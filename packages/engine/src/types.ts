@@ -1382,6 +1382,13 @@ export type Frame =
       memo?: string[];
       /** Alvos do último passo com alvo (para 'chosen'). */
       last?: string[];
+      /**
+       * Mesa com mais de dois jogadores: a carta que cada oponente revelou num passo repetido para cada um
+       * (`cards`, pelo lugar), e o `last` que o último deles deixou (`tail`: enquanto `last` é esse, valem estas).
+       */
+      lastOf?: { cards: Record<number, string[]>; tail: string[] };
+      /** Mesa com mais de dois jogadores: os jogadores da última linha "o efeito vale para …" deste efeito. */
+      hitNote?: string;
       /** Custo escolhido em "Choose a cost". */
       chosenCost?: number;
       /** Quantidade do acontecimento que disparou o efeito (ex.: cartas descartadas). */

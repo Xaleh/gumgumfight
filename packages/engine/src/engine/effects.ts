@@ -26,8 +26,10 @@ export function stepEffect(state: GameState, frame: EffectFrame) {
     // na ordem dos turnos (cada cópia leva o oponente em `vs`).
     if (step.vs === undefined && eachOpponent(step) && fixedOpponent(state, frame.controller) === undefined) {
       const original = step;
-      frame.steps.splice(frame.i, 1, ...opponentsOf(state, frame.controller).map((o) => ({ ...original, vs: o })));
+      const copies = opponentsOf(state, frame.controller).map((o) => ({ ...original, vs: o }));
+      frame.steps.splice(frame.i, 1, ...copies);
       step = frame.steps[frame.i];
+      noteWhoIsHit(state, frame, copies);
     }
     // O oponente da vez saiu da mesa antes de o passo chegar nele.
     if (step.vs !== undefined && state.players[step.vs].out) {
@@ -62,6 +64,24 @@ export function stepEffect(state: GameState, frame: EffectFrame) {
     frame.choice = undefined;
     frame.memo = undefined;
   }
+}
+
+/**
+ * Mesa com mais de dois: o histórico diz para quem vale o passo que roda contra cada oponente (a carta fala em
+ * "your opponent", e quem está na mesa precisa saber que foi atingido, ou por que não foi). Só entram os oponentes
+ * para quem a condição do passo vale ("If your opponent has 7 or more cards…": só quem tem 7 ou mais); sem nenhum,
+ * a linha da condição que falhou já explica. Dois passos seguidos do mesmo efeito para os mesmos jogadores ("return
+ * all cards… and draw 5") dão uma linha só.
+ */
+function noteWhoIsHit(state: GameState, frame: EffectFrame, copies: EffectStep[]) {
+  if (copies[0]?.afterIf && frame.ifFailed) return;
+  const hit = copies.filter((c) => !c.if || withOpponent(frame.controller, c.vs!, () => stepConditionMet(state, frame, c))).map((c) => state.players[c.vs!].name);
+  if (!hit.length) return;
+  const source = cardDef(state, frame.source).name;
+  const players = hit.join(', ');
+  if (frame.hitNote === players) return;
+  frame.hitNote = players;
+  log(state, frame.controller, lg('effectHits', `${source}: o efeito vale para ${players}.`, { source, players }), { cards: [frame.source] });
 }
 
 /** Passos que agem sobre "o oponente" (a mão, a Vida, os DON!!, o deck dele) sem escolher um alvo em campo. */
@@ -105,8 +125,10 @@ export function eachOpponent(step: EffectStep): boolean {
       return step.side === 'opponent';
     case 'arrangeLife':
       return step.whose === 'opponent';
+    // "your or your opponent's Life cards" é uma carta só, de uma Vida à escolha (a própria ou a de um oponente):
+    // o passo roda uma vez, com uma opção por Vida.
     case 'peekLife':
-      return step.whose !== 'own';
+      return step.whose === 'opponent';
     case 'handAllToDeck':
     case 'negateOnPlay':
       return step.who === 'opponent';
@@ -213,18 +235,30 @@ function chosenMatches(state: GameState, card: string, filter: CardFilter): bool
   return matchesFilter(cardDef(state, card), rest);
 }
 
+/**
+ * "A carta revelada" (ou escolhida) do passo anterior, para o "If the revealed card …". Numa mesa de mais de dois,
+ * um passo que revela a carta de cada oponente guarda a de cada um (`frame.lastOf`): o passo seguinte que também
+ * roda contra cada oponente olha a carta daquele oponente (só quem revelou um Evento perde a Vida), e o que não
+ * mira um oponente só (um alvo em campo) vale se a carta de algum deles serve, como as condições de patamar.
+ */
+function revealedCards(frame: EffectFrame, step: EffectStep): string[] {
+  const of = frame.lastOf;
+  // Um passo com alvo depois da revelação troca `frame.last`: aí vale o alvo, não as cartas reveladas.
+  if (!of || of.tail.join() !== (frame.last ?? []).join()) return frame.last?.length ? [frame.last[0]] : [];
+  if (step.vs !== undefined) return (of.cards[step.vs] ?? []).slice(0, 1);
+  return Object.values(of.cards).flatMap((cards) => cards.slice(0, 1));
+}
+
 export function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   if (step.if?.lastDone && !frame.last?.length) return false;
   if (step.if?.searchMissed && frame.searched) return false;
   if (step.if?.lastKOd && !(frame.koTargets ?? []).some((u) => state.players[ownerOf(state, u)].trash.includes(u))) return false;
   if (step.if?.revealedHasChosenCost) {
-    const card = frame.last?.[0];
-    if (!card || frame.chosenCost === undefined || (cardDef(state, card).cost ?? 0) !== frame.chosenCost) return false;
+    if (frame.chosenCost === undefined || !revealedCards(frame, step).some((card) => (cardDef(state, card).cost ?? 0) === frame.chosenCost)) return false;
   }
   const filter = step.if?.chosenMatches;
   if (filter) {
-    const card = frame.last?.[0];
-    if (!card || !chosenMatches(state, card, filter)) return false;
+    if (!revealedCards(frame, step).some((card) => chosenMatches(state, card, filter))) return false;
   }
   return conditionHolds(state, frame.controller, frame.source, step.if);
 }

@@ -2468,6 +2468,7 @@ export default {
   'engine.revealedTopOrBottom': '{source}: {card}をデッキの上に残しますか、それとも下に置きますか？',
   'engine.deckTopOrBottom': '{source}: デッキの上と下、どちらに置きますか？',
   'engine.opponentDeckTopIs': '{source}: 相手のデッキの一番上のカードは{card}です。',
+  'engine.deckTopOfIs': '{source}: {opponent}のデッキの一番上のカードは{card}です。',
   // ---- 自分のキャラとカード ----
   'engine.chooseOwnCardsToRest': '{source}: レストにする自分のカードを{n|#枚}選んでください。',
   'engine.chooseOwnCardsToReturn': '{source}: 手札に戻す自分のカードを{n|#枚}選んでください。',
@@ -2494,6 +2495,7 @@ export default {
   'engine.chooseHandCardsToLifeTop': '{source}: ライフの上に加える手札を{n|#枚}まで選んでください。',
   'engine.peekWhichLife': '{source}: どちらのライフの一番上のカードを見ますか？',
   'engine.lifeTopIsWhere': '{source}: 一番上のカードは{card}です。どこに置きますか？',
+  'engine.lifeTopOfIsWhere': '{source}: {opponent}のライフの一番上のカードは{card}です。どこに置きますか？',
   // ---- 任意のコストと置換 ----
   'engine.opponentMayLifeTrash': '{source}: 効果を避けるために、ライフの上から{n|#枚}をトラッシュに置きますか？',
   'engine.opponentMayDiscard': '{source}: 効果を避けるために、手札を{n|#枚}トラッシュに置きますか？',
@@ -2526,6 +2528,7 @@ export default {
   'engine.optLifeTopFaceUp': 'ライフの上に加える（表向き）',
   'engine.optPeekOwnLife': '自分のライフを見る',
   'engine.optPeekOpponentLife': '相手のライフを見る',
+  'engine.optPeekLifeOf': '{player}のライフを見る',
   'engine.optDontPeek': '見ない',
   // ---- 3人以上の卓（四皇） ----
   'engine.whoseDonToRest': '{source}：どの相手のアクティブのドン!!を1枚レストにしますか？',
@@ -2712,6 +2715,8 @@ export default {
   'log.peeksLifeOwnBottom': '{player}は自分のライフの一番上のカードを見て、下に置きます。',
   'log.peeksLifeOpponentTop': '{player}は相手のライフの一番上のカードを見て、上に残します。',
   'log.peeksLifeOpponentBottom': '{player}は相手のライフの一番上のカードを見て、下に置きます。',
+  'log.peeksLifeOfBottom': '{player}は{opponent}のライフの一番上のカードを見て、下に置きます。',
+  'log.peeksLifeOfTop': '{player}は{opponent}のライフの一番上のカードを見て、上に残します。',
   'log.faceUpLifeToBottom': '{card}（表向きのライフ）はデッキの下に置かれます。',
   // ---- 手札、デッキ、トラッシュ ----
   'log.draws': '{player}はカードを{n|#枚}引きます。',
@@ -2727,6 +2732,7 @@ export default {
   'log.revealsFromDeckToHand': '{player}はデッキから{card}を公開し、手札に加えます。',
   'log.revealsDeckTop': '{player}はデッキの上から{card}を公開します。',
   'log.revealsOppDeckTop': '{player}は相手のデッキの上から{card}を公開します。',
+  'log.revealsDeckTopOf': '{player}は{opponent}のデッキの上から{card}を公開します。',
   'log.addsToHand': '{player}は{card}を手札に加えます。',
   'log.trashToHand': '{player}はトラッシュから{card}を手札に加えます。',
   'log.placesAtBottom': '{player}はカードを{n|#枚}デッキの下に置きます。',
@@ -2799,6 +2805,7 @@ export default {
   'log.lapsedConditionTagged': '{card} {tag}：条件を満たさなくなったため、効果は発動しません。',
   'log.onKoConditionFails': '{card} {tag}：条件を満たしていないため、効果は発動しません。',
   'log.conditionFails': '{source}: 条件を満たしていないため（{reason}）、効果は発生しません。',
+  'log.effectHits': '{source}: この効果は{players}に適用されます。',
   'log.cond.maxCharacters': '{player}のキャラは{n|#枚}。{limit}枚以下である必要があります',
   'log.cond.maxCharactersSelf': '{player}のキャラはこのカードを含めて{n|#枚}。{limit}枚以下である必要があります',
   'log.cond.minCharacters': '{player}のキャラは{n|#枚}。{limit}枚以上である必要があります',

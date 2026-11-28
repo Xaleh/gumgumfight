@@ -43,18 +43,34 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
 }
 
 /**
+ * Responde ao que o jogo estiver perguntando, para a partida seguir: o botão de confirmar (não bloquear, não usar
+ * Counter, usar o efeito, a escolha já marcada); sem ele, a primeira opção de uma pergunta com opções (como pagar
+ * um custo); sem ela, marca a primeira carta que a pergunta destaca (o alvo obrigatório de um efeito), e o
+ * confirmar acende na volta seguinte. Devolve se havia o que responder.
+ */
+async function answer(page: Page): Promise<boolean> {
+  for (const selector of ['[data-hotkey~="confirm"]:not(:disabled)', '[data-hotkey~="option"]', '.game .card.hl-option']) {
+    const target = page.locator(selector).first();
+    if ((await target.count()) === 0) continue;
+    // `force`: o botão de decisão pulsa quando só resta concluir, e o clique não deve esperar ele parar.
+    await target.click({ timeout: 2000, force: true });
+    return true;
+  }
+  return false;
+}
+
+/**
  * Joga até o jogador ter, no próprio turno, uma carta da mão que dá para jogar: encerra o turno enquanto não
  * tem e responde ao que o jogo perguntar no meio (não bloquear, não usar Counter, confirmar) pelo botão de
  * confirmar que estiver na tela.
  */
 async function untilPlayable(page: Page): Promise<Locator> {
   const playable = page.locator('.hand.bottom .card.hl-playable');
-  const confirm = page.locator('[data-hotkey~="confirm"]:not(:disabled)');
   await expect(async () => {
     if (await canEndTurn(page)) {
       if ((await playable.count()) > 0) return;
       await endTurn(page).click();
-    } else if ((await confirm.count()) > 0) await confirm.first().click({ timeout: 2000 });
+    } else await answer(page);
     throw new Error('ainda sem carta para jogar');
   }).toPass({ timeout: 90_000, intervals: [400] });
   return playable.first();
@@ -106,12 +122,19 @@ test.describe('a mesa com o mouse e o teclado', () => {
     await expect(inHand).toHaveCount(0);
     // O ataque: o Líder vira (fica "rested") assim que o ataque é declarado.
     await expect(async () => {
-      // A carta jogada pode perguntar algo antes (um [Ao Jogar], o alvo de um Evento): responde pelo botão de
-      // confirmar. Enquanto a pergunta está na tela o "Encerrar turno" não existe.
-      const confirm = page.locator('[data-hotkey~="confirm"]:not(:disabled)');
-      if (!(await canEndTurn(page)) && (await confirm.count()) > 0) await confirm.first().click({ timeout: 2000 });
-      await expect(endTurn(page)).toBeEnabled({ timeout: 1000 });
-    }).toPass({ timeout: 30_000 });
+      // A carta jogada pode perguntar algo antes (um [Ao Jogar], como pagar um custo, o alvo de um Evento), e o
+      // bot ataca no turno dele: responde ao que for (`answer`). Enquanto a pergunta está na tela o "Encerrar
+      // turno" não existe.
+      if (!(await canEndTurn(page))) {
+        await answer(page);
+        throw new Error('a vez ainda não está livre');
+      }
+      // No primeiro turno ninguém ataca: se a carta saiu nele (uma de custo 1 na mão inicial), o ataque fica para
+      // o turno seguinte. O Líder que pode atacar tem o contorno de pronto.
+      if ((await page.locator('.side.bottom .leader-zone .card.hl-ready').count()) > 0) return;
+      await endTurn(page).click();
+      throw new Error('o Líder ainda não pode atacar');
+    }).toPass({ timeout: 90_000, intervals: [400] });
     await expect(myLeader(page)).not.toHaveClass(/\brested\b/);
     await drag(page, await point(myLeader(page)), await point(theirLeader(page)));
     await expect(myLeader(page)).toHaveClass(/\brested\b/);
