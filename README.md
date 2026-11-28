@@ -891,7 +891,8 @@ Fases seguintes (análise guardada no servidor, precisão em "Minhas partidas", 
 
 ## Estilos do bot
 
-Em **Contra o bot**, além do **Nível** (Fácil, Normal, Difícil), há o **Estilo do bot**, salvo no navegador:
+Em **Contra o bot**, o botão com o resumo ("Bot: Difícil · Controle") abre as **Opções do bot**: quem começa, o
+**Nível** (Fácil, Normal, Difícil) e o **Estilo do bot**, salvo no navegador:
 
 - **Equilibrado** (padrão): o bot de sempre, com os pesos ajustados em auto-jogo.
 - **Agressivo**: vai na Vida do oponente. Defende pouco (não bloqueia nem na última Vida, guarda o Counter), aceita
@@ -1037,6 +1038,13 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   sala: o placar da série soma sozinho, quem perdeu um jogo começa o seguinte e a tela de fim de jogo tem o botão do
   próximo jogo. A partida aparece em **Assistir partidas** com o nome do torneio e a fase. Cada jogo entra nas
   estatísticas na fila **Torneio**.
+- **Chat do torneio:** o **🏟 Lobby do torneio** (na página do torneio) tem um chat para o torneio inteiro, ao lado das
+  mesas (no celular, uma barra embaixo com a última mensagem e a contagem das que chegaram com ele fechado). **Qualquer
+  pessoa lê**; **escrevem** os inscritos (mesmo quem já foi eliminado), os Judges e o organizador, que aparecem com o
+  papel ao lado do nome. As mensagens têm até 240 caracteres, com palavrões censurados e o mesmo ritmo do chat da
+  partida (uma a cada 1,5 s, 10 por minuto). Quem escreveu **apaga** a própria mensagem; o Judge e o organizador
+  apagam qualquer uma. O chat aparece com as 100 últimas mensagens, aceita mensagens até **2 horas depois** do fim do
+  torneio e depois fica só para leitura. A [Sala do Tempo](#sala-do-tempo) não tem chat.
 - **Organização:** o organizador lança o placar de qualquer partida (W.O., queda de conexão, partida jogada fora do
   site), tira jogadores e avança: próxima rodada do suíço, início do top cut, próxima fase da chave e, depois da
   final, o encerramento. **Encerrar agora** termina antes.

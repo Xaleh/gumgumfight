@@ -98,6 +98,7 @@ import {
   checkInPlayer,
   createCall,
   countPlayers,
+  isListedJudge,
   isVirtualId,
   listVirtuals,
   createTournament,
@@ -158,6 +159,7 @@ import {
   warningStatus,
 } from './store';
 import { fixTicket, pointedText } from './calls';
+import { hasLobbyChat, LOBBY_CHAT_MAX_LENGTH, LobbyChat, lobbyChatOpen, type LobbyChatRole } from './chat';
 import {
   advanceChamber,
   beginChamber,
@@ -1402,6 +1404,8 @@ export function registerTournamentRoutes(
       roundComplete: t.status === 'running' && roundComplete(t, matches),
       /** Sala do Tempo: mesas da rodada (todas) e quantas foram decididas no sorteio. */
       chamber: t.chamber ? { tables: round.length, virtualTables: round.filter((m) => !humanTable(m)).length } : null,
+      /** O lobby tem chat (`GET /api/tournaments/:id/chat`). */
+      chat: hasLobbyChat(t),
       /** Quem pede: gerencia o torneio, é Judge dele (vê relógios e chamados) e a conta. */
       viewer: { userId: u?.id ?? null, manage, judge },
       judges: judges.map((j) => ({ userId: j.userId, name: j.name })),
@@ -1416,6 +1420,83 @@ export function registerTournamentRoutes(
         ? tables.filter((m) => m.call).map((m) => ({ matchId: m.id, table: m.table, roomId: m.roomId, openedAt: m.call!.openedAt, names: [m.p1.name, m.p2?.name ?? '?'], reason: m.call!.reason }))
         : [],
     };
+  });
+
+  // ------------------------------------------------------------------ chat do lobby
+
+  const lobbyChat = new LobbyChat(db, now);
+  /**
+   * O papel da conta no chat do lobby, ou null (só lê): o organizador, um Judge da lista, um inscrito
+   * (mesmo eliminado ou desistente) ou quem administra o site, que entra como Judge. O nome do inscrito
+   * é o da inscrição, usado se a conta não tiver perfil público.
+   */
+  const chatRole = (t: Tournament, u: User): { role: LobbyChatRole; entryName?: string } | null => {
+    if (u.id === t.organizerId) return { role: 'organizer' };
+    if (isListedJudge(db, t.id, u.id)) return { role: 'judge' };
+    const entry = db.prepare('SELECT name FROM tournament_players WHERE tournament_id = ? AND user_id = ?').get(t.id, u.id) as { name: string } | undefined;
+    if (entry) return { role: 'player', entryName: entry.name };
+    return isAdmin(u.role) ? { role: 'judge' } : null;
+  };
+  /** A conversa como `u` a vê: as mensagens, se pode escrever (e por que não) e se pode apagar as dos outros. */
+  const chatView = (t: Tournament, u: User | null) => {
+    const feed = lobbyChat.feed(t.id);
+    const role = u ? chatRole(t, u)?.role : undefined;
+    const post = !lobbyChatOpen(t, now()) ? ('closed' as const) : !u ? ('login' as const) : role ? ('ok' as const) : ('participants' as const);
+    const moderate = Boolean(u && (role === 'organizer' || role === 'judge' || isAdmin(u.role)));
+    return { rev: feed.rev, post, moderate, max: LOBBY_CHAT_MAX_LENGTH, messages: feed.messages };
+  };
+  /** O torneio do chat, ou responde 404 (torneio inexistente ou sem chat, como a Sala do Tempo). */
+  const chatTournament = (id: string, reply: FastifyReply): Tournament | null => {
+    const t = getTournament(db, id);
+    if (!t) void reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
+    else if (!hasLobbyChat(t)) void reply.code(404).send(fail('lobbyChatOff', 'Este torneio não tem chat.'));
+    else return t;
+    return null;
+  };
+
+  /**
+   * Chat do lobby: as últimas mensagens, para qualquer pessoa que abra o lobby. O lobby consulta de
+   * poucos em poucos segundos; a conversa fica pronta em memória (ver chat.ts) e, com o ETag, a
+   * consulta sem novidade sai como 304.
+   */
+  app.get<{ Params: { id: string } }>('/api/tournaments/:id/chat', async (req, reply) => {
+    const t = chatTournament(req.params.id, reply);
+    if (!t) return reply;
+    const view = chatView(t, user(req));
+    const etag = `"${view.rev}:${view.post}:${view.moderate ? 1 : 0}"`;
+    reply.header('etag', etag).header('cache-control', 'private, no-cache');
+    if (req.headers['if-none-match'] === etag) return reply.code(304).send();
+    return view;
+  });
+
+  /** Mensagem no chat do lobby: inscritos, Judges e o organizador. Devolve a conversa já com ela. */
+  app.post<{ Params: { id: string }; Body: { text?: unknown } }>('/api/tournaments/:id/chat', async (req, reply) => {
+    const t = chatTournament(req.params.id, reply);
+    if (!t) return reply;
+    const me = account(req, reply);
+    if (!me) return reply;
+    if (!lobbyChatOpen(t, now())) return reply.code(409).send(fail('lobbyChatClosed', 'O chat deste torneio já foi encerrado.'));
+    const who = chatRole(t, me);
+    if (!who) return reply.code(403).send(fail('lobbyChatParticipantsOnly', 'Só os inscritos, os Judges e o organizador escrevem no chat do torneio.'));
+    const name = findPlayer(db, accountOwnerKey(me.id))?.name ?? who.entryName ?? (who.role === 'judge' ? 'Judge' : '?');
+    const r = lobbyChat.post(t.id, { userId: me.id, name, role: who.role }, req.body?.text);
+    if (!r.ok) return reply.code(r.code).send(fail(r.errorCode, r.error, r.errorParams));
+    return reply.code(201).send(chatView(t, me));
+  });
+
+  /** Apaga uma mensagem do chat do lobby: quem escreveu, um Judge ou o organizador. */
+  app.delete<{ Params: { id: string; messageId: string } }>('/api/tournaments/:id/chat/:messageId', async (req, reply) => {
+    const t = chatTournament(req.params.id, reply);
+    if (!t) return reply;
+    const me = account(req, reply);
+    if (!me) return reply;
+    const id = Number(req.params.messageId);
+    const owner = Number.isInteger(id) ? lobbyChat.authorOf(t.id, id) : null;
+    if (owner === null) return reply.code(404).send(fail('lobbyChatMessageNotFound', 'Mensagem não encontrada.'));
+    if (owner !== me.id && !isJudge(t, me)) return reply.code(403).send(fail('lobbyChatCannotRemove', 'Só quem escreveu, um Judge ou o organizador apaga a mensagem.'));
+    const r = lobbyChat.remove(t.id, id, me.id);
+    if (!r.ok) return reply.code(r.code).send(fail(r.errorCode, r.error, r.errorParams));
+    return chatView(t, me);
   });
 
   /**

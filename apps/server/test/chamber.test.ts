@@ -153,6 +153,11 @@ describe('Sala do Tempo: rotas', () => {
     const forTeam = (await req(app, 'GET', '/api/tournaments', team)).json();
     expect(forTeam.tournaments.map((x: { id: string; chamber: boolean }) => [x.id, x.chamber])).toEqual([[t.id, true]]);
     expect(forTeam.canChamber).toBe(true);
+
+    // Treino de uma pessoa só: o lobby da sala não tem chat.
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}/lobby`, team)).json().chat).toBe(false);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}/chat`, team)).json()).toMatchObject({ errorCode: 'lobbyChatOff' });
+    expect((await req(app, 'POST', `/api/tournaments/${t.id}/chat`, team, { text: 'oi' })).statusCode).toBe(404);
   });
 
   it('sem o treino contra o bot do servidor, a sala não abre', async () => {

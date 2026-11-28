@@ -15,8 +15,13 @@ export async function openHome(page: Page) {
  */
 export async function startBotMatch(page: Page) {
   await openHome(page);
-  await page.getByRole('button', { name: label('menu.botEasy'), exact: true }).click();
-  await page.getByRole('button', { name: label('menu.you'), exact: true }).click();
+  // Nível e quem começa ficam na folha "Opções do bot"; o nome do botão começa por aí e segue com o que está escolhido.
+  await page.getByRole('button', { name: new RegExp(`^${label('menu.botOptions')}`) }).click();
+  const options = page.getByRole('dialog');
+  await options.getByRole('button', { name: label('menu.botEasy'), exact: true }).click();
+  await options.getByRole('button', { name: label('menu.you'), exact: true }).click();
+  await options.getByRole('button', { name: label('common.ok'), exact: true }).click();
+  await expect(options).toBeHidden();
   await page.getByRole('button', { name: label('menu.battle'), exact: true }).click();
   // Confirmação do deck equipado.
   const confirm = page.getByRole('dialog');

@@ -123,6 +123,10 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   a classificação final (1º lugar com 1V 0D e 2º com 0V 1D).
 - `@iphone`: a inscrição pelo convite no celular (o organizador cria, o jogador escolhe o deck e se inscreve, o
   organizador vê o inscrito). E, desde 2026-11-27, o torneio inteiro, com a partida na sala online.
+- Chat do lobby (`@iphone` também): a inscrita escreve, o organizador encontra a mensagem e responde, a resposta
+  chega para ela sozinha com o papel "Organizador", o visitante sem conta lê e não tem onde escrever, e o organizador
+  apaga a mensagem dela (some para os três). Só no celular: a barra de baixo mostra a última mensagem e a contagem das
+  que chegaram com o chat fechado, e abrir a conversa zera a contagem.
 - Com as três fases, o A1 fica `[x]`.
 
 ### Depois do A1 — a mesa com o mouse e o teclado

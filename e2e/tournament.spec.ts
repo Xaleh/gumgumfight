@@ -7,7 +7,7 @@ import { openHome } from './support/app';
 import { expect, test } from './support/fixtures';
 import { label, t } from './support/i18n';
 import { concede, expectResult, playToFirstTurn } from './support/online';
-import { createTournament, inviteUrl, markReady, register } from './support/tournament';
+import { createTournament, inviteUrl, markReady, openLobbyChat, register } from './support/tournament';
 
 test('torneio suíço: criar, inscrever, jogar a rodada e encerrar @iphone', async ({ page: organizer, newPlayer }) => {
   test.setTimeout(3 * 60_000);
@@ -75,4 +75,73 @@ test('inscrição pelo link de convite no celular @iphone', async ({ page: organ
   await expect(player.getByText('Luffy Roxo/Vermelho (ST10)').first()).toBeVisible();
   await organizer.goto(inviteUrl(id));
   await expect(organizer.getByRole('button', { name: label('tour.tabPlayers', { n: 1 }), exact: true })).toBeVisible();
+});
+
+test('chat do lobby: inscrito e organizador conversam, o visitante só lê e o organizador apaga @iphone', async ({ page: organizer, newPlayer }) => {
+  const ana = await newPlayer();
+  const visitor = await newPlayer();
+  await login(organizer, 'Org Chat', 'organizer');
+  await login(ana, 'Ana Chat');
+  await openHome(organizer);
+  const id = await createTournament(organizer, `Torneio Chat ${Date.now()}`);
+  await register(ana, id, 'Luffy Roxo/Vermelho (ST10)');
+
+  const send = async (chat: Awaited<ReturnType<typeof openLobbyChat>>, text: string) => {
+    await chat.getByLabel(label('lobbyChat.messageLabel'), { exact: true }).fill(text);
+    await chat.getByRole('button', { name: label('online.send'), exact: true }).click();
+    // Quem manda vê a mensagem na hora (a resposta do envio já traz a conversa).
+    await expect(chat.locator('.lobby-chat-msg.mine').filter({ hasText: text })).toBeVisible();
+  };
+
+  // A inscrita escreve; o organizador, que abre o lobby depois, encontra a mensagem e responde.
+  const anaChat = await openLobbyChat(ana, id);
+  await expect(anaChat.getByText(label('lobbyChat.empty'), { exact: true })).toBeVisible();
+  await send(anaChat, 'Oi, que horas começa?');
+  const orgChat = await openLobbyChat(organizer, id);
+  await expect(orgChat.locator('.lobby-chat-msg').filter({ hasText: 'Oi, que horas começa?' })).toBeVisible();
+  await send(orgChat, 'Em dez minutos!');
+  // A resposta chega para ela sozinha (o lobby consulta o chat de poucos em poucos segundos), com o papel de quem escreveu.
+  const reply = anaChat.locator('.lobby-chat-msg').filter({ hasText: 'Em dez minutos!' });
+  await expect(reply).toBeVisible();
+  await expect(reply.locator('.lobby-chat-role')).toHaveText(label('tour.interventionRole.organizer'));
+
+  // Quem não tem conta lê a conversa e não tem onde escrever.
+  const visitorChat = await openLobbyChat(visitor, id);
+  await expect(visitorChat.locator('.lobby-chat-msg')).toHaveCount(2);
+  await expect(visitorChat.getByText(label('lobbyChat.loginHint'), { exact: true })).toBeVisible();
+  await expect(visitorChat.getByLabel(label('lobbyChat.messageLabel'), { exact: true })).toHaveCount(0);
+
+  // A inscrita só apaga a própria mensagem; o organizador apaga a dela, e ela some para todos.
+  await expect(anaChat.getByRole('button', { name: label('lobbyChat.remove'), exact: true })).toHaveCount(1);
+  organizer.once('dialog', (d) => d.accept());
+  await orgChat.locator('.lobby-chat-msg').filter({ hasText: 'Oi, que horas começa?' }).getByRole('button', { name: label('lobbyChat.remove'), exact: true }).click();
+  for (const chat of [orgChat, anaChat, visitorChat]) {
+    await expect(chat.locator('.lobby-chat-msg')).toHaveCount(1);
+    await expect(chat.locator('.lobby-chat-msg')).toContainText('Em dez minutos!');
+  }
+});
+
+test('chat do lobby no celular: a barra de baixo conta as mensagens que chegam com ele fechado @iphone', async ({ page: organizer, newPlayer }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'na tela larga o chat é uma coluna sempre aberta');
+  const ana = await newPlayer();
+  await login(organizer, 'Org Barra', 'organizer');
+  await login(ana, 'Ana Barra');
+  await openHome(organizer);
+  const id = await createTournament(organizer, `Torneio Barra ${Date.now()}`);
+  await register(ana, id, 'Luffy Roxo/Vermelho (ST10)');
+
+  await ana.goto(`${inviteUrl(id)}&lobby=1`);
+  const bar = ana.getByRole('complementary', { name: label('lobbyChat.title'), exact: true }).getByRole('button', { name: label('lobbyChat.title') });
+  await expect(bar).toContainText(label('lobbyChat.empty'));
+  const orgChat = await openLobbyChat(organizer, id);
+  await orgChat.getByLabel(label('lobbyChat.messageLabel'), { exact: true }).fill('Check-in aberto!');
+  await orgChat.getByRole('button', { name: label('online.send'), exact: true }).click();
+  // A barra mostra a última mensagem e quantas chegaram; abrir a conversa zera a contagem.
+  await expect(bar).toContainText('Check-in aberto!');
+  await expect(ana.getByLabel(label('lobbyChat.unread', { n: 1 }), { exact: true })).toHaveText('1');
+  await bar.click();
+  await expect(ana.locator('.lobby-chat-msg')).toContainText('Check-in aberto!');
+  await ana.getByRole('button', { name: label('online.closeChatLabel'), exact: true }).click();
+  await expect(bar).toBeVisible();
+  await expect(ana.locator('.lobby-chat-badge')).toHaveCount(0);
 });

@@ -6,6 +6,20 @@ import { label } from './i18n';
 /** O link de convite do torneio (o mesmo que "Copiar convite" põe na área de transferência). */
 export const inviteUrl = (id: string) => `/?torneio=${encodeURIComponent(id)}`;
 
+/**
+ * Abre o lobby do torneio (o link do aviso de chamado de Judge) com o chat à vista: na tela larga ele
+ * é a coluna ao lado; na estreita, a barra de baixo, que este passo abre. Devolve o painel do chat.
+ */
+export async function openLobbyChat(page: Page, id: string) {
+  await page.goto(`${inviteUrl(id)}&lobby=1`);
+  const chat = page.getByRole('complementary', { name: label('lobbyChat.title'), exact: true });
+  await expect(chat).toBeVisible();
+  const bar = chat.getByRole('button', { name: label('lobbyChat.title') });
+  if (await bar.isVisible()) await bar.click();
+  await expect(chat.locator('.lobby-chat-log')).toBeVisible();
+  return chat;
+}
+
 /** Menu → Torneios → Criar torneio (suíço, Standard, sem data: o organizador começa à mão). Devolve o id. */
 export async function createTournament(page: Page, name: string): Promise<string> {
   await page.getByRole('button', { name: label('menu.navTournaments'), exact: true }).first().click();
