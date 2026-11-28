@@ -202,6 +202,11 @@ function DailyPanel({
   useEffect(() => {
     if (status !== 'playing') setCollapsed(false);
   }, [status]);
+  // Tentativa nova no celular: o painel volta a ser a barra, com a mesa inteira à vista.
+  const retry = () => {
+    onRetry();
+    if (!window.matchMedia('(min-width: 1000px)').matches) setCollapsed(true);
+  };
 
   const share = async () => {
     const text = dailyShareText(t, data, result, streak, location.origin);
@@ -280,7 +285,7 @@ function DailyPanel({
       {status === 'failed' && (
         <div className="coach-fail" role="alert">
           <p>{t(FAILED[goal])}</p>
-          <button type="button" className="btn primary" onClick={onRetry}>
+          <button type="button" className="btn primary" onClick={retry}>
             {t('daily.retry')}
           </button>
         </div>
@@ -307,7 +312,7 @@ function DailyPanel({
           {t('daily.exit')}
         </button>
         {status === 'solved' && (
-          <button type="button" className="btn" onClick={onRetry}>
+          <button type="button" className="btn" onClick={retry}>
             {t('daily.playAgain')}
           </button>
         )}

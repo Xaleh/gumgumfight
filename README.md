@@ -1376,7 +1376,9 @@ sequência e os quadradinhos dos últimos dias (✅/⬛), sem nada das jogadas.
 
 No computador o painel do desafio fica ao lado da mesa. No celular ele fica em cima: recolhido (como começa), é uma
 barra com o número, a dificuldade, o objetivo e de quem é a vez, e a mesa encolhe para caber inteira abaixo dela (a
-mão, o Líder e o deck do oponente ficam à vista); aberto pela seta, mostra o enunciado por cima da mesa.
+mão, o Líder e o deck do oponente ficam à vista); aberto pela seta, mostra o enunciado por cima da mesa. Ele abre
+sozinho quando a tentativa termina e volta a ser a barra em **Tentar de novo**. O painel de **Gravar jogando** do
+editor de desafios funciona do mesmo jeito.
 
 A fila é o catálogo em código (`apps/server/src/daily/catalog.ts`, a semente) seguido dos desafios montados na
 Administração. Cada dia publicado recebe o próximo ainda não usado e, depois de usar todos, recomeça pelo publicado há

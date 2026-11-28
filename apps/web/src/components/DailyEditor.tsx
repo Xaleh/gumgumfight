@@ -785,6 +785,9 @@ function Recorder({
   const actionsRef = useRef<Action[]>([]);
   const [run, setRun] = useState(() => runChallenge(start, spec, []));
   const [error, setError] = useState<string | null>(null);
+  // No celular o painel flutua sobre a mesa: começa recolhido, numa barra só, e a mesa cabe abaixo dela (`reserve`,
+  // como no desafio do dia). Abre sozinho quando há o que fazer nele: a tentativa acabou ou o salvar pede atenção.
+  const [collapsed, setCollapsed] = useState(() => !window.matchMedia('(min-width: 1000px)').matches);
 
   // O oponente responde pelas regras do desafio: refazer do começo dá a mesma mesa que o servidor vai montar.
   const replay = useCallback(
@@ -810,6 +813,9 @@ function Recorder({
     [replay, onBack, run.status],
   );
   const status: ChallengeStatus = run.status;
+  useEffect(() => {
+    if (status !== 'playing' || manual !== null || saveError) setCollapsed(false);
+  }, [status, manual, saveError]);
   const game: TableGame = {
     state: run.state,
     dispatch,
@@ -828,7 +834,7 @@ function Recorder({
     downloadReplay: noop,
   };
   const panel = (
-    <div className="coach daily-panel" role="region" aria-label={t('daily.admin.record')}>
+    <div className={['coach', 'daily-panel', collapsed ? 'collapsed' : ''].join(' ')} role="region" aria-label={t('daily.admin.record')}>
       <div className="coach-head">
         <span className="coach-avatar" aria-hidden="true">
           <Icon name="flask" size={22} />
@@ -836,6 +842,9 @@ function Recorder({
         <div className="coach-head-text">
           <span className="coach-kicker">{t('daily.admin.record')}</span>
         </div>
+        <button type="button" className="coach-collapse" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed} aria-label={t('tutorial.collapse')}>
+          <Icon name="chevron" size={16} />
+        </button>
       </div>
       <h3 className="coach-title">{t(GOAL[spec.goal])}</h3>
       <p className="coach-body small">{t('daily.admin.recordHint')}</p>
@@ -850,7 +859,15 @@ function Recorder({
         <button type="button" className="btn small" disabled={status !== 'failed'} onClick={() => onRecord('wrong', actionsRef.current)}>
           {t('daily.admin.useWrong')}
         </button>
-        <button type="button" className="btn small" onClick={() => replay([])}>
+        <button
+          type="button"
+          className="btn small"
+          onClick={() => {
+            replay([]);
+            // Tentativa nova no celular: o painel volta a ser a barra, com a mesa inteira à vista.
+            if (!window.matchMedia('(min-width: 1000px)').matches) setCollapsed(true);
+          }}
+        >
           {t('daily.retry')}
         </button>
       </div>
@@ -878,5 +895,5 @@ function Recorder({
       </div>
     </div>
   );
-  return <LessonTable game={game} onExit={onBack} tutorial={{ coach: panel, floatAt: 'top', exitLabel: t('daily.admin.backToBoard') }} />;
+  return <LessonTable game={game} onExit={onBack} tutorial={{ coach: panel, floatAt: 'top', reserve: true, exitLabel: t('daily.admin.backToBoard') }} />;
 }

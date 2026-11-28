@@ -158,6 +158,9 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   recolhido, numa barra, e a mesa (a coluna, a faixa de cima e o Líder do oponente) começa abaixo dela. Aberto pela
   seta, o painel fica por cima sem mudar o tamanho da mesa; recolhido de novo, volta a caber acima dela. Entrou em
   28/11/2026, quando o painel recolhido cobria a mão, o Líder e o deck do oponente.
+- `daily.spec.ts`, editor de desafios (`@iphone`): uma conta de admin abre **Administração › Desafio do dia**,
+  duplica o primeiro desafio e vai para a mesa gravar. O painel de "Gravar jogando" começa recolhido, com a mesa
+  abaixo dele; aberto, mostra os botões de gravar; **Tentar de novo** devolve a barra.
 
 ### Depois do A1 — a mesa do Yonko
 
