@@ -1374,6 +1374,10 @@ conta, e depois de resolver o resultado do dia não muda (dá para jogar de novo
 seguidos**, o recorde e os últimos dias. **Compartilhar** gera um texto com o número do desafio, as tentativas, a
 sequência e os quadradinhos dos últimos dias (✅/⬛), sem nada das jogadas.
 
+No computador o painel do desafio fica ao lado da mesa. No celular ele fica em cima: recolhido (como começa), é uma
+barra com o número, a dificuldade, o objetivo e de quem é a vez, e a mesa encolhe para caber inteira abaixo dela (a
+mão, o Líder e o deck do oponente ficam à vista); aberto pela seta, mostra o enunciado por cima da mesa.
+
 A fila é o catálogo em código (`apps/server/src/daily/catalog.ts`, a semente) seguido dos desafios montados na
 Administração. Cada dia publicado recebe o próximo ainda não usado e, depois de usar todos, recomeça pelo publicado há
 mais tempo.
@@ -1825,7 +1829,8 @@ partida é jogada na sala do torneio, o resultado entra sozinho e o torneio term
 é testada com o mouse e o teclado (`e2e/table.spec.ts`): arrastar um DON!! até o Líder e de volta, segurar o clique numa
 carta, reordenar a mão, arrastar uma carta para o campo, atacar arrastando o Líder e os atalhos de teclado. O gibi das
 lições sem mesa do tutorial também (`e2e/tutorial.spec.ts`): virar a página pelo botão e puxando a ponta. E a tela
-virando como página ao entrar e sair das seções do menu (`e2e/screen-turn.spec.ts`). As
+virando como página ao entrar e sair das seções do menu (`e2e/screen-turn.spec.ts`). E o painel do desafio do dia no
+celular, que recolhido não cobre o lado do oponente (`e2e/daily.spec.ts`). As
 contas de teste são criadas direto no banco temporário, com as funções do servidor (`e2e/support/account-cli.ts`): não
 há rota de login de teste. Os testes marcados com `@iphone` rodam também no iPhone 13 com o WebKit, o motor do Safari
 (onde os boosters abertos já saíram do lugar), entre eles a inscrição num torneio pelo celular.

@@ -164,7 +164,7 @@ function DailyRun({ data, start, onExit, onReload }: { data: DailyToday; start: 
       onExit={onExit}
     />
   );
-  return <LessonTable game={game} onExit={onExit} tutorial={{ coach: panel, hidePrompt: status !== 'playing', floatAt: 'top', exitLabel: t('daily.exit') }} />;
+  return <LessonTable game={game} onExit={onExit} tutorial={{ coach: panel, hidePrompt: status !== 'playing', floatAt: 'top', reserve: true, exitLabel: t('daily.exit') }} />;
 }
 
 function DailyPanel({
@@ -191,7 +191,8 @@ function DailyPanel({
   onExit: () => void;
 }) {
   const t = useT();
-  // No celular o painel flutua sobre a mesa: começa recolhido (o objetivo e de quem é a vez) para não cobrir as cartas.
+  // No celular o painel flutua sobre a mesa: começa recolhido, numa barra só (o objetivo e de quem é a vez), e a mesa
+  // se ajusta para caber abaixo dela (`reserve`): nada do lado do oponente fica coberto.
   const [collapsed, setCollapsed] = useState(() => !window.matchMedia('(min-width: 1000px)').matches);
   const [shared, setShared] = useState(false);
   const { goal } = data.challenge;

@@ -18,7 +18,7 @@ import {
   type PlayerId,
   zoneOf,
 } from '@gumgum/engine';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, isAdmin, isTeam, type LiveRoom, type RoomDecks, seesHands } from '../../api';
 import { BotReport } from '../BotFeedback';
 import { CoachPanel } from '../CoachPanel';
@@ -681,6 +681,28 @@ export function Table({
 
   const gameRef = useRef<HTMLDivElement>(null);
   /**
+   * Celular, com `tutorial.reserve`: a mesa guarda em cima o espaço do treinador recolhido (`--coach-reserve`, a
+   * altura dele) e a coluna encolhe (o useBoardSize refaz o tamanho das cartas). Aberto, o treinador fica por cima
+   * e a medida do recolhido continua valendo.
+   */
+  const coachFloat = useRef<HTMLDivElement>(null);
+  const reserveCoach = Boolean(tutorial?.reserve) && (tutorial?.floatAt ?? 'top') === 'top' && !wide;
+  useLayoutEffect(() => {
+    const el = coachFloat.current;
+    const root = gameRef.current;
+    if (!reserveCoach || !el || !root) return;
+    const measure = () => {
+      if (el.querySelector('.coach.collapsed')) root.style.setProperty('--coach-reserve', `${el.offsetHeight}px`);
+    };
+    measure();
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+      root.style.removeProperty('--coach-reserve');
+    };
+  }, [reserveCoach]);
+  /**
    * Janelas por cima da mesa com as próprias teclas (o menu, o histórico, o resumo do fim, o relato, a carta
    * ampliada do histórico, as cartas reveladas…): enquanto uma delas está aberta, os atalhos não valem. Com a
    * pesquisa do histórico (a lupa) aberta também não, mesmo com o foco fora do campo.
@@ -873,6 +895,7 @@ export function Table({
         drag ? 'dragging' : '',
         replay ? 'replaying' : '',
         tutorial ? 'lesson' : '',
+        reserveCoach ? 'coach-reserve' : '',
         broadcast ? 'broadcast' : '',
         streamer ? 'streamer' : '',
         lateral ? `lateral playmat-${streamerPlaymat}` : '',
@@ -1190,7 +1213,11 @@ export function Table({
 
         {tutorial?.overlay}
         {kind === 'bot' && !replay && !tutorial && coachTips && human !== null && !intro && !zoom && !logCard && !sheet && <CoachTipPill state={state} human={human} />}
-        {tutorial && !wide && <div className={['coach-float', tutorial.floatAt ?? 'top'].join(' ')}>{tutorial.coach}</div>}
+        {tutorial && !wide && (
+          <div className={['coach-float', tutorial.floatAt ?? 'top'].join(' ')} ref={coachFloat}>
+            {tutorial.coach}
+          </div>
+        )}
 
         {state.phase === 'gameover' && showResult && !tutorial && (
           <GameResult

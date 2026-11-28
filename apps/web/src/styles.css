@@ -11352,6 +11352,25 @@ html[lang='ja'] body {
   font-size: 14px;
   line-height: 1.45;
 }
+/*
+ * `tutorial.reserve` (desafio do dia): a mesa começa abaixo do treinador recolhido, que não cobre mais a mão, o
+ * Líder e o deck do oponente. A altura dele (`--coach-reserve`) vem do Table.tsx. O treinador é fixo em relação à
+ * coluna da mesa (o `contain` dela), que desceu: o `top` negativo o devolve ao alto da tela.
+ */
+.game.coach-reserve {
+  --coach-top: max(8px, env(safe-area-inset-top));
+  --coach-gap: 6px;
+}
+.game.coach-reserve .board-col {
+  margin-top: calc(var(--coach-top) + var(--coach-reserve, 52px) + var(--coach-gap));
+}
+.game.coach-reserve .coach-float.top {
+  top: calc(-1 * (var(--coach-reserve, 52px) + var(--coach-gap)));
+  max-height: 46dvh;
+}
+.game.coach-reserve .mat {
+  padding-top: 0;
+}
 
 /* destaques na mesa */
 .spotlight {
@@ -22853,6 +22872,73 @@ div.dk-tile-main {
   font-size: 13px;
   font-weight: 900;
   color: var(--amber-text);
+}
+/*
+ * Celular, painel recolhido: uma barra só (estrela, número e nível, objetivo, de quem é a vez, abrir). A mesa
+ * reserva a altura dela (`.game.coach-reserve`), então quanto mais baixa, maiores as cartas.
+ */
+.coach-float .daily-panel.collapsed {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'ico kicker do toggle'
+    'ico title do toggle';
+  align-items: center;
+  gap: 1px 8px;
+  padding: 6px 10px;
+}
+.coach-float .daily-panel.collapsed .coach-head {
+  display: contents;
+}
+.coach-float .daily-panel.collapsed .coach-avatar {
+  grid-area: ico;
+  width: 32px;
+  height: 32px;
+}
+.coach-float .daily-panel.collapsed .coach-avatar svg {
+  width: 18px;
+  height: 18px;
+}
+.coach-float .daily-panel.collapsed .coach-head-text {
+  grid-area: kicker;
+  align-self: end;
+}
+.coach-float .daily-panel.collapsed .coach-kicker {
+  font-size: 10px;
+  letter-spacing: 0.8px;
+}
+.coach-float .daily-panel.collapsed .daily-streak {
+  display: none;
+}
+.coach-float .daily-panel.collapsed .coach-title {
+  grid-area: title;
+  align-self: start;
+  margin: 0;
+  font-size: 18px;
+}
+/* De quem é a vez vira só o ícone (o texto continua para o leitor de tela; a faixa do meio da mesa já diz o resto). */
+.coach-float .daily-panel.collapsed .coach-do {
+  grid-area: do;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+}
+.coach-float .daily-panel.collapsed .coach-do span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.coach-float .daily-panel.collapsed .coach-collapse {
+  grid-area: toggle;
+}
+.coach-float .daily-panel.collapsed .coach-fail {
+  grid-column: 1 / -1;
+  margin-top: 6px;
 }
 .daily-attacks {
   margin: 0;

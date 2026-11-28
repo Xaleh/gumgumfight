@@ -152,6 +152,13 @@ tentativa de 4 jobs seguidos (e nas duas num deles, que ficou vermelho).
   rodapé (Estatísticas, Torneios, Montar decks, com o menu rolado até o fim) também viram, e entrar numa partida não.
   Com as animações suaves e com as desligadas, nenhuma camada é criada.
 
+### Depois do A1 — o desafio do dia no celular
+
+- `daily.spec.ts` (`@iphone`, pulado no `desktop`, onde o painel fica ao lado): abre `/?desafio`; o painel começa
+  recolhido, numa barra, e a mesa (a coluna, a faixa de cima e o Líder do oponente) começa abaixo dela. Aberto pela
+  seta, o painel fica por cima sem mudar o tamanho da mesa; recolhido de novo, volta a caber acima dela. Entrou em
+  28/11/2026, quando o painel recolhido cobria a mão, o Líder e o deck do oponente.
+
 ### Depois do A1 — a mesa do Yonko
 
 - `yonko.spec.ts` (`@iphone`): a mesa local do Yonko, da tela inicial ao primeiro turno de quem joga. A preparação

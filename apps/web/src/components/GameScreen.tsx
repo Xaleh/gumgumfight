@@ -363,6 +363,11 @@ export interface TableTutorial {
   hidePrompt?: boolean;
   /** Celular: o treinador flutua em cima ou embaixo (longe das áreas destacadas). */
   floatAt?: 'top' | 'bottom';
+  /**
+   * Celular: a mesa encolhe para caber abaixo do treinador recolhido (`.coach.collapsed`), que assim não cobre o
+   * lado do oponente; aberto, ele fica por cima. Só vale com o treinador em cima.
+   */
+  reserve?: boolean;
   /** Texto do botão de sair (padrão: "Sair da lição"). */
   exitLabel?: string;
 }
